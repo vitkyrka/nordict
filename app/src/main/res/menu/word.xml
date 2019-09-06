@@ -1,0 +1,17 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <item
+        android:id="@+id/menu_star"
+        android:icon="@android:drawable/btn_star_big_on"
+        app:showAsAction="never"
+        android:visible="true"
+        android:title="@string/add_bookmark" />
+
+    <item
+        android:id="@+id/menu_share"
+        android:title="@string/menu_share"
+        app:showAsAction="ifRoom"
+        android:visible="true" />
+
+</menu>

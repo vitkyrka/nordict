@@ -1,0 +1,228 @@
+package se.whitchurch.nordict
+
+import android.annotation.SuppressLint
+import android.app.SearchManager
+import android.app.TaskStackBuilder
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.SharedPreferences
+import android.net.ConnectivityManager
+import android.net.Uri
+import android.util.LruCache
+import android.util.Pair
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SearchView
+import androidx.core.app.NavUtils
+import okhttp3.Cache
+import okhttp3.CacheControl
+import okhttp3.OkHttpClient
+import java.util.concurrent.TimeUnit
+
+class Ordboken private constructor(context: Context) {
+    private val mConnMgr: ConnectivityManager
+    val mPrefs: SharedPreferences
+    var images = ArrayList<String>()
+    var currentWord: Word? = null
+    var lastWhere: Where? = null
+        private set
+    var lastWhat: String? = null
+        private set
+    val client: OkHttpClient
+    var currentCss: String = ""
+    lateinit var currentDictionary: Dictionary
+    var currentFlag: Int = R.drawable.flag_se
+    private var currentIndex = 0
+    private var dictionaries: Array<Dictionary>
+    lateinit var dictMap: Map<String, Dictionary>
+    private var flags: Array<Int>
+    private val mCache: LruCache<Uri, Word> = LruCache(25)
+    private val mSearchResultCache: LruCache<Pair<String, Int>, List<SearchResult>> = LruCache(25)
+
+    val isOnline: Boolean
+        get() {
+            val networkInfo = mConnMgr.activeNetworkInfo
+            return networkInfo != null && networkInfo.isConnected
+        }
+
+    // Caller does the commit
+    val prefsEditor: SharedPreferences.Editor
+        @SuppressLint("CommitPrefEdits")
+        get() {
+            val ed = mPrefs.edit()
+
+            ed.putString("lastWhere", lastWhere!!.toString())
+            ed.putString("lastWhat", lastWhat)
+
+            return ed
+        }
+
+    enum class Where {
+        MAIN, WORD
+    }
+
+    init {
+        val cache = Cache(context.cacheDir, (50 * 1024 * 1024).toLong())
+        client = OkHttpClient.Builder()
+                .cache(cache)
+                .addInterceptor {
+                    var request = it.request()
+
+                    if (isOnline) {
+                        request = request.newBuilder().header("Cache-Control", "public, max-age=86400, max-stale=86400").build()
+                    } else {
+                        request = request.newBuilder()
+                                .cacheControl(CacheControl.FORCE_CACHE).build()
+                    }
+
+                    it.proceed(request)
+                }
+                .readTimeout(120, TimeUnit.SECONDS)
+                .build()
+
+        mPrefs = context.getSharedPreferences("ordboken", Context.MODE_PRIVATE)
+        lastWhere = Where.valueOf(mPrefs.getString("lastWhere", Where.MAIN.toString()))
+        lastWhat = mPrefs.getString("lastWhat", "ordbok")
+        mConnMgr = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+
+        val so = SoDictionary(client)
+        so.init()
+
+        val ddo = DdoDictionary(client)
+        ddo.init()
+
+        dictionaries = arrayOf(so, ddo)
+        flags = arrayOf(R.drawable.flag_se, R.drawable.flag_dk)
+
+        currentIndex = 0
+        currentDictionary = so
+        currentFlag = R.drawable.flag_se
+
+        dictMap = mapOf(so.tag to so, ddo.tag to ddo)
+    }
+
+    fun getWord(uri: Uri): Word? {
+        val word = mCache.get(uri)
+        if (word != null) return word
+
+        for (dict in dictionaries) {
+            dict.get(uri)?.let {
+                mCache.put(uri, it)
+                return it
+            }
+        }
+
+        return null
+    }
+
+    fun search(query: String, count: Int): List<SearchResult> {
+        val key = Pair.create(query, currentIndex)
+        var results: List<SearchResult>?
+
+        results = mSearchResultCache.get(key)
+        if (results == null) {
+            results = currentDictionary.search(query)
+            mSearchResultCache.put(key, results)
+        }
+
+        return results
+    }
+
+    fun initSearchView(activity: AppCompatActivity, menu: Menu, query: String?, focus: Boolean): SearchView {
+        val searchManager = activity
+                .getSystemService(Context.SEARCH_SERVICE) as SearchManager
+        val searchView = activity.findViewById<View>(R.id.mySearchView) as SearchView
+
+        searchView.setSearchableInfo(searchManager.getSearchableInfo(ComponentName(activity,
+                MainActivity::class.java)))
+
+        // Hack to get the magnifying glass icon inside the EditText
+        searchView.setIconifiedByDefault(true)
+        searchView.isIconified = false
+
+        // Hack to get rid of the collapse button
+        searchView.onActionViewExpanded()
+
+        if (!focus) {
+            searchView.clearFocus()
+        }
+
+        // searchView.setSubmitButtonEnabled(true);
+        searchView.isQueryRefinementEnabled = true
+
+        if (query != null) {
+            searchView.setQuery(query, false)
+        }
+
+        val dictItem = menu.findItem(R.id.dictionary_button)
+
+        dictItem.setIcon(flags[currentIndex])
+
+        dictItem.setOnMenuItemClickListener {
+            val index = (currentIndex + 1) % dictionaries.size
+
+            currentIndex = index
+            currentDictionary = dictionaries[index]
+            currentFlag = flags[index].also {
+                dictItem.setIcon(it)
+            }
+
+            false
+        }
+
+        return searchView
+    }
+
+    fun onOptionsItemSelected(activity: AppCompatActivity, item: MenuItem): Boolean {
+        if (item.itemId == android.R.id.home) {
+            val upIntent = NavUtils.getParentActivityIntent(activity)
+            if (NavUtils.shouldUpRecreateTask(activity, upIntent!!)) {
+                TaskStackBuilder.create(activity)
+                        .addNextIntentWithParentStack(upIntent)
+                        .startActivities()
+            } else {
+                NavUtils.navigateUpFromSameTask(activity)
+            }
+            return true
+        }
+
+        return false
+    }
+
+    fun setLastView(where: Where, what: String) {
+        lastWhere = where
+        lastWhat = what
+    }
+
+    companion object {
+        private var sInstance: Ordboken? = null
+
+        fun getInstance(context: Context): Ordboken {
+            var instance = sInstance
+            if (instance == null) {
+                instance = Ordboken(context)
+                sInstance = instance
+            }
+
+            return instance
+        }
+
+        fun startWordActivity(activity: AppCompatActivity, word: String, uri: Uri) {
+            val intent = Intent(activity, WordActivity::class.java).apply {
+                data = uri
+                flags = Intent.FLAG_ACTIVITY_NO_ANIMATION
+                putExtra("title", word)
+            }
+
+            activity.startActivity(intent)
+        }
+
+        fun startWordActivity(activity: AppCompatActivity, word: String, url: String) {
+            startWordActivity(activity, word, Uri.parse(url))
+        }
+    }
+}

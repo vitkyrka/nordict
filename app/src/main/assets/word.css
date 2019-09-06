@@ -1,0 +1,37 @@
+.popup {
+    display: none !important;
+}
+
+a.normal {
+    text-decoration: inherit !important;
+    color: inherit !important;
+    cursor: default !important;
+}
+
+#content.neuter {
+    background: #efe;
+}
+
+.match.neuter {
+    color: green;
+}
+
+.match.neuter:before {
+    content: "(et) ";
+}
+
+.tryck {
+    visibility: hidden;
+}
+
+.lemma.neuter {
+    background: #efe;
+}
+
+.lemma.neuter .grundform {
+    color: green;
+}
+
+.lemma.neuter .grundform:before {
+    content: "(ett) ";
+}

@@ -1,0 +1,10 @@
+local.properties
+bin/
+gen/
+build/
+*.swp
+*.swo
+.cache
+*.class
+.settings
+.gradle
