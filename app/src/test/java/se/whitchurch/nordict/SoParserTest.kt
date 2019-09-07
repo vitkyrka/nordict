@@ -1,5 +1,6 @@
 package se.whitchurch.nordict
 
+import android.net.Uri
 import com.google.common.truth.Truth.assertThat
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -30,7 +31,7 @@ class SoParserTest {
         assertThat(words).hasSize(1)
         val word = words[0]
 
-        assertThat(word.uri).isEqualTo("https://svenska.se/so/?id=33534&ref=lnr246130")
+        assertThat(word.uri).isEqualTo(Uri.parse("https://svenska.se/so/?id=33534&ref=lnr246130"))
 
         assertThat(word.mTitle).isEqualTo("mjugg")
 
@@ -51,7 +52,7 @@ class SoParserTest {
         assertThat(words).hasSize(1)
         val word = words[0]
 
-        assertThat(word.uri).isEqualTo("https://svenska.se/so/?id=18788&ref=lnr176698")
+        assertThat(word.uri).isEqualTo(Uri.parse("https://svenska.se/so/?id=18788&ref=lnr176698"))
 
         assertThat(word.mTitle).isEqualTo("gård")
 
