@@ -42,6 +42,57 @@ class SoParser {
             } else {
                 "n"
             }
+
+            // Highlight the plural for common gender but the definite form singular for neuter
+            // nouns, to help in applying the technique described in https://bit.ly/EN-ETT-in-Swedish.
+            lemma.selectFirst("span.bojning")?.let {
+                var html = it.html()
+                val parts = it.text().split("[ ,]".toRegex())
+                var plural: String = ""
+                var addPlural: Boolean = false
+
+                if (ngenus < 0 && neutr < 0) {
+                    if (parts.size == 2) {
+                        plural = parts[1]
+                        addPlural = true
+                    } else if (parts.size > 2 && parts[1] !in arrayOf("", "äv.", "el.", "plur.")) {
+                        plural = parts[1]
+                        addPlural = true
+                    } else if (parts.size > 2) {
+                        for ((i, word) in parts.withIndex()) {
+                            if (word == "plur.") {
+                                plural = parts[i + 1]
+                                break
+                            }
+                        }
+                    }
+                }
+
+                if (plural.isNotEmpty()) {
+                    if (addPlural) {
+                        html = html.replaceFirst(plural, "<span class=\"tempmm\">plur.</span> $plural")
+                    }
+
+                    if (headword.gender == "n") {
+                        html = html.replaceFirst("<span class=\"tempmm\">plur.</span> $plural",
+                                "<span class=\"tempmm\">plur.</span> <strong>$plural</strong>")
+                    }
+                }
+
+                if (headword.gender == "t") {
+                    html = html.replace(parts[0], "<strong>${parts[0]}</strong>")
+
+                    if (plural.isNotEmpty()) {
+                        // Third declension neuter nouns
+                        if (!headword.mTitle.endsWith("er") && plural.endsWith("er")) {
+                            html = html.replaceFirst("<span class=\"tempmm\">plur.</span> $plural",
+                                    "<span class=\"tempmm\">plur.</span> <strong>$plural</strong>")
+                        }
+                    }
+                }
+
+                it.html(html)
+            }
         }
 
         fun parse(page: String, tag: String = "foo"): List<Word> {

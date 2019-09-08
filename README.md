@@ -53,6 +53,11 @@ It builds upon ideas previously implemented in
   forms are replaced with the word which they represent.  The idea is that
   seeing the forms fully spelled out will help in remembering them.
 
+* **Gender memorization aids (SO).**  The headword in neuter nouns is prefixed
+  with the indefinite article, and different declined forms are highlighted in
+  neuter and common gender nouns, in order to aid in applying [the techniques
+  described by Olle Kjellin](https://bit.ly/EN-ETT-in-Swedish).
+
 ## License
 
 See [LICENSE](LICENSE).

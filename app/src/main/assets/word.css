@@ -32,6 +32,10 @@ a.normal {
     color: green;
 }
 
+.lemma.neuter .bojning strong {
+    color: green;
+}
+
 .lemma.neuter .grundform:before {
     content: "(ett) ";
 }
