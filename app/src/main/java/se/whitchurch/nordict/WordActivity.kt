@@ -21,6 +21,7 @@ import androidx.appcompat.app.ActionBar
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.test.espresso.idling.CountingIdlingResource
+import com.google.android.material.bottomappbar.BottomAppBar
 import se.whitchurch.nordict.OrdbokenContract.FavoritesEntry
 import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
 import java.io.StringReader
@@ -57,6 +58,18 @@ class WordActivity : AppCompatActivity() {
         actionBar!!.displayOptions = (ActionBar.DISPLAY_SHOW_CUSTOM or ActionBar.DISPLAY_SHOW_HOME
                 or ActionBar.DISPLAY_HOME_AS_UP)
         actionBar.setCustomView(R.layout.actionbar)
+
+        val bottomBar = findViewById<BottomAppBar>(R.id.bottom_app_bar)
+        bottomBar.replaceMenu(R.menu.bottom_word)
+        bottomBar.setOnMenuItemClickListener {
+            when (it.itemId) {
+                R.id.menu_share -> {
+                    share()
+                    true
+                }
+                else -> false
+            }
+        }
 
         mWebView = findViewById<View>(R.id.webView) as WebView
         mWebView!!.webChromeClient = WebChromeClient()
@@ -477,9 +490,6 @@ class WordActivity : AppCompatActivity() {
 
         if (item.itemId == R.id.menu_star) {
             StarToggleTask().execute()
-        } else if (item.itemId == R.id.menu_share) {
-            share()
-            return true
         }
 
         return super.onOptionsItemSelected(item)

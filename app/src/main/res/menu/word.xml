@@ -8,10 +8,4 @@
         android:visible="true"
         android:title="@string/add_bookmark" />
 
-    <item
-        android:id="@+id/menu_share"
-        android:title="@string/menu_share"
-        app:showAsAction="ifRoom"
-        android:visible="true" />
-
 </menu>

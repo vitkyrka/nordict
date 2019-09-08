@@ -1,4 +1,4 @@
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.coordinatorlayout.widget.CoordinatorLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -66,4 +66,15 @@
 
     </LinearLayout>
 
-</FrameLayout>
+    <com.google.android.material.bottomappbar.BottomAppBar
+        android:id="@+id/bottom_app_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        app:backgroundTint="@color/design_default_color_primary"
+        style="@style/Widget.MaterialComponents.BottomAppBar"
+        app:hideOnScroll="true"
+        app:layout_scrollFlags="scroll|enterAlways"
+        />
+
+</androidx.coordinatorlayout.widget.CoordinatorLayout>
