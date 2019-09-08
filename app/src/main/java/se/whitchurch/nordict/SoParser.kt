@@ -75,6 +75,8 @@ class SoParser {
                 }
 
                 lemma.select("span.bojning").first()?.let {
+                    it.html(it.html().replace("~", word))
+
                     val text = it.text()
 
                     // ingen böjning
