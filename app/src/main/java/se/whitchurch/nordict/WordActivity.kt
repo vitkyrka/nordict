@@ -2,6 +2,7 @@ package se.whitchurch.nordict
 
 import android.annotation.SuppressLint
 import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.database.sqlite.SQLiteDatabase
 import android.graphics.Typeface
@@ -43,6 +44,7 @@ class WordActivity : AppCompatActivity() {
     private var mStarred: Boolean = false
     private var mGotStarred: Boolean = false
     private var mPageFinished: Boolean = false
+    private var autoPlay: Boolean = false
     private var mId: Int? = 0
 
     @SuppressLint("AddJavascriptInterface")
@@ -61,10 +63,34 @@ class WordActivity : AppCompatActivity() {
 
         val bottomBar = findViewById<BottomAppBar>(R.id.bottom_app_bar)
         bottomBar.replaceMenu(R.menu.bottom_word)
+
+        autoPlay = getPreferences(Context.MODE_PRIVATE)?.getBoolean("autoPlay", false) ?: false
+        bottomBar.menu.findItem(R.id.menu_autoplay).apply {
+            isChecked = autoPlay
+            setIcon(if (autoPlay) R.drawable.autoplay_on else R.drawable.autoplay_off)
+        }
+
         bottomBar.setOnMenuItemClickListener {
             when (it.itemId) {
                 R.id.menu_share -> {
                     share()
+                    true
+                }
+                R.id.menu_play -> {
+                    mWord?.audio?.let { audio -> playAudio(audio) }
+                    true
+                }
+                R.id.menu_autoplay -> {
+                    it.isChecked = !it.isChecked
+                    autoPlay = it.isChecked
+                    it.setIcon(if (autoPlay) R.drawable.autoplay_on else R.drawable.autoplay_off)
+
+                    getPreferences(Context.MODE_PRIVATE)?.let { pref ->
+                        with (pref.edit()) {
+                            putBoolean("autoPlay", autoPlay)
+                            commit()
+                        }
+                    }
                     true
                 }
                 else -> false
@@ -131,6 +157,10 @@ class WordActivity : AppCompatActivity() {
                 runOnUiThread {
                     mWebView!!.visibility = View.VISIBLE
                     mStatusLayout!!.visibility = View.GONE
+
+                    if (autoPlay) mWord?.audio?.let {
+                        audio -> playAudio(audio)
+                    }
 
                     loadResource.decrement()
                 }
@@ -301,6 +331,47 @@ class WordActivity : AppCompatActivity() {
             StarUpdateTask().execute()
             HistorySaveTask().execute()
         }
+    }
+
+    private fun playAudio(urls: ArrayList<String>) {
+        if (urls.size == 0) {
+            return
+        }
+
+        val mediaPlayer = MediaPlayer()
+        mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC)
+
+        try {
+            mediaPlayer.setDataSource(urls[0])
+        } catch (e: Exception) {
+            Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
+                    .show()
+            return
+        }
+
+        var current = 0;
+        mediaPlayer.setOnCompletionListener {
+            current += 1
+            if (urls.size <= current) {
+                return@setOnCompletionListener
+            }
+
+            it.reset()
+            it.setDataSource(urls[current])
+            it.prepareAsync()
+        }
+
+        mediaPlayer.setOnPreparedListener { mp ->
+            mp.start()
+        }
+
+        mediaPlayer.setOnErrorListener { mp, what, extra ->
+            Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
+                    .show()
+            false
+        }
+
+        mediaPlayer.prepareAsync()
     }
 
     private fun playAudio(url: String) {

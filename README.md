@@ -58,6 +58,9 @@ It builds upon ideas previously implemented in
   neuter and common gender nouns, in order to aid in applying [the techniques
   described by Olle Kjellin](https://bit.ly/EN-ETT-in-Swedish).
 
+* **Pronunciation auto-play (DDO, SO).**  The record pronunciations can be
+  configured to automatically play when the entry is opened.
+
 ## License
 
 See [LICENSE](LICENSE).

@@ -141,12 +141,17 @@ class SoParser {
                     summary.append(text)
                 }
 
+                val audio = arrayListOf<String>()
+
                 lemma.select("a.ljudfil")?.forEach {
                     val onclick = it.attr("onclick")?.toString() ?: return@forEach
                     val mp3 = mp3Regex.find(onclick)?.groupValues?.get(1) ?: return@forEach
+                    val url = "https://isolve-so-service.appspot.com/pronounce?id=$mp3"
 
-                    it.attr("href", "https://isolve-so-service.appspot.com/pronounce?id=$mp3")
+                    it.attr("href", url)
                     it.removeAttr("onclick")
+
+                    audio.add(url)
                 }
 
                 val headword = Word(tag, word, word, summary.toString(), cleanpage,
@@ -158,6 +163,8 @@ class SoParser {
                 if (headword.gender == "t") {
                     lemma.addClass("neuter")
                 }
+
+                headword.audio.addAll(audio)
 
                 lemma.select(".lexem")?.forEach lexem@{ lexem ->
                     xrefs.add(lexem.attr("id"))

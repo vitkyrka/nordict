@@ -2,10 +2,25 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/menu_autoplay"
+        android:icon="@drawable/autoplay_off"
+        app:showAsAction="ifRoom"
+        android:visible="true"
+        android:checkable="true"
+        android:title="Autoplay audio" />
+
+    <item
         android:id="@+id/menu_share"
         android:icon="@drawable/add_card"
         app:showAsAction="ifRoom"
         android:visible="true"
         android:title="Add card" />
+
+    <item
+        android:id="@+id/menu_play"
+        android:icon="@drawable/play"
+        app:showAsAction="ifRoom"
+        android:visible="true"
+        android:title="Play audio" />
 
 </menu>
