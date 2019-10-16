@@ -7,10 +7,11 @@ class DdoParser {
     companion object {
         private val mp3Regex = "([0-9_]+)".toRegex()
 
-        fun parse(page: String, uri: Uri, tag: String = "foo"): Word {
+        fun parse(page: String, uri: Uri, tag: String = "foo"): Word? {
             val doc = Jsoup.parse(page, "https://ordnet.dk/ddo/")
 
-            val word = doc.selectFirst(".match").ownText()
+            val match = doc.selectFirst(".match") ?: return null
+            val word = match.ownText()
             val element = doc.select("#content").first()
             val content = element.outerHtml()
             val cleanpage = doc.head().html() + "<body>" + content
