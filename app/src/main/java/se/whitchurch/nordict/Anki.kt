@@ -7,17 +7,17 @@ import org.json.JSONArray
 class Anki(val context: Context) {
     private var api: AddContentApi = AddContentApi(context)
 
-    private fun getDeckId(): Long? {
+    private fun getDeckId(name: String): Long? {
         val deckList = api.deckList
         if (deckList != null) {
             for (entry in deckList.entries) {
-                if (entry.value == DECK_NAME) {
+                if (entry.value == name) {
                     return entry.key
                 }
             }
         }
 
-        return api.addNewDeck(DECK_NAME)
+        return api.addNewDeck(name)
     }
 
     private fun getModelId(): Long? {
@@ -35,7 +35,7 @@ class Anki(val context: Context) {
                 Model.AFMT, null, null, null)
     }
 
-    fun createCard(text: String, examples: List<String>, images: List<String>, audio: String): Long? {
+    fun createCard(deck: String, text: String, examples: List<String>, images: List<String>, audio: String): Long? {
         // Anki centers text by default, which is not optimal for large HTML pages.
         val back = "<div style=\"text-align: left\">$text</div>"
 
@@ -45,10 +45,6 @@ class Anki(val context: Context) {
                 audio,
                 back)
 
-        return api.addNote(getModelId()!!, getDeckId()!!, fields, null)
-    }
-
-    companion object {
-        const val DECK_NAME = "Nordict"
+        return api.addNote(getModelId()!!, getDeckId(deck)!!, fields, null)
     }
 }

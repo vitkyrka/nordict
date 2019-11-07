@@ -29,6 +29,7 @@ class CardActivity : AppCompatActivity() {
     private var currentDefinition: Word.Definition? = null
     private var currentCard: CardView? = null
     private var mAudio: String = ""
+    private var mDeckName = "Nordict"
     private var mLeftCards = 0
 
     private fun createCard(title: String, examples: List<String>): CardView {
@@ -45,8 +46,10 @@ class CardActivity : AppCompatActivity() {
         return card as CardView
     }
 
-    private fun cardAdded(id: Long?) {
-        Toast.makeText(this, if (id == null) "Fail" else "Card added",
+    private fun createCard(text: String, examples: List<String>, images: List<String>, audio: String) {
+        val id = anki.createCard(mDeckName, text, examples, images, audio)
+
+        Toast.makeText(this, if (id == null) "Fail" else "Card added to $mDeckName",
                 Toast.LENGTH_SHORT).show()
 
         if (id != null) {
@@ -74,11 +77,9 @@ class CardActivity : AppCompatActivity() {
                     examples = arrayListOf(word.mTitle)
                 }
 
-                val id = anki.createCard(word.getPage(listOf(definition), ordboken.currentCss),
+                createCard(word.getPage(listOf(definition), ordboken.currentCss),
                         examples, images, mAudio)
-
                 card.visibility = View.GONE
-                cardAdded(id)
             }
 
             card.findViewById<Button>(R.id.card_sentences_button).apply {
@@ -136,10 +137,8 @@ class CardActivity : AppCompatActivity() {
                     examples = arrayListOf(word.mTitle)
                 }
 
-                val id = anki.createCard(text, examples, ArrayList(), "")
-
+                createCard(text, examples, ArrayList(), "")
                 card.visibility = View.GONE
-                cardAdded(id)
             }
 
             cardHolder.addView(card)
@@ -177,6 +176,9 @@ class CardActivity : AppCompatActivity() {
         }
 
         anki = Anki(this)
+
+        mDeckName = intent?.getStringExtra("deckName") ?: "Nordict"
+        title = mDeckName
 
         ordboken = Ordboken.getInstance(this)
         ordboken.images = ArrayList()
