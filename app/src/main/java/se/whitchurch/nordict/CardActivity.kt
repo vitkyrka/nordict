@@ -29,6 +29,7 @@ class CardActivity : AppCompatActivity() {
     private var currentDefinition: Word.Definition? = null
     private var currentCard: CardView? = null
     private var mAudio: String = ""
+    private var mLeftCards = 0
 
     private fun createCard(title: String, examples: List<String>): CardView {
         val card = layoutInflater.inflate(R.layout.card, cardHolder, false)
@@ -39,7 +40,22 @@ class CardActivity : AppCompatActivity() {
 
         cardExample.text = examples.joinToString(separator = "; ")
 
+        mLeftCards += 1
+
         return card as CardView
+    }
+
+    private fun cardAdded(id: Long?) {
+        Toast.makeText(this, if (id == null) "Fail" else "Card added",
+                Toast.LENGTH_SHORT).show()
+
+        if (id != null) {
+            mLeftCards -= 1
+        }
+
+        if (mLeftCards <= 0) {
+            finish()
+        }
     }
 
     private fun loadWord(word: Word) {
@@ -62,8 +78,7 @@ class CardActivity : AppCompatActivity() {
                         examples, images, mAudio)
 
                 card.visibility = View.GONE
-                Toast.makeText(this, (if (id == null) "fail " else "ok ") + definition.definition,
-                        Toast.LENGTH_LONG).show()
+                cardAdded(id)
             }
 
             card.findViewById<Button>(R.id.card_sentences_button).apply {
@@ -124,8 +139,7 @@ class CardActivity : AppCompatActivity() {
                 val id = anki.createCard(text, examples, ArrayList(), "")
 
                 card.visibility = View.GONE
-                Toast.makeText(this, (if (id == null) "fail " else "ok ") + idiom.idiom,
-                        Toast.LENGTH_LONG).show()
+                cardAdded(id)
             }
 
             cardHolder.addView(card)
