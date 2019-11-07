@@ -17,6 +17,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.ichi2.anki.api.AddContentApi
 import kotlinx.android.synthetic.main.activity_card.*
+import okhttp3.Request
 
 
 class CardActivity : AppCompatActivity() {
@@ -27,6 +28,7 @@ class CardActivity : AppCompatActivity() {
     private var sentencesMap = HashMap<String, ArrayList<String>>()
     private var currentDefinition: Word.Definition? = null
     private var currentCard: CardView? = null
+    private var mAudio: String = ""
 
     private fun createCard(title: String, examples: List<String>): CardView {
         val card = layoutInflater.inflate(R.layout.card, cardHolder, false)
@@ -56,7 +58,8 @@ class CardActivity : AppCompatActivity() {
                     examples = arrayListOf(word.mTitle)
                 }
 
-                val id = anki.createCard(word.getPage(listOf(definition), ordboken.currentCss), examples, images)
+                val id = anki.createCard(word.getPage(listOf(definition), ordboken.currentCss),
+                        examples, images, mAudio)
 
                 card.visibility = View.GONE
                 Toast.makeText(this, (if (id == null) "fail " else "ok ") + definition.definition,
@@ -118,7 +121,7 @@ class CardActivity : AppCompatActivity() {
                     examples = arrayListOf(word.mTitle)
                 }
 
-                val id = anki.createCard(text, examples, ArrayList())
+                val id = anki.createCard(text, examples, ArrayList(), "")
 
                 card.visibility = View.GONE
                 Toast.makeText(this, (if (id == null) "fail " else "ok ") + idiom.idiom,
@@ -168,7 +171,7 @@ class CardActivity : AppCompatActivity() {
             return
         }
 
-        loadWord(word)
+        WordAudioTask().execute(word)
     }
 
     fun showImages(view: ViewGroup, images: ArrayList<String>) {
@@ -225,13 +228,43 @@ class CardActivity : AppCompatActivity() {
 
     }
 
-    private inner class WordTask : AsyncTask<Uri, Void, Word?>() {
-        override fun doInBackground(vararg params: Uri): Word? {
-            return ordboken.getWord(params[0])
+    fun getAudio(word: Word) : String {
+        var audio = ""
+
+        if (word.audio.isNotEmpty()) {
+            val request = Request.Builder().url(word.audio[0])
+                    .build()
+            val response = ordboken.client.newCall(request).execute()
+            if (response.isSuccessful) {
+                audio = Base64.encodeToString(response.body?.bytes(), Base64.DEFAULT)
+            }
         }
 
-        override fun onPostExecute(result: Word?) {
-            result?.let { loadWord(it) }
+        return audio
+    }
+
+    private inner class WordTask : AsyncTask<Uri, Void, Pair<Word?, String>>() {
+        override fun doInBackground(vararg params: Uri): Pair<Word?, String> {
+            val word = ordboken.getWord(params[0])
+            val audio = word?.let { getAudio(it) } ?: ""
+
+            return Pair(word, audio)
+        }
+
+        override fun onPostExecute(result: Pair<Word?, String>) {
+            mAudio = result.second
+            result.first?.let { loadWord(it) }
+        }
+    }
+
+    private inner class WordAudioTask : AsyncTask<Word, Void, Pair<Word, String>>() {
+        override fun doInBackground(vararg params: Word): Pair<Word, String> {
+            return Pair(params[0], getAudio(params[0]))
+        }
+
+        override fun onPostExecute(result: Pair<Word, String>) {
+            mAudio = result.second
+            loadWord(result.first)
         }
     }
 

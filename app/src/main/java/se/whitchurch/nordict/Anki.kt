@@ -35,13 +35,14 @@ class Anki(val context: Context) {
                 Model.AFMT, null, null, null)
     }
 
-    fun createCard(text: String, examples: List<String>, images: List<String>): Long? {
+    fun createCard(text: String, examples: List<String>, images: List<String>, audio: String): Long? {
         // Anki centers text by default, which is not optimal for large HTML pages.
         val back = "<div style=\"text-align: left\">$text</div>"
 
         val fields = arrayOf(
                 JSONArray(images).toString(),
                 JSONArray(examples).toString(),
+                audio,
                 back)
 
         return api.addNote(getModelId()!!, getDeckId()!!, fields, null)

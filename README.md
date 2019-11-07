@@ -33,7 +33,8 @@ It builds upon ideas previously implemented in
   [Korp](https://spraakbanken.gu.se/korp/)) or images (from Google Image
   Search) can be added.  Javascript is used in the card to display a random
   subset of the examples and images on the front and the formatted definition
-  on the back.
+  on the back.  The prounciation audio is also included and works offline in
+  the flashcard.
 
 * **Phonetic transcription (DDO).** The official DDO website includes a
   phonetic transcription for each word in a [simplified version of the
