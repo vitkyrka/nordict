@@ -268,6 +268,7 @@ class WordActivity : AppCompatActivity() {
             val text = TextView(this)
 
             text.setPadding(20, 10, 0, 10)
+            text.textSize = 19f
 
             if (homograph.uri == word.uri) {
                 text.text = "☑ " + homograph.mTitle + " " + homograph.mSummary
