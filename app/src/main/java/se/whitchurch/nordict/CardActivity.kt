@@ -134,7 +134,7 @@ class CardActivity : AppCompatActivity() {
                 var examples = idiom.examples
 
                 if (examples.isEmpty()) {
-                    examples = arrayListOf(word.mTitle)
+                    examples = arrayListOf(idiom.idiom)
                 }
 
                 createCard(text, examples, ArrayList(), "")
