@@ -1,5 +1,6 @@
 package se.whitchurch.nordict
 
+import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import android.text.Html
@@ -16,10 +17,7 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
                 null, SQLiteDatabase.OPEN_READONLY)
     }
 
-    override fun search(query: String): List<SearchResult> {
-        val args = arrayOf("^$query*")
-        val cursor = db.rawQuery("select so.code, so.data from so WHERE article IN (SELECT so.article FROM so, so_fts where grundform MATCH ? AND so.rowid = so_fts.rowid) AND (code == 12 OR code == 77 OR code == 49 OR code == 40) ORDER BY rowid",
-                args)
+    fun cursorToResults(cursor: Cursor): List<SearchResult> {
         val results = ArrayList<SearchResult>()
 
         var headword = ""
@@ -52,6 +50,23 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
         }
 
         return results
+    }
+
+    fun sqlSearch(where: String, args: Array<String>?): List<SearchResult> {
+        val cursor = db.rawQuery("select so.code, so.data from so WHERE article IN ($where) AND (code == 12 OR code == 77 OR code == 49 OR code == 40) ORDER BY rowid",
+                args)
+
+        return cursorToResults(cursor)
+    }
+
+    override fun search(query: String): List<SearchResult> {
+        return sqlSearch("SELECT so.article FROM so, so_fts where grundform MATCH ? AND so.rowid = so_fts.rowid",
+                arrayOf("^$query*"))
+    }
+
+    override fun list(position: Int): List<SearchResult> {
+        // return sqlSearch("SELECT DISTINCT so.article FROM so LIMIT 1 OFFSET ?", arrayOf(position.toString()))
+        return sqlSearch("SELECT DISTINCT so.article FROM so WHERE code == 12 and data == \"verb\" LIMIT 2 OFFSET ?", arrayOf(position.toString()))
     }
 
     override fun get(uri: Uri): Word? {

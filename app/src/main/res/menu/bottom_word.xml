@@ -2,6 +2,34 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <item
+        android:id="@+id/menu_previous"
+        android:icon="@drawable/previous"
+        app:showAsAction="always"
+        android:visible="false"
+        android:title="Previous" />
+
+    <item
+        android:id="@+id/menu_jump"
+        android:icon="@drawable/jump"
+        app:showAsAction="never"
+        android:visible="false"
+        android:title="Jump" />
+
+    <item
+        android:id="@+id/menu_filter"
+        android:icon="@drawable/filter"
+        app:showAsAction="always"
+        android:visible="false"
+        android:title="Filter" />
+
+    <item
+        android:id="@+id/menu_next"
+        android:icon="@drawable/next"
+        app:showAsAction="always"
+        android:visible="false"
+        android:title="Next" />
+
+    <item
         android:id="@+id/menu_autoplay"
         android:icon="@drawable/autoplay_off"
         app:showAsAction="ifRoom"
@@ -12,14 +40,14 @@
     <item
         android:id="@+id/menu_share"
         android:icon="@drawable/add_card"
-        app:showAsAction="ifRoom"
+        app:showAsAction="always"
         android:visible="true"
         android:title="Add card" />
 
     <item
         android:id="@+id/menu_play"
         android:icon="@drawable/play"
-        app:showAsAction="ifRoom"
+        app:showAsAction="always"
         android:visible="true"
         android:title="Play audio" />
 

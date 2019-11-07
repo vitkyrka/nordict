@@ -1,11 +1,13 @@
 package se.whitchurch.nordict
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.Button
 import androidx.appcompat.app.ActionBar
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -58,6 +60,15 @@ class HistoryActivity : androidx.appcompat.app.AppCompatActivity() {
                     }
                 }
         )
+
+        findViewById<Button>(R.id.alphabetical).setOnClickListener {
+            val intent = Intent(this, WordActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NO_ANIMATION
+                putExtra("list", true)
+            }
+
+            startActivity(intent)
+        }
 
         actionBar.navigationMode = ActionBar.NAVIGATION_MODE_TABS
         val tabListener = object : ActionBar.TabListener {

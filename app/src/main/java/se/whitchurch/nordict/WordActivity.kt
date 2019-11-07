@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.database.sqlite.SQLiteDatabase
 import android.graphics.Typeface
 import android.media.AudioManager
@@ -11,7 +12,9 @@ import android.media.MediaPlayer
 import android.net.Uri
 import android.os.AsyncTask
 import android.os.Bundle
+import android.text.InputType
 import android.util.JsonReader
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
@@ -19,6 +22,7 @@ import android.view.Window
 import android.webkit.*
 import android.widget.*
 import androidx.appcompat.app.ActionBar
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.test.espresso.idling.CountingIdlingResource
@@ -45,7 +49,7 @@ class WordActivity : AppCompatActivity() {
     private var mGotStarred: Boolean = false
     private var mPageFinished: Boolean = false
     private var autoPlay: Boolean = false
-    private var mId: Int? = 0
+    private var mListInfo: ListInfo = ListInfo(position = -1)
 
     @SuppressLint("AddJavascriptInterface")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -60,6 +64,7 @@ class WordActivity : AppCompatActivity() {
         actionBar!!.displayOptions = (ActionBar.DISPLAY_SHOW_CUSTOM or ActionBar.DISPLAY_SHOW_HOME
                 or ActionBar.DISPLAY_HOME_AS_UP)
         actionBar.setCustomView(R.layout.actionbar)
+        actionBar.setDisplayHomeAsUpEnabled(true)
 
         val bottomBar = findViewById<BottomAppBar>(R.id.bottom_app_bar)
         bottomBar.replaceMenu(R.menu.bottom_word)
@@ -86,10 +91,45 @@ class WordActivity : AppCompatActivity() {
                     it.setIcon(if (autoPlay) R.drawable.autoplay_on else R.drawable.autoplay_off)
 
                     getPreferences(Context.MODE_PRIVATE)?.let { pref ->
-                        with (pref.edit()) {
+                        with(pref.edit()) {
                             putBoolean("autoPlay", autoPlay)
                             commit()
                         }
+                    }
+                    true
+                }
+                R.id.menu_previous -> {
+                    if (mListInfo.position > 0) {
+                        mListInfo.position -= 1
+                        fetchWord(null)
+                    }
+                    true
+                }
+                R.id.menu_jump -> {
+                    val builder = AlertDialog.Builder(this)
+                    val input = EditText(this).apply {
+                        hint = "Entry number"
+                        inputType = InputType.TYPE_CLASS_NUMBER
+                        setRawInputType(Configuration.KEYBOARD_12KEY)
+                    }
+                    builder.setTitle("Jump to entry")
+                    builder.setView(input)
+                    builder.setPositiveButton("OK") { _, _ ->
+                        mListInfo.position = input.text.toString().toInt()
+                        fetchWord(null)
+
+                    }
+                    builder.setNegativeButton("Cancel") { dialog, _ ->
+                        dialog.cancel()
+                    }
+                    builder.show()
+                    true
+                }
+                R.id.menu_next -> {
+                    mListInfo.next?.let {
+                        mUrl = it.uri
+                        mListInfo.position += 1
+                        fetchWord(null)
                     }
                     true
                 }
@@ -158,8 +198,8 @@ class WordActivity : AppCompatActivity() {
                     mWebView!!.visibility = View.VISIBLE
                     mStatusLayout!!.visibility = View.GONE
 
-                    if (autoPlay) mWord?.audio?.let {
-                        audio -> playAudio(audio)
+                    if (autoPlay) mWord?.audio?.let { audio ->
+                        playAudio(audio)
                     }
 
                     loadResource.decrement()
@@ -181,10 +221,19 @@ class WordActivity : AppCompatActivity() {
             setTitle(title)
         }
 
+        if (intent.getBooleanExtra("list", false)) {
+            val position = mOrdboken!!.mPrefs.getInt("listPosition", 0)
+            mListInfo = ListInfo(position = position, next = null)
+            bottomBar.menu.findItem(R.id.menu_next).isVisible = true
+            bottomBar.menu.findItem(R.id.menu_previous).isVisible = true
+            bottomBar.menu.findItem(R.id.menu_jump).isVisible = true
+            bottomBar.menu.findItem(R.id.menu_filter).isVisible = true
+        }
+
         val url = if (intent != null && intent.data != null) {
             intent.data
         } else {
-           Uri.parse("https://svenska.se/so/?id=18788&ref=lnr176698")
+            Uri.parse("https://svenska.se/so/?id=18788&ref=lnr176698")
         }
 
         mUrl = url
@@ -196,15 +245,23 @@ class WordActivity : AppCompatActivity() {
         mStatusText!!.setText(R.string.loading)
         mRetryButton!!.visibility = View.GONE
         loadResource.increment()
-        WordTask().execute(mUrl)
+
+        if (mListInfo.position > -1) {
+            findViewById<View>(R.id.listInfo).visibility = View.VISIBLE
+            findViewById<TextView>(R.id.listInfoPosition).text = "Entry ${mListInfo.position}"
+        }
+
+        WordTask().execute(Pair(mUrl!!, mListInfo))
     }
 
     private fun loadHomographs(word: Word) {
+        val linearLayout = findViewById<LinearLayout>(R.id.linear_layout)
+
+        linearLayout.removeAllViews()
+
         if (word.mHomographs.size == 0) {
             return
         }
-
-        val linearLayout = findViewById<LinearLayout>(R.id.linear_layout)
 
         var pos = 0
         for (homograph in word.mHomographs) {
@@ -302,16 +359,38 @@ class WordActivity : AppCompatActivity() {
         }
     }
 
-    private inner class WordTask : AsyncTask<Uri, Void, Word>() {
-        override fun doInBackground(vararg params: Uri): Word? {
-            return mOrdboken!!.getWord(params[0])
+    private inner class ListInfo(var position: Int, var next: SearchResult? = null) {
+    }
+
+    private inner class WordTask : AsyncTask<Pair<Uri, ListInfo>, Void, Pair<Word?, ListInfo>>() {
+        override fun doInBackground(vararg params: Pair<Uri, ListInfo>): Pair<Word?, ListInfo> {
+            val listInfo = params[0].second
+            var word: Word? = null
+
+            if (listInfo.position > -1) {
+                val list = mOrdboken!!.currentDictionary.list(listInfo.position)
+
+                if (list.isNotEmpty()) {
+                    word = mOrdboken!!.getWord(list[0].uri)
+                }
+
+                listInfo.next = if (list.size > 1) list[1] else null;
+            } else {
+                word = mOrdboken!!.getWord(params[0].first)
+            }
+
+            return Pair(word, listInfo)
         }
 
-        override fun onPostExecute(result: Word?) {
-            mWord = result
-            mOrdboken!!.currentWord = mWord
+        override fun onPostExecute(result: Pair<Word?, ListInfo>) {
+            val word = result.first
+            val listInfo = result.second
 
-            if (result == null) {
+            mWord = word
+            mOrdboken!!.currentWord = mWord
+            mListInfo = listInfo
+
+            if (word == null) {
                 mProgressBar!!.visibility = View.GONE
                 if (!mOrdboken!!.isOnline) {
                     mStatusText!!.setText(R.string.error_offline)
@@ -324,12 +403,22 @@ class WordActivity : AppCompatActivity() {
                 return
             }
 
-            loadHomographs(result)
-            loadWebView(result)
-            title = result.mTitle
+            title = word.toString()
+            Log.i("word", word.toString())
+
+            loadHomographs(word)
+            loadWebView(word)
+            title = word.mTitle
 
             StarUpdateTask().execute()
             HistorySaveTask().execute()
+
+
+            if (mListInfo.position > -1) {
+                val ed = mOrdboken!!.mPrefs.edit()
+                ed.putInt("listPosition", mListInfo.position)
+                ed.apply()
+            }
         }
     }
 

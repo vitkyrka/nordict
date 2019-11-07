@@ -138,6 +138,8 @@ class DdoDictionary(client: OkHttpClient) : Dictionary(client) {
         return getInflectedResults(query)
     }
 
+    override fun list(position: Int) : List<SearchResult> = arrayListOf()
+
     companion object {
         const val NAME = "DDO"
         private val MAIN_SITE_CONTENT_PATTERN = Pattern.compile("class=\"ar\" id=\"([0-9]+)\"", Pattern.DOTALL)

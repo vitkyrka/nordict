@@ -15,6 +15,23 @@
         android:orientation="vertical">
 
         <LinearLayout
+            android:id="@+id/listInfo"
+            android:background="@android:color/white"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="List"
+                android:id="@+id/listInfoPosition"
+                />
+
+        </LinearLayout>
+
+        <LinearLayout
             android:id="@+id/linear_layout"
             android:background="@android:color/white"
             android:layout_width="match_parent"
