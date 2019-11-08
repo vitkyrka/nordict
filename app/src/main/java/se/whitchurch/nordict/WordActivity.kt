@@ -49,7 +49,7 @@ class WordActivity : AppCompatActivity() {
     private var mGotStarred: Boolean = false
     private var mPageFinished: Boolean = false
     private var autoPlay: Boolean = false
-    private var mListInfo: ListInfo = ListInfo(position = -1)
+    private var mWordList: WordList = WordList(position = -1)
 
     @SuppressLint("AddJavascriptInterface")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -99,8 +99,8 @@ class WordActivity : AppCompatActivity() {
                     true
                 }
                 R.id.menu_previous -> {
-                    if (mListInfo.position > 0) {
-                        mListInfo.position -= 1
+                    if (mWordList.position > 0) {
+                        mWordList.position -= 1
                         fetchWord(null)
                     }
                     true
@@ -115,7 +115,7 @@ class WordActivity : AppCompatActivity() {
                     builder.setTitle("Jump to entry")
                     builder.setView(input)
                     builder.setPositiveButton("OK") { _, _ ->
-                        mListInfo.position = input.text.toString().toInt()
+                        mWordList.position = input.text.toString().toInt()
                         fetchWord(null)
 
                     }
@@ -126,9 +126,9 @@ class WordActivity : AppCompatActivity() {
                     true
                 }
                 R.id.menu_next -> {
-                    mListInfo.next?.let {
+                    mWordList.next?.let {
                         mUrl = it.uri
-                        mListInfo.position += 1
+                        mWordList.position += 1
                         fetchWord(null)
                     }
                     true
@@ -223,7 +223,7 @@ class WordActivity : AppCompatActivity() {
 
         if (intent.getBooleanExtra("list", false)) {
             val position = mOrdboken!!.mPrefs.getInt("listPosition", 0)
-            mListInfo = ListInfo(position = position, next = null)
+            mWordList = WordList(position = position, next = null)
             bottomBar.menu.findItem(R.id.menu_next).isVisible = true
             bottomBar.menu.findItem(R.id.menu_previous).isVisible = true
             bottomBar.menu.findItem(R.id.menu_jump).isVisible = true
@@ -246,12 +246,12 @@ class WordActivity : AppCompatActivity() {
         mRetryButton!!.visibility = View.GONE
         loadResource.increment()
 
-        if (mListInfo.position > -1) {
+        if (mWordList.position > -1) {
             findViewById<View>(R.id.listInfo).visibility = View.VISIBLE
-            findViewById<TextView>(R.id.listInfoPosition).text = "Entry ${mListInfo.position}"
+            findViewById<TextView>(R.id.listInfoPosition).text = "Entry ${mWordList.position}"
         }
 
-        WordTask().execute(Pair(mUrl!!, mListInfo))
+        WordTask().execute(Pair(mUrl!!, mWordList))
     }
 
     private fun loadHomographs(word: Word) {
@@ -360,36 +360,27 @@ class WordActivity : AppCompatActivity() {
         }
     }
 
-    private inner class ListInfo(var position: Int, var next: SearchResult? = null) {
-    }
-
-    private inner class WordTask : AsyncTask<Pair<Uri, ListInfo>, Void, Pair<Word?, ListInfo>>() {
-        override fun doInBackground(vararg params: Pair<Uri, ListInfo>): Pair<Word?, ListInfo> {
-            val listInfo = params[0].second
+    private inner class WordTask : AsyncTask<Pair<Uri, WordList>, Void, Pair<Word?, WordList>>() {
+        override fun doInBackground(vararg params: Pair<Uri, WordList>): Pair<Word?, WordList> {
+            val wordList = params[0].second
             var word: Word? = null
 
-            if (listInfo.position > -1) {
-                val list = mOrdboken!!.currentDictionary.list(listInfo.position)
-
-                if (list.isNotEmpty()) {
-                    word = mOrdboken!!.getWord(list[0].uri)
-                }
-
-                listInfo.next = if (list.size > 1) list[1] else null;
+            word = if (wordList.position > -1) {
+                mOrdboken!!.currentDictionary.getNext(wordList)
             } else {
-                word = mOrdboken!!.getWord(params[0].first)
+                mOrdboken!!.getWord(params[0].first)
             }
 
-            return Pair(word, listInfo)
+            return Pair(word, wordList)
         }
 
-        override fun onPostExecute(result: Pair<Word?, ListInfo>) {
+        override fun onPostExecute(result: Pair<Word?, WordList>) {
             val word = result.first
-            val listInfo = result.second
+            val wordList = result.second
 
             mWord = word
             mOrdboken!!.currentWord = mWord
-            mListInfo = listInfo
+            mWordList = wordList
 
             if (word == null) {
                 mProgressBar!!.visibility = View.GONE
@@ -415,9 +406,9 @@ class WordActivity : AppCompatActivity() {
             HistorySaveTask().execute()
 
 
-            if (mListInfo.position > -1) {
+            if (mWordList.position > -1) {
                 val ed = mOrdboken!!.mPrefs.edit()
-                ed.putInt("listPosition", mListInfo.position)
+                ed.putInt("listPosition", mWordList.position)
                 ed.apply()
             }
         }
@@ -585,7 +576,7 @@ class WordActivity : AppCompatActivity() {
             mOrdboken?.currentCss = css
 
             val intent = Intent(this, CardActivity::class.java).apply {
-                putExtra("deckName", if (mListInfo.position > -1) "Nordict - List" else "Nordict")
+                putExtra("deckName", if (mWordList.position > -1) "Nordict - List" else "Nordict")
             }
             startActivity(intent)
         })

@@ -26,5 +26,5 @@ abstract class Dictionary(val client: OkHttpClient) {
         return response.body?.string() ?: ""
     }
 
-    abstract fun list(position: Int): List<SearchResult>
+    abstract fun getNext(wordList: WordList): Word?
 }

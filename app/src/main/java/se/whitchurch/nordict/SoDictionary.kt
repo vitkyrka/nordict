@@ -64,9 +64,13 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
                 arrayOf("^$query*"))
     }
 
-    override fun list(position: Int): List<SearchResult> {
+    override fun getNext(wordList: WordList): Word? {
         // return sqlSearch("SELECT DISTINCT so.article FROM so LIMIT 1 OFFSET ?", arrayOf(position.toString()))
-        return sqlSearch("SELECT DISTINCT so.article FROM so WHERE code == 12 and data == \"verb\" LIMIT 2 OFFSET ?", arrayOf(position.toString()))
+        val list = sqlSearch("SELECT DISTINCT so.article FROM so WHERE code == 12 and data == \"verb\" LIMIT 2 OFFSET ?", arrayOf(wordList.position.toString()))
+
+        wordList.next = if (list.size > 1) list[1] else null
+
+        return if (list.isNotEmpty()) get(list[0].uri) else null
     }
 
     override fun get(uri: Uri): Word? {

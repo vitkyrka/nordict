@@ -138,7 +138,7 @@ class DdoDictionary(client: OkHttpClient) : Dictionary(client) {
         return getInflectedResults(query)
     }
 
-    override fun list(position: Int) : List<SearchResult> = arrayListOf()
+    override fun getNext(wordList: WordList): Word? = null
 
     companion object {
         const val NAME = "DDO"
