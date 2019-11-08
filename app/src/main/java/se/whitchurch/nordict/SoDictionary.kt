@@ -65,10 +65,21 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
     }
 
     override fun getNext(wordList: WordList): Word? {
+        val where = "code == 12 and data == \"verb\""
         // return sqlSearch("SELECT DISTINCT so.article FROM so LIMIT 1 OFFSET ?", arrayOf(position.toString()))
-        val list = sqlSearch("SELECT DISTINCT so.article FROM so WHERE code == 12 and data == \"verb\" LIMIT 2 OFFSET ?", arrayOf(wordList.position.toString()))
+        val list = sqlSearch("SELECT DISTINCT so.article FROM so WHERE $where LIMIT 2 OFFSET ?", arrayOf(wordList.position.toString()))
 
         wordList.next = if (list.size > 1) list[1] else null
+
+        if (wordList.count < 0) {
+            val cursor = db.rawQuery("select COUNT(DISTINCT so.article) FROM so WHERE $where", null)
+
+            if (cursor.moveToNext()) {
+                wordList.count = cursor.getInt(0)
+            }
+
+            cursor.close()
+        }
 
         return if (list.isNotEmpty()) get(list[0].uri) else null
     }

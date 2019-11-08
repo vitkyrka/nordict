@@ -248,7 +248,11 @@ class WordActivity : AppCompatActivity() {
 
         if (mWordList.position > -1) {
             findViewById<View>(R.id.listInfo).visibility = View.VISIBLE
-            findViewById<TextView>(R.id.listInfoPosition).text = "Entry ${mWordList.position}"
+            findViewById<TextView>(R.id.listInfoPosition).text = if (mWordList.count > 0) {
+                "Entry ${mWordList.position} / ${mWordList.count}"
+            } else {
+                "Entry ${mWordList.position}"
+            }
         }
 
         WordTask().execute(Pair(mUrl!!, mWordList))
