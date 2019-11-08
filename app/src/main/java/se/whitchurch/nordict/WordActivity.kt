@@ -49,6 +49,7 @@ class WordActivity : AppCompatActivity() {
     private var mGotStarred: Boolean = false
     private var mPageFinished: Boolean = false
     private var autoPlay: Boolean = false
+    private var mFilterName: String? = null
     private var mWordList: WordList = WordList(position = -1)
 
     @SuppressLint("AddJavascriptInterface")
@@ -101,7 +102,7 @@ class WordActivity : AppCompatActivity() {
                 R.id.menu_previous -> {
                     if (mWordList.position > 0) {
                         mWordList.position -= 1
-                        fetchWord(null)
+                        fetchWord()
                     }
                     true
                 }
@@ -116,7 +117,7 @@ class WordActivity : AppCompatActivity() {
                     builder.setView(input)
                     builder.setPositiveButton("OK") { _, _ ->
                         mWordList.position = input.text.toString().toInt()
-                        fetchWord(null)
+                        fetchWord()
 
                     }
                     builder.setNegativeButton("Cancel") { dialog, _ ->
@@ -125,11 +126,25 @@ class WordActivity : AppCompatActivity() {
                     builder.show()
                     true
                 }
+                R.id.menu_filter -> {
+                    val fitlerNames = mOrdboken!!.currentDictionary.filters.keys.toTypedArray()
+                    val builder = AlertDialog.Builder(this)
+                    builder.setTitle("Select filter")
+                    builder.setItems(fitlerNames)
+                    { _, which ->
+                        mWordList.filter = mOrdboken!!.currentDictionary.filters[fitlerNames[which]]
+                        mWordList.position = 0
+                        mWordList.count = -1
+                        fetchWord()
+                    }
+                    builder.show()
+                    true
+                }
                 R.id.menu_next -> {
                     mWordList.next?.let {
                         mUrl = it.uri
                         mWordList.position += 1
-                        fetchWord(null)
+                        fetchWord()
                     }
                     true
                 }
@@ -223,7 +238,9 @@ class WordActivity : AppCompatActivity() {
 
         if (intent.getBooleanExtra("list", false)) {
             val position = mOrdboken!!.mPrefs.getInt("listPosition", 0)
-            mWordList = WordList(position = position, next = null)
+            val filter = mOrdboken!!.mPrefs.getString("listFilter", null)
+
+            mWordList = WordList(position = position, next = null, filter = filter)
             bottomBar.menu.findItem(R.id.menu_next).isVisible = true
             bottomBar.menu.findItem(R.id.menu_previous).isVisible = true
             bottomBar.menu.findItem(R.id.menu_jump).isVisible = true
@@ -237,25 +254,16 @@ class WordActivity : AppCompatActivity() {
         }
 
         mUrl = url
-        fetchWord(null)
+        fetchWord()
     }
 
-    fun fetchWord(view: View?) {
+    fun fetchWord(forceUrl: Boolean = false) {
         mProgressBar!!.visibility = View.VISIBLE
         mStatusText!!.setText(R.string.loading)
         mRetryButton!!.visibility = View.GONE
         loadResource.increment()
 
-        if (mWordList.position > -1) {
-            findViewById<View>(R.id.listInfo).visibility = View.VISIBLE
-            findViewById<TextView>(R.id.listInfoPosition).text = if (mWordList.count > 0) {
-                "Entry ${mWordList.position} / ${mWordList.count}"
-            } else {
-                "Entry ${mWordList.position}"
-            }
-        }
-
-        WordTask().execute(Pair(mUrl!!, mWordList))
+        WordTask().execute(Triple(mUrl!!, mWordList, forceUrl))
     }
 
     private fun loadHomographs(word: Word) {
@@ -282,7 +290,12 @@ class WordActivity : AppCompatActivity() {
             }
 
             text.setOnClickListener {
-                Ordboken.startWordActivity(this, "", homograph.uri)
+                if (mWordList.position > -1) {
+                    mUrl = homograph.uri
+                    fetchWord(true)
+                } else {
+                    Ordboken.startWordActivity(this, "", homograph.uri)
+                }
             }
 
             linearLayout.addView(text, pos)
@@ -364,12 +377,12 @@ class WordActivity : AppCompatActivity() {
         }
     }
 
-    private inner class WordTask : AsyncTask<Pair<Uri, WordList>, Void, Pair<Word?, WordList>>() {
-        override fun doInBackground(vararg params: Pair<Uri, WordList>): Pair<Word?, WordList> {
+    private inner class WordTask : AsyncTask<Triple<Uri, WordList, Boolean>, Void, Pair<Word?, WordList>>() {
+        override fun doInBackground(vararg params: Triple<Uri, WordList, Boolean>): Pair<Word?, WordList> {
             val wordList = params[0].second
             var word: Word? = null
 
-            word = if (wordList.position > -1) {
+            word = if (wordList.position > -1 && !params[0].third) {
                 mOrdboken!!.currentDictionary.getNext(wordList)
             } else {
                 mOrdboken!!.getWord(params[0].first)
@@ -413,7 +426,26 @@ class WordActivity : AppCompatActivity() {
             if (mWordList.position > -1) {
                 val ed = mOrdboken!!.mPrefs.edit()
                 ed.putInt("listPosition", mWordList.position)
+                ed.putString("listFilter", mWordList.filter)
                 ed.apply()
+            }
+
+
+            if (mWordList.position > -1) {
+                var info = if (mWordList.count > 0) {
+                    "Entry ${mWordList.position} / ${mWordList.count}"
+                } else {
+                    "Entry ${mWordList.position}"
+                }
+
+                val filters = mOrdboken!!.currentDictionary.filters
+                filters.keys.filter { filters[it] == mWordList.filter }.firstOrNull()?.let {
+                    mFilterName = it
+                    info += " - $it"
+                }
+
+                findViewById<TextView>(R.id.listInfoPosition).text = info
+                findViewById<View>(R.id.listInfo).visibility = View.VISIBLE
             }
         }
     }
@@ -580,7 +612,7 @@ class WordActivity : AppCompatActivity() {
             mOrdboken?.currentCss = css
 
             val intent = Intent(this, CardActivity::class.java).apply {
-                putExtra("deckName", if (mWordList.position > -1) "Nordict - List" else "Nordict")
+                putExtra("deckName", if (mFilterName != null) "Nordict - $mFilterName" else "Nordict")
             }
             startActivity(intent)
         })

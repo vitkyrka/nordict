@@ -12,6 +12,7 @@ import java.util.regex.Pattern
 class DdoDictionary(client: OkHttpClient) : Dictionary(client) {
     override val tag: String = "DDO"
     override val flag: Int = R.drawable.flag_dk
+    override val filters: Map<String, String> = emptyMap()
 
     override fun init() {
     }

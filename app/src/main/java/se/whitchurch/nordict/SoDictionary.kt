@@ -64,8 +64,23 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
                 arrayOf("^$query*"))
     }
 
+    override val filters: Map<String, String> = mapOf(
+            "Colloquial" to "vard",
+            "Plural pronunciation" to "bojUttal",
+            "Verbs" to "verb"
+    )
+
     override fun getNext(wordList: WordList): Word? {
-        val where = "code == 12 and data == \"verb\""
+        val where = when (wordList.filter) {
+            "bojUttal" -> "code == 49 AND data LIKE \"%boj_uttal%\""
+            "verb" -> "code == 12 and data == \"verb\""
+            "vard" -> "data LIKE \"vard.%\""
+            else -> {
+                wordList.filter = "verb"
+                "code == 12 and data == \"verb\""
+            }
+        }
+
         // return sqlSearch("SELECT DISTINCT so.article FROM so LIMIT 1 OFFSET ?", arrayOf(position.toString()))
         val list = sqlSearch("SELECT DISTINCT so.article FROM so WHERE $where LIMIT 2 OFFSET ?", arrayOf(wordList.position.toString()))
 
