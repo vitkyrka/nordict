@@ -115,8 +115,8 @@ class CardActivity : AppCompatActivity() {
                         imagesMap[definition.definition] = empty
                         sentencesMap[definition.definition] = empty
 
-                        showImages(findViewById<LinearLayout>(R.id.card_images), empty)
-                        showSentences(findViewById<LinearLayout>(R.id.card_sentences), empty)
+                        showImages(card.findViewById<LinearLayout>(R.id.card_images), empty)
+                        showSentences(card.findViewById<LinearLayout>(R.id.card_sentences), empty)
                     }
                 }
                 visibility = View.VISIBLE
