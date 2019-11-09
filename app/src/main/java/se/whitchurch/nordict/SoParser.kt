@@ -172,7 +172,16 @@ class SoParser {
 
                     lexem.select(".idiom")?.forEach idiom@{ idiom ->
                         val fras = idiom.selectFirst(".fras").text()
-                        val def = idiom.selectFirst(".idiomdef")?.text() ?: return@idiom
+                        var def = idiom.selectFirst(".idiomdef")?.text() ?: return@idiom
+
+                        idiom.selectFirst(".idiomdeft")?.let {
+                            def += " (${it.text()})"
+                        }
+
+                        idiom.selectFirst(".ikom")?.let {
+                            def += " [${it.text()}]"
+                        }
+
                         val obj = Word.Idiom(fras, def)
 
                         obj.examples.addAll(idiom.select(".idiomex").map { it.text() })
