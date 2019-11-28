@@ -133,7 +133,7 @@ class WordActivity : AppCompatActivity() {
                     builder.setItems(fitlerNames)
                     { _, which ->
                         mWordList.filter = mOrdboken!!.currentDictionary.filters[fitlerNames[which]]
-                        mWordList.position = 0
+                        mWordList.position = mOrdboken!!.mPrefs.getInt("listPosition${mWordList.filter}", 0)
                         mWordList.count = -1
                         fetchWord()
                     }
@@ -237,8 +237,12 @@ class WordActivity : AppCompatActivity() {
         }
 
         if (intent.getBooleanExtra("list", false)) {
-            val position = mOrdboken!!.mPrefs.getInt("listPosition", 0)
             val filter = mOrdboken!!.mPrefs.getString("listFilter", null)
+            val position = if (filter == null) {
+                0
+            } else {
+                mOrdboken!!.mPrefs.getInt("listPosition$filter", 0)
+            }
 
             mWordList = WordList(position = position, next = null, filter = filter)
             bottomBar.menu.findItem(R.id.menu_next).isVisible = true
@@ -425,8 +429,12 @@ class WordActivity : AppCompatActivity() {
 
             if (mWordList.position > -1) {
                 val ed = mOrdboken!!.mPrefs.edit()
-                ed.putInt("listPosition", mWordList.position)
+
                 ed.putString("listFilter", mWordList.filter)
+                mWordList.filter?.let {
+                    ed.putInt("listPosition$it", mWordList.position)
+                }
+
                 ed.apply()
             }
 
