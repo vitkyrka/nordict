@@ -67,12 +67,16 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
     override val filters: Map<String, String> = mapOf(
             "Colloquial" to "vard",
             "Plural Acc1 w/o -orer" to "plural2",
+            "Verbs Acc1 w/o -era, be-, för-" to "verbAcc1",
             "Verbs" to "verb"
     )
 
     override fun getNext(wordList: WordList): Word? {
         val where = when (wordList.filter) {
             "plural2" -> "code == 49 AND data LIKE \"%boj_uttal%´%</boj_uttal>\" AND data NOT LIKE \"%<boj_uttal>[-o´rer]</boj_uttal>%\" AND DATA NOT LIKE \"%t]</boj_uttal>\" AND DATA NOT LIKE \"%n]</boj_uttal>\" AND DATA NOT LIKE \"%´% <boj%\" AND DATA LIKE \"%r <boj%\""
+            "verbAcc1" -> "article IN (SELECT article from so where code == 12 and data == \"verb\") " +
+                    "AND article IN (select article from so WHERE (code == 85 AND data LIKE \"%´%\") OR (code == 77 AND data LIKE \"%´%\")) " +
+                    "AND article NOT IN (SELECT ARTICLE from so WHERE code == 77 AND (data LIKE \"% %\" OR data LIKE \"%e´ra\" OR data LIKE \"%era\" OR data LIKE \"be%\" OR data LIKE \"för%\"))"
             "verb" -> "code == 12 and data == \"verb\""
             "vard" -> "data LIKE \"vard.%\""
             else -> {
