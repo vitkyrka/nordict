@@ -1,5 +1,6 @@
 package se.whitchurch.nordict
 
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
@@ -29,7 +30,7 @@ class CardActivity : AppCompatActivity() {
     private var currentDefinition: Word.Definition? = null
     private var currentCard: CardView? = null
     private var mAudio: String = ""
-    private var mDeckName = "Nordict"
+    private var saveDeckName = true
     private var mLeftCards = 0
 
     private fun createCard(title: String, examples: List<String>): CardView {
@@ -47,13 +48,23 @@ class CardActivity : AppCompatActivity() {
     }
 
     private fun createCard(text: String, examples: List<String>, images: List<String>, audio: String) {
-        val id = anki.createCard(mDeckName, text, examples, images, audio)
+        val deckName = findViewById<EditText>(R.id.deckName).text.toString()
+        val id = anki.createCard(deckName, text, examples, images, audio)
 
-        Toast.makeText(this, if (id == null) "Fail" else "Card added to $mDeckName",
+        Toast.makeText(this, if (id == null) "Fail" else "Card added to $deckName",
                 Toast.LENGTH_SHORT).show()
 
         if (id != null) {
             mLeftCards -= 1
+        }
+
+        if (saveDeckName) {
+            getPreferences(Context.MODE_PRIVATE)?.let { pref ->
+                with(pref.edit()) {
+                    putString("deckName", deckName)
+                    commit()
+                }
+            }
         }
 
         if (mLeftCards <= 0) {
@@ -177,8 +188,15 @@ class CardActivity : AppCompatActivity() {
 
         anki = Anki(this)
 
-        mDeckName = intent?.getStringExtra("deckName") ?: "Nordict"
-        title = mDeckName
+        var deckName = getPreferences(Context.MODE_PRIVATE)?.getString("deckName", "Nordict") ?: "Nordict"
+
+        intent?.getStringExtra("deckName")?.let {
+            saveDeckName = false
+            deckName = it
+        }
+
+        findViewById<EditText>(R.id.deckName).setText(deckName)
+        title = deckName
 
         ordboken = Ordboken.getInstance(this)
         ordboken.images = ArrayList()

@@ -620,7 +620,9 @@ class WordActivity : AppCompatActivity() {
             mOrdboken?.currentCss = css
 
             val intent = Intent(this, CardActivity::class.java).apply {
-                putExtra("deckName", if (mFilterName != null) "Nordict - $mFilterName" else "Nordict")
+                if (mFilterName != null) {
+                    putExtra("deckName", "Nordict - $mFilterName")
+                }
             }
             startActivity(intent)
         })
