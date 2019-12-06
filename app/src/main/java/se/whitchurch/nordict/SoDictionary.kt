@@ -66,13 +66,13 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
 
     override val filters: Map<String, String> = mapOf(
             "Colloquial" to "vard",
-            "Plural pronunciation" to "bojUttal",
+            "Plural Acc1 w/o -orer" to "plural2",
             "Verbs" to "verb"
     )
 
     override fun getNext(wordList: WordList): Word? {
         val where = when (wordList.filter) {
-            "bojUttal" -> "code == 49 AND data LIKE \"%boj_uttal%\""
+            "plural2" -> "code == 49 AND data LIKE \"%boj_uttal%´%</boj_uttal>\" AND data NOT LIKE \"%<boj_uttal>[-o´rer]</boj_uttal>%\" AND DATA NOT LIKE \"%t]</boj_uttal>\" AND DATA NOT LIKE \"%n]</boj_uttal>\" AND DATA NOT LIKE \"%´% <boj%\" AND DATA LIKE \"%r <boj%\""
             "verb" -> "code == 12 and data == \"verb\""
             "vard" -> "data LIKE \"vard.%\""
             else -> {
