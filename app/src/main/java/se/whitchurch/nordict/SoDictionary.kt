@@ -67,6 +67,8 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
     override val filters: Map<String, String> = mapOf(
             "Colloquial" to "vard",
             "Plural Acc1 w/o -orer" to "plural2",
+            "-el Acc1" to "elAcc1",
+            "-el Acc2 w/o compound" to "elAcc2",
             "Verbs Acc1 w/o -era, be-, för-" to "verbAcc1",
             "Verbs" to "verb"
     )
@@ -77,6 +79,13 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
             "verbAcc1" -> "article IN (SELECT article from so where code == 12 and data == \"verb\") " +
                     "AND article IN (select article from so WHERE (code == 85 AND data LIKE \"%´%\") OR (code == 77 AND data LIKE \"%´%\")) " +
                     "AND article NOT IN (SELECT ARTICLE from so WHERE code == 77 AND (data LIKE \"% %\" OR data LIKE \"%e´ra\" OR data LIKE \"%era\" OR data LIKE \"be%\" OR data LIKE \"för%\"))"
+
+            "elAcc1" -> "article IN (select article from so WHERE code == 77 AND data LIKE \"%el\") " +
+                    "AND article IN (select article from so WHERE ((code == 77 OR code == 85) AND data LIKE \"%´%\" AND data NOT LIKE \"%`%´%\")) "
+            "elAcc2" -> "article IN (select article from so WHERE code == 77 AND data LIKE \"%el\") " +
+                    "AND article IN (select article from so WHERE ((code == 77 OR code == 85) AND data LIKE \"%`%\" AND data NOT LIKE \"%´%`%\")) " +
+                    "AND article NOT IN (select article FROM so WHERE code == 100 AND (data LIKE \"%|%\" OR data LIKE \"%-%\"))"
+
             "verb" -> "code == 12 and data == \"verb\""
             "vard" -> "data LIKE \"vard.%\""
             else -> {
