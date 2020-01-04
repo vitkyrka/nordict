@@ -95,6 +95,28 @@ class SoParser {
             }
         }
 
+        private fun makeIdiom(fras: String, lexblock: Element): Word.Idiom? {
+            var def = lexblock.selectFirst(".idiomdef")?.text() ?: return null
+
+            lexblock.selectFirst(".idiomdeft")?.let {
+                def += " (${it.text()})"
+            }
+
+            lexblock.selectFirst(".ikom")?.let {
+                def += " [${it.text()}]"
+            }
+
+            lexblock.selectFirst(".idiomxnr")?.let {
+                def = "${it.text()}. $def"
+            }
+
+            val obj = Word.Idiom(fras, def)
+
+            obj.examples.addAll(lexblock.select(".idiomex").map { it.text() })
+
+            return obj
+        }
+
         fun parse(page: String, tag: String = "foo"): List<Word> {
             val words: ArrayList<Word> = ArrayList()
             val doc = Jsoup.parse(page, "https://svenska.se/so/")
@@ -172,20 +194,19 @@ class SoParser {
 
                     lexem.select(".idiom")?.forEach idiom@{ idiom ->
                         val fras = idiom.selectFirst(".fras").text()
-                        var def = idiom.selectFirst(".idiomdef")?.text() ?: return@idiom
 
-                        idiom.selectFirst(".idiomdeft")?.let {
-                            def += " (${it.text()})"
+                        if (idiom.selectFirst(".idiomlexblock") == null) {
+                            makeIdiom(fras, idiom)?.let {
+                                headword.idioms.add(it)
+                            }
+                        } else {
+                            // E.g. det står/är skrivet i stjärnorna
+                            idiom.select(".idiomlexblock").forEach { lexblock ->
+                                makeIdiom(fras, lexblock)?.let {
+                                    headword.idioms.add(it)
+                                }
+                            }
                         }
-
-                        idiom.selectFirst(".ikom")?.let {
-                            def += " [${it.text()}]"
-                        }
-
-                        val obj = Word.Idiom(fras, def)
-
-                        obj.examples.addAll(idiom.select(".idiomex").map { it.text() })
-                        headword.idioms.add(obj)
                     }
 
                     val def = lexem.selectFirst(".def")?.text() ?: return@lexem
