@@ -39,3 +39,7 @@ a.normal {
 .lemma.neuter .grundform:before {
     content: "(ett) ";
 }
+
+#cookieInformerBooklet {
+    visibility: hidden;
+}
