@@ -28,10 +28,10 @@ class DdoParser {
             doc.selectFirst("#id-boj")?.let {
                 val span = it.selectFirst(".allow-glossing") ?: return@let
 
-                it.html(it.html().replace("-", word))
+                span.html(span.html().replace("-", word))
 
                 summary.append(" ")
-                summary.append(span.text())
+                summary.append(span.text().replace("-", word))
             }
 
             val headword = Word(tag, word, word, summary.toString(), cleanpage, uri, element,
