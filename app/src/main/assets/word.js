@@ -67,6 +67,8 @@ var getCSS = function() {
         .inlineList a { padding: 0.2em; }
         .citat { font-style: italic; }
         div { padding: 0.1em };
+        .match.neuter { color: green; }
+        .match.neuter:before { content: "(et) "; }
 `;
         return css;
     }
