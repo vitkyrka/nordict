@@ -182,6 +182,9 @@ class WordActivity : AppCompatActivity() {
                         data = Uri.parse(url)
                     }
                     startActivity(intent)
+                } else if (url.contains("https://ordnet.dk/korpusdk/qconc")) {
+                    val browserIntent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                    startActivity(browserIntent)
                 } else if (url.contains("/so/?id=")) {
                     val intent = Intent(this@WordActivity, WordActivity::class.java).apply {
                         data = Uri.parse(url.replace("file:///", "https://svenska.se/"))
