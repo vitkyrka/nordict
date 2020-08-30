@@ -49,12 +49,15 @@ class DdoParser {
                 val text = it.text() ?: return@let
                 if (!text.contains("substantiv")) return@let
 
-                headword.gender = if (text.contains("intetkøn")) {
+                val neutral = text.indexOf("intetkøn")
+                val common = text.indexOf("fælleskøn")
+
+                // Compare cirkus and fond
+                headword.gender = if (neutral >= 0 && (common < 0 || neutral < common)) {
                     "t"
                 } else {
                     "n"
                 }
-
             }
 
             if (headword.gender == "t") {
