@@ -629,7 +629,9 @@ class WordActivity : AppCompatActivity() {
 
             val intent = Intent(this, CardActivity::class.java).apply {
                 if (mFilterName != null) {
-                    putExtra("deckName", "Nordict - $mFilterName")
+                    putExtra("deckName", "Nordict - ${word.dict} - $mFilterName")
+                } else {
+                    putExtra("deckName", "Nordict - ${word.dict}")
                 }
             }
             startActivity(intent)
