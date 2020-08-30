@@ -17,19 +17,25 @@ class DdoDictionary(client: OkHttpClient) : Dictionary(client) {
     override fun init() {
     }
 
-    private fun getEntryUri(id: String): Uri {
+    private fun getEntryUri(id: String, paramName: String = "entry_id"): Uri {
         return Uri.parse("https://ordnet.dk/ddo/ordbog")
                 .buildUpon()
-                .appendQueryParameter("entry_id", id)
+                .appendQueryParameter(paramName, id)
                 .appendQueryParameter("query", ".")
                 .build()
     }
 
     private fun getMainSiteWord(uri: Uri): Word? {
-        val id = uri.getQueryParameter("entry_id") ?: return null
+        var id = uri.getQueryParameter("entry_id")
+        val newUri: Uri
 
         // Replace query with . to avoid duplicates in history
-        val newUri = getEntryUri(id)
+        if (id != null) {
+            newUri = getEntryUri(id)
+        } else {
+            id = uri.getQueryParameter("subentry_id") ?: return null
+            newUri = getEntryUri(id, "subentry_id")
+        }
 
         val page = fetch(newUri.toString())
 

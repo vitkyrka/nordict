@@ -177,6 +177,11 @@ class WordActivity : AppCompatActivity() {
                         data = Uri.parse(url)
                     }
                     startActivity(intent)
+                } else if (url.contains("https://ordnet.dk/ddo/ordbog?subentry_id=")) {
+                    val intent = Intent(this@WordActivity, WordActivity::class.java).apply {
+                        data = Uri.parse(url)
+                    }
+                    startActivity(intent)
                 } else if (url.contains("/so/?id=")) {
                     val intent = Intent(this@WordActivity, WordActivity::class.java).apply {
                         data = Uri.parse(url.replace("file:///", "https://svenska.se/"))
