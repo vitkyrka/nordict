@@ -49,6 +49,29 @@ var createLinks = function(el) {
 
 var getCSS = function() {
     var css = "";
+
+    if (document.title.indexOf("Danske") > 0) {
+        css += `
+        .documentActions { display: none; }
+        .instrumentPanel { display: none; }
+        .kilde { display: none; }
+        .popup { display: none; }
+        #cookieInformerBooklet { display: none; }
+        .rel-begreber { display: none; }
+        img { display: none; }
+        .artikelkilde { display: none; }
+        .stempel { font-weight: bold; }
+        .match { font-size: 1.5em; }
+        h2 { font-size: 1em; }
+        .dividerSmall:before { content: "|"; }
+        .inlineList a { padding: 0.2em; }
+        .citat { font-style: italic; }
+        div { padding: 0.1em };
+`;
+        return css;
+    }
+
+
     $(document.styleSheets).each(function (index) {
         try {
             $(this.cssRules).each(function (e) {
