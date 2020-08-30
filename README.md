@@ -50,9 +50,9 @@ It builds upon ideas previously implemented in
   back button after navigating to another word via a hyperlink.  This is fixed
   in Nordict.
 
-* **Inflected forms expansion (SO).**  The swung dashes/tildes in the inflected
-  forms are replaced with the word which they represent.  The idea is that
-  seeing the forms fully spelled out will help in remembering them.
+* **Inflected forms expansion (DDO, SO).**  The swung dashes/tildes in the
+  inflected forms are replaced with the word which they represent.  The idea is
+  that seeing the forms fully spelled out will help in remembering them.
 
 * **Gender memorization aids (SO).**  The headword in neuter nouns is prefixed
   with the indefinite article, and different declined forms are highlighted in
