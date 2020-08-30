@@ -40,6 +40,20 @@ a.normal {
     content: "(ett) ";
 }
 
+/* DDO */
+
+#content {
+    margin: 0 0 0 0 !important;
+}
+
+.documentActions {
+    display: none !important;
+}
+
+.instrumentPanel {
+    display: none !important;
+}
+
 #cookieInformerBooklet {
-    visibility: hidden;
+    display: none !important;
 }
