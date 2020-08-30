@@ -2,6 +2,7 @@ package se.whitchurch.nordict
 
 import android.net.Uri
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 
 class DdoParser {
     companion object {
@@ -63,6 +64,33 @@ class DdoParser {
             if (headword.gender == "t") {
                 doc.selectFirst(".match")?.addClass("neuter")
                 element.addClass("neuter")
+            }
+
+            doc.selectFirst("#content-betydninger")?.let {
+                var defel = Element("div")
+                var defText: String? = null
+
+                for (el in it.children()) {
+                    if (el.className() == "definitionNumber") {
+                        if (defText != null) {
+                            val def = Word.Definition(defText, defel)
+                            headword.definitions.add(def)
+
+                            defel = Element("div")
+                            defText = null
+                        }
+
+                        defel.appendChild(el)
+                    } else if (el.className() == "definitionIndent") {
+                        if (defText == null) defText = el.selectFirst(".definitionBox").text()
+                        defel.appendChild(el)
+                    }
+                }
+
+                if (defText != null) {
+                    val def = Word.Definition(defText, defel)
+                    headword.definitions.add(def)
+                }
             }
 
             return headword

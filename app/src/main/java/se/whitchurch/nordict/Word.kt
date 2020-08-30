@@ -26,10 +26,9 @@ class Word(val dict: String, val mTitle: String, val mSlug: String, val summary:
 
     fun getPage(chosenDefs: List<Definition>? = null, css: String? = null): String {
         val doc = element.clone()
-        val parent = doc.select(".article").first()
 
         lemma?.let {
-            parent.appendChild(it.clone())
+            doc.select(".article").first().appendChild(it.clone())
         }
 
         var last = doc.selectFirst(".avstav")
@@ -40,8 +39,14 @@ class Word(val dict: String, val mTitle: String, val mSlug: String, val summary:
         val defs = chosenDefs ?: definitions
         for (def in defs) {
             val el = def.element.clone()
-            last.after(el)
-            last = el
+
+            if (last != null) {
+                last.after(el)
+                last = el
+            } else {
+                doc.selectFirst("#content-betydninger").appendChild(el)
+                last = el
+            }
         }
 
         if (css != null) {
