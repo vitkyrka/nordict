@@ -4,9 +4,7 @@ import argparse
 import sys
 import os
 import re
-import pickle
-import sqlite3
-import subprocess
+import hashlib
 import pprint
 import json
 
@@ -29,14 +27,15 @@ class Feature(object):
     key = attr.ib()
 
 
-def make_deck(deckid, model, feature, words):
+def make_deck(model, feature, words):
+    deckid = int(hashlib.sha256(feature.title.encode('utf-8')).hexdigest(), 16) % 10**8
     deck = genanki.Deck(deckid, feature.title)
 
     for key, g in itertools.groupby(sorted(words, key=feature.key), key=feature.key):
         similar = list(g)
         if len(similar) == 1:
             continue
-    
+
         print(key)
         similar = sorted(similar, key=lambda w:w['text'])
         print(similar)
@@ -89,8 +88,23 @@ def main():
 
     features = [
         Feature(slug='stød', title='Stød', key=lambda w:w['text'].replace('ˀ', '')),
+
+        Feature(slug='front0', title='[i] / [e]', key=lambda w:re.sub('(i|e)ː?', 'X', w['text'])),
         Feature(slug='front1', title='[e] / [ε]', key=lambda w:re.sub('(e|ε)ː?', 'X', w['text'])),
         Feature(slug='front2', title='[ε] / [εj] / [æ]', key=lambda w:re.sub('(εj|æː?|εː?)', 'X', w['text'])),
+        Feature(slug='front3', title='[æ] / [a]', key=lambda w:re.sub('(æ|a)ː?', 'X', w['text'])),
+        Feature(slug='front', title='[i] / [e] / [ε] / [æ] / [a]', key=lambda w:re.sub('(i|e)ː?', 'X', w['text'])),
+
+        Feature(slug='fround0', title='[y] / [ø]', key=lambda w:re.sub('(y|ø)ː?', 'X', w['text'])),
+        Feature(slug='fround1', title='[ø] / [œ]', key=lambda w:re.sub('(ø|œ)ː?', 'X', w['text'])),
+        Feature(slug='fround2', title='[œ] / [ɶ]', key=lambda w:re.sub('(œ|ɶ)ː?', 'X', w['text'])),
+        Feature(slug='fround', title='[y] / [ø] / [œ] / [ɶ]', key=lambda w:re.sub('(y|ø|œ|ɶ)ː?', 'X', w['text'])),
+
+        Feature(slug='back0', title='[u] / [o]', key=lambda w:re.sub('(u|o)ː?', 'X', w['text'])),
+        Feature(slug='back1', title='[o] / [ɔ]', key=lambda w:re.sub('(o|ɔ)ː?', 'X', w['text'])),
+        Feature(slug='back2', title='[ɔ] / [ɒ]', key=lambda w:re.sub('(ɔ|ɒ)ː?', 'X', w['text'])),
+        Feature(slug='back3', title='[ɒ] / [ʌ]', key=lambda w:re.sub('(ɒ|ʌ)ː?', 'X', w['text'])),
+        Feature(slug='back', title='[u] / [o] / [ɔ] / / [ɒ] / [ʌ]', key=lambda w:re.sub('(u|o|ɔ|ɒ|ʌ)ː?', 'X', w['text'])),
     ]
 
     withoutstod = lambda w:w['text'].replace('ˀ', '')
@@ -98,8 +112,7 @@ def main():
     withoutstod = lambda w:re.sub('(εj|æː|ε|æ|e)', 'X', w['text'])
 
     for i, feature in enumerate(features):
-        deckid = 19874192732 + i
-        deck = make_deck(deckid, model, feature, words)
+        deck = make_deck(model, feature, words)
         genanki.Package(deck).write_to_file(feature.slug + '.apkg')
 
     return
