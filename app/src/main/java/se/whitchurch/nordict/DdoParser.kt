@@ -66,29 +66,44 @@ class DdoParser {
                 element.addClass("neuter")
             }
 
-            doc.selectFirst("#content-betydninger")?.let {
+            doc.selectFirst("#content-betydninger")?.let { betydninger ->
                 var defel = Element("div")
                 var defText: String? = null
+                var defExamples: ArrayList<String> = arrayListOf()
 
-                for (el in it.children()) {
+                for (el in betydninger.children()) {
                     if (el.className() == "definitionNumber") {
                         if (defText != null) {
                             val def = Word.Definition(defText, defel)
+                            def.examples.addAll(defExamples)
                             headword.definitions.add(def)
 
                             defel = Element("div")
                             defText = null
+                            defExamples = arrayListOf()
                         }
 
                         defel.appendChild(el)
                     } else if (el.className() == "definitionIndent") {
                         if (defText == null) defText = el.selectFirst(".definitionBox").text()
                         defel.appendChild(el)
+
+                        el.select(".details").forEach { details ->
+                            val label = details.selectFirst(".stempel")?.text() ?: return@forEach
+                            if (label != "Eksempler") return@forEach
+
+                            details.selectFirst(".inlineList")?.textNodes()?.forEach {
+                                defExamples.add(it.toString().trim())
+                            }
+                        }
+
+                        defExamples.addAll(el.select(".citat").map { it.text() })
                     }
                 }
 
                 if (defText != null) {
                     val def = Word.Definition(defText, defel)
+                    def.examples.addAll(defExamples)
                     headword.definitions.add(def)
                 }
             }
