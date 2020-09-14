@@ -8,6 +8,48 @@ class DdoParser {
     companion object {
         private val mp3Regex = "([0-9_]+)".toRegex()
 
+        private fun parseDefinitions(headword: Word, betydninger: Element) {
+            var defel = Element("div")
+            var defText: String? = null
+            var defExamples: ArrayList<String> = arrayListOf()
+
+            for (el in betydninger.children()) {
+                if (el.className() == "definitionNumber") {
+                    if (defText != null) {
+                        val def = Word.Definition(defText, defel)
+                        def.examples.addAll(defExamples)
+                        headword.definitions.add(def)
+
+                        defel = Element("div")
+                        defText = null
+                        defExamples = arrayListOf()
+                    }
+
+                    defel.appendChild(el)
+                } else if (el.className() == "definitionIndent") {
+                    if (defText == null) defText = el.selectFirst(".definitionBox").text()
+                    defel.appendChild(el)
+
+                    el.select(".details").forEach { details ->
+                        val label = details.selectFirst(".stempel")?.text() ?: return@forEach
+                        if (label != "Eksempler") return@forEach
+
+                        details.selectFirst(".inlineList")?.textNodes()?.forEach {
+                            defExamples.add(it.toString().trim())
+                        }
+                    }
+
+                    defExamples.addAll(el.select(".citat").map { it.text() })
+                }
+            }
+
+            if (defText != null) {
+                val def = Word.Definition(defText, defel)
+                def.examples.addAll(defExamples)
+                headword.definitions.add(def)
+            }
+        }
+
         fun parse(page: String, uri: Uri, tag: String = "foo"): Word? {
             val doc = Jsoup.parse(page, "https://ordnet.dk/ddo/")
 
@@ -67,26 +109,26 @@ class DdoParser {
             }
 
             doc.selectFirst("#content-betydninger")?.let { betydninger ->
-                var defel = Element("div")
+                parseDefinitions(headword, betydninger)
+            }
+
+            doc.selectFirst("#content-faste-udtryk")?.let { udtryk ->
                 var defText: String? = null
                 var defExamples: ArrayList<String> = arrayListOf()
+                var idiomTitle = ""
 
-                for (el in betydninger.children()) {
+                for (el in udtryk.children()) {
                     if (el.className() == "definitionNumber") {
                         if (defText != null) {
-                            val def = Word.Definition(defText, defel)
+                            val def = Word.Idiom(idiomTitle, defText!!)
                             def.examples.addAll(defExamples)
-                            headword.definitions.add(def)
+                            headword.idioms.add(def)
 
-                            defel = Element("div")
                             defText = null
                             defExamples = arrayListOf()
                         }
-
-                        defel.appendChild(el)
                     } else if (el.className() == "definitionIndent") {
                         if (defText == null) defText = el.selectFirst(".definitionBox").text()
-                        defel.appendChild(el)
 
                         el.select(".details").forEach { details ->
                             val label = details.selectFirst(".stempel")?.text() ?: return@forEach
@@ -98,14 +140,21 @@ class DdoParser {
                         }
 
                         defExamples.addAll(el.select(".citat").map { it.text() })
+                    } else if (el.className() == "definitionBox") {
+                        idiomTitle = el.selectFirst(".match").text()
                     }
                 }
 
                 if (defText != null) {
-                    val def = Word.Definition(defText, defel)
+                    val def = Word.Idiom(idiomTitle, defText!!)
                     def.examples.addAll(defExamples)
-                    headword.definitions.add(def)
+                    headword.idioms.add(def)
                 }
+            }
+
+            if (headword.definitions.isEmpty() and headword.idioms.isEmpty()) {
+                // Separate page for idiom, eg. klappe hesten
+                doc.selectFirst(".artikel")?.let { parseDefinitions(headword, it) }
             }
 
             return headword

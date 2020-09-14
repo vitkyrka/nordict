@@ -44,7 +44,9 @@ class Word(val dict: String, val mTitle: String, val mSlug: String, val summary:
                 last.after(el)
                 last = el
             } else {
-                doc.selectFirst("#content-betydninger").appendChild(el)
+                var parent = doc.selectFirst("#content-betydninger")
+                if (parent == null)  parent = doc.selectFirst(".artikel")
+                parent.appendChild(el)
                 last = el
             }
         }
