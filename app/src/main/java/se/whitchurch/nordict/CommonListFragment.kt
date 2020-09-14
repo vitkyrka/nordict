@@ -122,7 +122,7 @@ abstract class CommonListFragment(private val mTable: String) : Fragment() {
             return null
         }
 
-        override fun onPostExecute(aVoid: Void) {
+        override fun onPostExecute(aVoid: Void?) {
             HistoryTask().execute()
         }
     }
