@@ -118,16 +118,7 @@ class DdoParser {
                 var idiomTitle = ""
 
                 for (el in udtryk.children()) {
-                    if (el.className() == "definitionNumber") {
-                        if (defText != null) {
-                            val def = Word.Idiom(idiomTitle, defText!!)
-                            def.examples.addAll(defExamples)
-                            headword.idioms.add(def)
-
-                            defText = null
-                            defExamples = arrayListOf()
-                        }
-                    } else if (el.className() == "definitionIndent") {
+                    if (el.className() == "definitionIndent") {
                         if (defText == null) defText = el.selectFirst(".definitionBox").text()
 
                         el.select(".details").forEach { details ->
@@ -141,6 +132,15 @@ class DdoParser {
 
                         defExamples.addAll(el.select(".citat").map { it.text() })
                     } else if (el.className() == "definitionBox") {
+                        if (defText != null) {
+                            val def = Word.Idiom(idiomTitle, defText!!)
+                            def.examples.addAll(defExamples)
+                            headword.idioms.add(def)
+
+                            defText = null
+                            defExamples = arrayListOf()
+                        }
+
                         idiomTitle = el.selectFirst(".match").text()
                     }
                 }
