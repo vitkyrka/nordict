@@ -1,7 +1,7 @@
 # Nordict
 
-An Android app with a learner-friendly interface to monolingual Swedish and
-Danish dictionaries.  Major dictionaries of both these languages have official,
+An Android app with a learner-friendly interface to Swedish and Danish
+dictionaries.  Major dictionaries of both these languages have official,
 free-of-cost apps, but Nordict has unique features which may be helpful for
 non-native speakers.
 
@@ -20,10 +20,13 @@ It builds upon ideas previously implemented in
 - [Den Danske Ordbog](https://ordnet.dk/ddo) (DDO).  [Official
   app](https://play.google.com/store/apps/details?id=dk.dsl.ordnet.ddo).
 
+- [Svensk-Dansk Ordbog](https://sdo.dsl.dk/) (SDO).  [Official
+  app](https://play.google.com/store/apps/details?id=dk.dsl.ordnet.sdo).
+
 ## Features
 
-* **All words are hyperlinks (DDO, SO).** Any word in the definition can be
-  clicked to either jump directly to its definition (if there is a unique,
+* **All words are hyperlinks (DDO, SDO, SO).** Any word in the definition can
+  be clicked to either jump directly to its definition (if there is a unique,
   perfect match) or to put it in the search box to save some typing.
 
 * **AnkiDroid integration (DDO, SO).** Flashcards can be created directly from
@@ -45,10 +48,14 @@ It builds upon ideas previously implemented in
   Swedish and Danish are of the common gender, so Nordict highlights the
   entries for neuter nouns in an attempt to make them more memorable.
 
-* **Proper navigation (DDO, SO).**  The official SO app already gets this
+* **Proper navigation (DDO, SDO, SO).**  The official SO app already gets this
   right, but in the DDO app it is not possible to return to a word with the
   back button after navigating to another word via a hyperlink.  This is fixed
   in Nordict.
+
+* **Smooth inter-dictionary navigation (SDO).**  The official SDO app shows a
+  dialog whenever a link from SDO to DDO is clicked, but this is not present in
+  Nordict.
 
 * **Inflected forms expansion (DDO, SO).**  The swung dashes/tildes in the
   inflected forms are replaced with the word which they represent.  The idea is
