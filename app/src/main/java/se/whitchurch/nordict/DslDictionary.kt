@@ -145,6 +145,6 @@ abstract class DslDictionary(client: OkHttpClient) : Dictionary(client) {
 
     companion object {
         const val NAME = "DDO"
-        private val MAIN_SITE_CONTENT_PATTERN = Pattern.compile("class=\"ar(?:tikel)\" id=\"([0-9]+)\"", Pattern.DOTALL)
+        private val MAIN_SITE_CONTENT_PATTERN = Pattern.compile("class=\"ar(?:tikel)?\" id=\"([0-9]+)\"", Pattern.DOTALL)
     }
 }
