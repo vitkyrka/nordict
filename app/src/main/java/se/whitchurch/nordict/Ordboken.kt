@@ -95,14 +95,17 @@ class Ordboken private constructor(context: Context) {
         val ddo = DdoDictionary(client)
         ddo.init()
 
-        dictionaries = arrayOf(so, ddo)
-        flags = arrayOf(R.drawable.flag_se, R.drawable.flag_dk)
+        val sdo = SdoDictionary(client)
+        sdo.init()
+
+        dictionaries = arrayOf(so, ddo, sdo)
+        flags = arrayOf(so.flag, ddo.flag, sdo.flag)
 
         currentIndex = 0
         currentDictionary = so
         currentFlag = R.drawable.flag_se
 
-        dictMap = mapOf(so.tag to so, ddo.tag to ddo)
+        dictMap = mapOf(so.tag to so, ddo.tag to ddo, sdo.tag to sdo)
     }
 
     fun getWord(uri: Uri): Word? {
