@@ -120,6 +120,11 @@ class MainActivity : AppCompatActivity() {
 
             mSeenResults = true
             mStatusText!!.setText(R.string.no_results)
+            findViewById<View>(R.id.list_empty).visibility = if (results.isEmpty()) {
+                View.VISIBLE
+            } else {
+                View.GONE
+            }
             mListView!!.adapter = SearchResultAdapter(this@MainActivity, results)
         }
     }
