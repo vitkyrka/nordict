@@ -98,7 +98,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             try {
-                return mOrdboken!!.currentDictionary.search(params[0]).toTypedArray()
+                return mOrdboken!!.currentDictionary.fullSearch(params[0]).toTypedArray()
             } catch (e: Exception) {
                 return null
             }

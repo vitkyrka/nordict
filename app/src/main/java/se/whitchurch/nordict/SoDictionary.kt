@@ -64,6 +64,8 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
                 arrayOf("^$query*"))
     }
 
+    override fun fullSearch(query: String): List<SearchResult> = search(query)
+
     override val filters: Map<String, String> = mapOf(
             "Colloquial" to "vard",
             "Plural Acc1 w/o -orer" to "plural2",

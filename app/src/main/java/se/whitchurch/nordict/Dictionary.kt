@@ -11,6 +11,7 @@ abstract class Dictionary(val client: OkHttpClient) {
     abstract val filters: Map<String, String>
     abstract fun init()
     abstract fun search(query: String): List<SearchResult>
+    abstract fun fullSearch(query: String): List<SearchResult>
     abstract fun get(uri: Uri): Word?
 
     fun fetch(pageUrl: String): String {

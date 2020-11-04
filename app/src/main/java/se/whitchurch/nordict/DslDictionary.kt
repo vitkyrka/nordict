@@ -141,6 +141,8 @@ abstract class DslDictionary(client: OkHttpClient) : Dictionary(client) {
         return getInflectedResults(query)
     }
 
+    override fun fullSearch(query: String): List<SearchResult> = search(query)
+
     override fun getNext(wordList: WordList): Word? = null
 
     companion object {
