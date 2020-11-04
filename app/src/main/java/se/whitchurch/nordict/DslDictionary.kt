@@ -117,6 +117,8 @@ abstract class DslDictionary(client: OkHttpClient) : Dictionary(client) {
         uriBuilder.appendQueryParameter("text", query)
         uriBuilder.appendQueryParameter("size", 50.toString())
 
+        results.addAll(getInflectedResults(query))
+
         try {
             val words = publicApiRequest(uriBuilder.build().toString())
 
@@ -124,15 +126,10 @@ abstract class DslDictionary(client: OkHttpClient) : Dictionary(client) {
                 results.add(SearchResult(words.getString(i),
                         Uri.parse("https://ws.dsl.dk/${shortName}/query?app=android&version=2.1.5&q=${Uri.encode(words.getString(i))}")))
             }
-
-            if (results.size > 0) {
-                return results
-            }
         } catch (e: JSONException) {
-            return results
         }
 
-        return getInflectedResults(query)
+        return results.distinctBy { it.mTitle }
     }
 
     override fun fullSearch(query: String): List<SearchResult> = search(query)
