@@ -93,12 +93,6 @@ abstract class DslDictionary(client: OkHttpClient) : Dictionary(client) {
                     Uri.parse("https://ordnet.dk/${shortName}/ordbog?entry_id=$id&query=.")))
         }
 
-        val matcher = MAIN_SITE_CONTENT_PATTERN.matcher(page)
-
-        while (matcher.find()) {
-            results.add(SearchResult(matcher.group(1)))
-        }
-
         return results
     }
 
