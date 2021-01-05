@@ -11,7 +11,7 @@ def main():
 
     template = jinja2.Environment().from_string(source='''
 {% for lemma in lemmas %}
-    <h2><a href="https://svenska.se/so/?sok={{lemma.word}}">{{lemma.word}}</a> <small><i>{{lemma.pos}}</i></small> {{lemma.pronunciation|escape}}</h2>
+    <h2><a href="https://svenska.se/so/?sok={{lemma.word}}">{{lemma.word}}</a> <small>{{lemma.declension|escape}} <i>{{lemma.pos}}</i></small><br>{{lemma.pronunciation|escape}}</h2>
 
     {% for def in lemma.definition %}
         <li>{{def}}</li>

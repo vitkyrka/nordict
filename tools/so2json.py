@@ -45,6 +45,8 @@ def main():
 
             lemmas.append(lemma)
             lemma = []
+        elif code == 49:
+            lemma['declension'] = data
         elif code == 77:
             lemma['word'] = data
         elif code == 85:
