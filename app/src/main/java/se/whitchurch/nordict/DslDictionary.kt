@@ -134,8 +134,6 @@ abstract class DslDictionary(client: OkHttpClient) : Dictionary(client) {
 
     override fun fullSearch(query: String): List<SearchResult> = search(query)
 
-    override fun getNext(wordList: WordList): Word? = null
-
     companion object {
         const val NAME = "DDO"
         private val MAIN_SITE_CONTENT_PATTERN = Pattern.compile("class=\"ar(?:tikel)?\" id=\"([0-9]+)\"", Pattern.DOTALL)

@@ -61,15 +61,6 @@ class HistoryActivity : androidx.appcompat.app.AppCompatActivity() {
                 }
         )
 
-        findViewById<Button>(R.id.alphabetical).setOnClickListener {
-            val intent = Intent(this, WordActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NO_ANIMATION
-                putExtra("list", true)
-            }
-
-            startActivity(intent)
-        }
-
         actionBar.navigationMode = ActionBar.NAVIGATION_MODE_TABS
         val tabListener = object : ActionBar.TabListener {
             override fun onTabReselected(tab: ActionBar.Tab?, ft: androidx.fragment.app.FragmentTransaction?) {

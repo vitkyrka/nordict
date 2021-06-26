@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
-import android.content.res.Configuration
 import android.database.sqlite.SQLiteDatabase
 import android.graphics.Typeface
 import android.media.AudioManager
@@ -12,7 +11,6 @@ import android.media.MediaPlayer
 import android.net.Uri
 import android.os.AsyncTask
 import android.os.Bundle
-import android.text.InputType
 import android.util.JsonReader
 import android.util.Log
 import android.view.Menu
@@ -22,7 +20,6 @@ import android.view.Window
 import android.webkit.*
 import android.widget.*
 import androidx.appcompat.app.ActionBar
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.test.espresso.idling.CountingIdlingResource
@@ -96,55 +93,6 @@ class WordActivity : AppCompatActivity() {
                             putBoolean("autoPlay", autoPlay)
                             commit()
                         }
-                    }
-                    true
-                }
-                R.id.menu_previous -> {
-                    if (mWordList.position > 0) {
-                        mWordList.position -= 1
-                        fetchWord()
-                    }
-                    true
-                }
-                R.id.menu_jump -> {
-                    val builder = AlertDialog.Builder(this)
-                    val input = EditText(this).apply {
-                        hint = "Entry number"
-                        inputType = InputType.TYPE_CLASS_NUMBER
-                        setRawInputType(Configuration.KEYBOARD_12KEY)
-                    }
-                    builder.setTitle("Jump to entry")
-                    builder.setView(input)
-                    builder.setPositiveButton("OK") { _, _ ->
-                        mWordList.position = input.text.toString().toInt()
-                        fetchWord()
-
-                    }
-                    builder.setNegativeButton("Cancel") { dialog, _ ->
-                        dialog.cancel()
-                    }
-                    builder.show()
-                    true
-                }
-                R.id.menu_filter -> {
-                    val fitlerNames = mOrdboken!!.currentDictionary.filters.keys.toTypedArray()
-                    val builder = AlertDialog.Builder(this)
-                    builder.setTitle("Select filter")
-                    builder.setItems(fitlerNames)
-                    { _, which ->
-                        mWordList.filter = mOrdboken!!.currentDictionary.filters[fitlerNames[which]]
-                        mWordList.position = mOrdboken!!.mPrefs.getInt("listPosition${mWordList.filter}", 0)
-                        mWordList.count = -1
-                        fetchWord()
-                    }
-                    builder.show()
-                    true
-                }
-                R.id.menu_next -> {
-                    mWordList.next?.let {
-                        mUrl = it.uri
-                        mWordList.position += 1
-                        fetchWord()
                     }
                     true
                 }
@@ -244,21 +192,6 @@ class WordActivity : AppCompatActivity() {
             setTitle(title)
         }
 
-        if (intent.getBooleanExtra("list", false)) {
-            val filter = mOrdboken!!.mPrefs.getString("listFilter", null)
-            val position = if (filter == null) {
-                0
-            } else {
-                mOrdboken!!.mPrefs.getInt("listPosition$filter", 0)
-            }
-
-            mWordList = WordList(position = position, next = null, filter = filter)
-            bottomBar.menu.findItem(R.id.menu_next).isVisible = true
-            bottomBar.menu.findItem(R.id.menu_previous).isVisible = true
-            bottomBar.menu.findItem(R.id.menu_jump).isVisible = true
-            bottomBar.menu.findItem(R.id.menu_filter).isVisible = true
-        }
-
         val url = if (intent != null && intent.data != null) {
             intent.data
         } else {
@@ -302,12 +235,7 @@ class WordActivity : AppCompatActivity() {
             }
 
             text.setOnClickListener {
-                if (mWordList.position > -1) {
-                    mUrl = homograph.uri
-                    fetchWord(true)
-                } else {
-                    Ordboken.startWordActivity(this, "", homograph.uri)
-                }
+                Ordboken.startWordActivity(this, "", homograph.uri)
             }
 
             linearLayout.addView(text, pos)
@@ -394,11 +322,7 @@ class WordActivity : AppCompatActivity() {
             val wordList = params[0].second
             var word: Word? = null
 
-            word = if (wordList.position > -1 && !params[0].third) {
-                mOrdboken!!.currentDictionary.getNext(wordList)
-            } else {
-                mOrdboken!!.getWord(params[0].first)
-            }
+            word = mOrdboken!!.getWord(params[0].first)
 
             return Pair(word, wordList)
         }
@@ -433,36 +357,6 @@ class WordActivity : AppCompatActivity() {
 
             StarUpdateTask().execute()
             HistorySaveTask().execute()
-
-
-            if (mWordList.position > -1) {
-                val ed = mOrdboken!!.mPrefs.edit()
-
-                ed.putString("listFilter", mWordList.filter)
-                mWordList.filter?.let {
-                    ed.putInt("listPosition$it", mWordList.position)
-                }
-
-                ed.apply()
-            }
-
-
-            if (mWordList.position > -1) {
-                var info = if (mWordList.count > 0) {
-                    "Entry ${mWordList.position} / ${mWordList.count}"
-                } else {
-                    "Entry ${mWordList.position}"
-                }
-
-                val filters = mOrdboken!!.currentDictionary.filters
-                filters.keys.filter { filters[it] == mWordList.filter }.firstOrNull()?.let {
-                    mFilterName = it
-                    info += " - $it"
-                }
-
-                findViewById<TextView>(R.id.listInfoPosition).text = info
-                findViewById<View>(R.id.listInfo).visibility = View.VISIBLE
-            }
         }
     }
 

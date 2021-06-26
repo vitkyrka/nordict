@@ -53,66 +53,18 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
     }
 
     fun sqlSearch(where: String, args: Array<String>?): List<SearchResult> {
-        val cursor = db.rawQuery("select so.code, so.data from so WHERE article IN ($where) AND (code == 12 OR code == 77 OR code == 49 OR code == 40) ORDER BY rowid",
+        val cursor = db.rawQuery("select so2.code, so2.data from so2 WHERE article IN ($where) AND (code == 12 OR code == 77 OR code == 49 OR code == 40) ORDER BY rowid",
                 args)
 
         return cursorToResults(cursor)
     }
 
     override fun search(query: String): List<SearchResult> {
-        return sqlSearch("SELECT so.article FROM so, so_fts where grundform MATCH ? AND so.rowid = so_fts.rowid",
+        return sqlSearch("SELECT so2.article from so2, so2_fts where grundform MATCH ? AND so2.rowid = so2_fts.rowid",
                 arrayOf("^$query*"))
     }
 
     override fun fullSearch(query: String): List<SearchResult> = search(query)
-
-    override val filters: Map<String, String> = mapOf(
-            "Colloquial" to "vard",
-            "Plural Acc1 w/o -orer" to "plural2",
-            "-el Acc1" to "elAcc1",
-            "-el Acc2 w/o compound" to "elAcc2",
-            "Verbs Acc1 w/o -era, be-, för-" to "verbAcc1",
-            "Verbs" to "verb"
-    )
-
-    override fun getNext(wordList: WordList): Word? {
-        val where = when (wordList.filter) {
-            "plural2" -> "code == 49 AND data LIKE \"%boj_uttal%´%</boj_uttal>\" AND data NOT LIKE \"%<boj_uttal>[-o´rer]</boj_uttal>%\" AND DATA NOT LIKE \"%t]</boj_uttal>\" AND DATA NOT LIKE \"%n]</boj_uttal>\" AND DATA NOT LIKE \"%´% <boj%\" AND DATA LIKE \"%r <boj%\""
-            "verbAcc1" -> "article IN (SELECT article from so where code == 12 and data == \"verb\") " +
-                    "AND article IN (select article from so WHERE (code == 85 AND data LIKE \"%´%\") OR (code == 77 AND data LIKE \"%´%\")) " +
-                    "AND article NOT IN (SELECT ARTICLE from so WHERE code == 77 AND (data LIKE \"% %\" OR data LIKE \"%e´ra\" OR data LIKE \"%era\" OR data LIKE \"be%\" OR data LIKE \"för%\"))"
-
-            "elAcc1" -> "article IN (select article from so WHERE code == 77 AND data LIKE \"%el\") " +
-                    "AND article IN (select article from so WHERE ((code == 77 OR code == 85) AND data LIKE \"%´%\" AND data NOT LIKE \"%`%´%\")) "
-            "elAcc2" -> "article IN (select article from so WHERE code == 77 AND data LIKE \"%el\") " +
-                    "AND article IN (select article from so WHERE ((code == 77 OR code == 85) AND data LIKE \"%`%\" AND data NOT LIKE \"%´%`%\")) " +
-                    "AND article NOT IN (select article FROM so WHERE code == 100 AND (data LIKE \"%|%\" OR data LIKE \"%-%\"))"
-
-            "verb" -> "code == 12 and data == \"verb\""
-            "vard" -> "data LIKE \"vard.%\""
-            else -> {
-                wordList.filter = "verb"
-                "code == 12 and data == \"verb\""
-            }
-        }
-
-        // return sqlSearch("SELECT DISTINCT so.article FROM so LIMIT 1 OFFSET ?", arrayOf(position.toString()))
-        val list = sqlSearch("SELECT DISTINCT so.article FROM so WHERE $where LIMIT 2 OFFSET ?", arrayOf(wordList.position.toString()))
-
-        wordList.next = if (list.size > 1) list[1] else null
-
-        if (wordList.count < 0) {
-            val cursor = db.rawQuery("select COUNT(DISTINCT so.article) FROM so WHERE $where", null)
-
-            if (cursor.moveToNext()) {
-                wordList.count = cursor.getInt(0)
-            }
-
-            cursor.close()
-        }
-
-        return if (list.isNotEmpty()) get(list[0].uri) else null
-    }
 
     override fun get(uri: Uri): Word? {
         if (uri.host != "svenska.se") {

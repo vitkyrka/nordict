@@ -69,10 +69,6 @@ It builds upon ideas previously implemented in
 * **Pronunciation auto-play (DDO, SO).**  The recorded pronunciations can be
   configured to automatically play when the entry is opened.
 
-* **Filterable lists (SO).**  Words can be viewed in filtered lists, using
-  various criteria such as whether a word is colloquial or whether it has a
-  possibly irregular pronunciation in the plural form.
-
 ## License
 
 See [LICENSE](LICENSE).
