@@ -28,19 +28,19 @@ a.normal {
     visibility: hidden;
 }
 
-.lemma.neuter {
+.superlemma.neuter {
     background: #efe;
 }
 
-.lemma.neuter .grundform {
+.superlemma.neuter .grundform {
     color: green;
 }
 
-.lemma.neuter .bojning strong {
+.superlemma.neuter .bojning strong {
     color: green;
 }
 
-.lemma.neuter .grundform:before {
+.superlemma.neuter .grundform:before {
     content: "(ett) ";
 }
 
