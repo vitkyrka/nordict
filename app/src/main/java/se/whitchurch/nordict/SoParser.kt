@@ -131,12 +131,12 @@ class SoParser {
             val uri = Uri.parse(selfUrl)
             val id = uri.getQueryParameter("id") ?: return words
 
-            doc.select(".lemma")?.forEach lemma@{ lemma ->
+            doc.select(".superlemma")?.forEach lemma@{ lemma ->
                 val xrefs = ArrayList<String>()
 
                 xrefs.add(lemma.attr("id"))
 
-                val grundform = lemma.select("span.grundform").first()?.text()
+                val grundform = lemma.select("span.orto").first()?.text()
                         ?: return words
                 val word = grundform.replace("`", "").replace("´", "")
 
@@ -145,6 +145,10 @@ class SoParser {
                 lemma.select("span.uttal").first()?.let {
                     summary.append(" ")
                     summary.append(it.text())
+                }
+
+                lemma.select("span.expansion")?.forEach {
+                    it.removeClass("collapsed")
                 }
 
                 lemma.select("span.bojning").first()?.let {
@@ -168,7 +172,7 @@ class SoParser {
                 lemma.select("a.ljudfil")?.forEach {
                     val onclick = it.attr("onclick")?.toString() ?: return@forEach
                     val mp3 = mp3Regex.find(onclick)?.groupValues?.get(1) ?: return@forEach
-                    val url = "https://isolve-so-service.appspot.com/pronounce?id=$mp3"
+                    val url = "https://isolve-so-service.appspot.com/pronounce?id=$mp3.mp3"
 
                     it.attr("href", url)
                     it.removeAttr("onclick")

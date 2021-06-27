@@ -28,10 +28,10 @@ class Word(val dict: String, val mTitle: String, val mSlug: String, val summary:
         val doc = element.clone()
 
         lemma?.let {
-            doc.select(".article").first().appendChild(it.clone())
+            doc.select(".artikel").first().appendChild(it.clone())
         }
 
-        var last = doc.selectFirst(".avstav")
+        var last = doc.selectFirst(".uttalblock")
         if (last == null) {
             last = doc.selectFirst(".bojning")
         }

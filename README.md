@@ -11,11 +11,11 @@ It builds upon ideas previously implemented in
 
 ## Supported dictionaries
 
-- [Svensk ordbok utgiven av Svenska Akademien](https://svenska.se/so/) (SO).  The
-  [official app](https://play.google.com/store/apps/details?id=se.svenskaakademien.so16)
-  must be installed to be able to use Nordict, since its offline database is used for
-  search suggestions.  Note that the official app works completely offline but
-  Nordict requires Internet access.
+- [Svensk ordbok utgiven av Svenska Akademien](https://svenska.se/so/) (SO).
+  [official
+  app](https://play.google.com/store/apps/details?id=se.svenskaakademien.so16).
+  Note that the official app works offline but Nordict requires an Internet
+  connection.
 
 - [Den Danske Ordbog](https://ordnet.dk/ddo) (DDO).  [Official
   app](https://play.google.com/store/apps/details?id=dk.dsl.ordnet.ddo).

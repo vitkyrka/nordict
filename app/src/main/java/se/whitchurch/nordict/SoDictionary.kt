@@ -6,62 +6,53 @@ import android.net.Uri
 import android.text.Html
 import android.util.Log
 import okhttp3.OkHttpClient
+import okhttp3.Request
+import org.json.JSONArray
+import org.json.JSONException
 
 class SoDictionary(client: OkHttpClient) : Dictionary(client) {
     override val tag: String = "SO"
     override val flag: Int = R.drawable.flag_se
-    private lateinit var db: SQLiteDatabase
+    override fun init() = Unit
 
-    override fun init() {
-        db = SQLiteDatabase.openDatabase("/sdcard/Android/obb/se.svenskaakademien.so16/main.16.se.svenskaakademien.so16.obb",
-                null, SQLiteDatabase.OPEN_READONLY)
-    }
+    private fun searchApiRequest(requestUrl: String): JSONArray {
+        val request = Request.Builder().url(requestUrl)
+                // Server uses Referer to determine whether to link to so/ or tre/
+                .addHeader("Referer", "https://svenska.se/so/")
+                .build()
+        val response = client.newCall(request).execute()
 
-    fun cursorToResults(cursor: Cursor): List<SearchResult> {
-        val results = ArrayList<SearchResult>()
-
-        var headword = ""
-        var pos = ""
-        var xref = ""
-
-        while (cursor.moveToNext()) {
-            val code = cursor.getInt(0)
-            val data = Html.fromHtml(cursor.getString(1), Html.FROM_HTML_MODE_LEGACY).toString()
-
-            when (code) {
-                77 -> headword = data
-                12 -> pos = data
-                40 -> xref = data
-            }
-
-            if (code != 49) {
-                continue
-            }
-
-            val declension = data
-            val word = headword.replace("`", "")
-                    .replace("´", "")
-                    .replace("|", "")
-
-            val summary = StringBuilder(headword).append(' ').append(pos).append(' ').append(declension)
-
-            results.add(SearchResult(word, summary.toString(),
-                    Uri.parse("https://svenska.se/so/?sok=${Uri.encode(word)}&ref=$xref")))
+        if (!response.isSuccessful) {
+            Log.e("SO", "Unexpected response: " + response.code)
+            return JSONArray()
         }
 
-        return results
-    }
+        val body = response.body?.string() ?: return JSONArray()
 
-    fun sqlSearch(where: String, args: Array<String>?): List<SearchResult> {
-        val cursor = db.rawQuery("select so2.code, so2.data from so2 WHERE article IN ($where) AND (code == 12 OR code == 77 OR code == 49 OR code == 40) ORDER BY rowid",
-                args)
-
-        return cursorToResults(cursor)
+        return JSONArray(body.substring(1, body.length - 1))
     }
 
     override fun search(query: String): List<SearchResult> {
-        return sqlSearch("SELECT so2.article from so2, so2_fts where grundform MATCH ? AND so2.rowid = so2_fts.rowid",
-                arrayOf("^$query*"))
+        val uriBuilder = Uri.parse("https://svenska.se/wp-admin/admin-ajax.php").buildUpon()
+
+        uriBuilder.appendQueryParameter("action", "tri_autocomplete")
+        uriBuilder.appendQueryParameter("term", query)
+
+        val results = ArrayList<SearchResult>()
+
+        try {
+            val words = searchApiRequest(uriBuilder.build().toString())
+
+            for (i in 0 until words.length()) {
+                val word = words.getJSONObject(i);
+                val label = word.getString("label")
+                val link = word.getString("link")
+                results.add(SearchResult(label, Uri.parse("https://svenska.se/$link")))
+            }
+        } catch (e: JSONException) {
+        }
+
+        return results
     }
 
     override fun fullSearch(query: String): List<SearchResult> = search(query)

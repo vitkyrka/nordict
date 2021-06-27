@@ -20,6 +20,10 @@ a.normal {
     content: "(et) ";
 }
 
+.spaltnr {
+    display: none;
+}
+
 .tryck {
     visibility: hidden;
 }
