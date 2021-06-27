@@ -61,3 +61,13 @@ a.normal {
 #cookieInformerBooklet {
     display: none !important;
 }
+
+/* Wiktionary */
+
+nav.page-actions-menu {
+    display: none;
+}
+
+span.mw-editsection {
+    display: none !important;
+}
