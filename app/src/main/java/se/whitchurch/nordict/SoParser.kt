@@ -228,10 +228,8 @@ class SoParser {
                     val def = lexem.selectFirst(".def")?.text() ?: return@lexem
                     val definition = Word.Definition(def, lexem)
 
-                    lexem.select(".exempelblock").forEach { exempelBlock ->
-                        exempelBlock.children().forEach {
-                            definition.examples.addAll(it.children().map { it.text() })
-                        }
+                    lexem.select(".syntex").forEach { exempelBlock ->
+                        definition.examples.add(exempelBlock.text())
                     }
 
                     headword.definitions.add(definition)
