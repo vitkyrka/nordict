@@ -73,6 +73,7 @@ It builds upon ideas previously implemented in
 
 See [LICENSE](LICENSE).
 
-The flags are from [FlagKit](https://github.com/madebybowtie/FlagKit).  The
+The flags are from [FlagKit](https://github.com/madebybowtie/FlagKit), by way
+of [Shusshu/android-flags](https://github.com/Shusshu/android-flags).  The
 other icons are [Material Design
 icons](https://github.com/google/material-design-icons).
