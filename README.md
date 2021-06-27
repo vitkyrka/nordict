@@ -12,7 +12,7 @@ It builds upon ideas previously implemented in
 ## Supported dictionaries
 
 - [Svensk ordbok utgiven av Svenska Akademien](https://svenska.se/so/) (SO).
-  [official
+  [Official
   app](https://play.google.com/store/apps/details?id=se.svenskaakademien.so16).
   Note that the official app works offline but Nordict requires an Internet
   connection.
