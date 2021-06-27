@@ -17,7 +17,25 @@ abstract class Wiktionary(client: OkHttpClient) : Dictionary(client) {
     override fun get(uri: Uri): Word? {
         val page = fetch(uri.toString())
 
-        return WiktionaryParser.parse(page, uri, tag, shortName)
+        val builder = uri.buildUpon()
+        builder.clearQuery()
+        uri.queryParameterNames.forEach {
+            if (it != REFPARAM)
+                builder.appendQueryParameter(it, uri.getQueryParameter(it))
+        }
+        val newUri = builder.build()
+
+        val words = WiktionaryParser.parse(page, newUri, tag, shortName)
+        if (words.isEmpty()) return null
+
+        val ref = uri.getQueryParameter(REFPARAM) ?: return words[0]
+
+        val candidates = words.filter { ref in it.xrefs }
+        if (candidates.isEmpty()) {
+            return words[0]
+        }
+
+        return candidates[0]
     }
 
     private fun publicApiRequest(requestUrl: String): JSONArray {
@@ -63,5 +81,6 @@ abstract class Wiktionary(client: OkHttpClient) : Dictionary(client) {
 
     companion object {
         const val NAME = "Wiktionary"
+        const val REFPARAM = "__ref"
     }
 }

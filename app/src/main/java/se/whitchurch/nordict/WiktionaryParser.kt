@@ -15,25 +15,24 @@ class WiktionaryParser {
             }
 
             val def = Word.Definition(clone.text(), li)
+
+            li.select("li")?.forEach {
+                def.examples.add(it.text())
+            }
+
             headword.definitions.add(def)
             li.remove()
         }
 
-        fun parse(page: String, uri: Uri, tag: String, shortName: String): Word? {
+        fun parse(page: String, uri: Uri, tag: String, shortName: String): List<Word> {
+            val words: ArrayList<Word> = ArrayList()
             val doc = Jsoup.parse(page, "https://${shortName}.m.wiktionary.org")
 
-            val heading = doc.selectFirst("#section_0") ?: return null
+            val heading = doc.selectFirst("#section_0") ?: return words
             val word = heading.text()
             val element = doc.selectFirst("#content")
             val content = element.outerHtml()
             val cleanpage = doc.head().html() + "<body>" + content
-
-            val summary = StringBuilder(word)
-
-            val headword = Word(tag, word, word, summary.toString(), cleanpage, uri,
-                    "https://${shortName}.m.wiktionary.org/",
-                    element,
-                    doc.head().html() + "<body>")
 
             // Remove other languages
             var preserve = false
@@ -68,18 +67,87 @@ class WiktionaryParser {
                 if (!preserve) it.remove()
             }
 
-            doc.select("audio")?.forEach audio@{ audio ->
-                val source = audio.selectFirst("source") ?: return@audio
-                val url = source.attr("src")
+            val lemmas = ArrayList<Element>()
+            var current = Element("div")
+            var etymology: Element? = null
+            var pronunciation: Element? = null
+            element.selectFirst("section")?.children()?.forEach {
+                if (it.tagName() == "h3") {
+                    current = Element("div")
 
-                headword.audio.add("https:$url")
+                    when {
+                        it.selectFirst("span.titreetym") != null -> {
+                            etymology = current
+                        }
+                        it.selectFirst("span.titrepron") != null -> {
+                            pronunciation = current
+                        }
+                        it.selectFirst("span.titredef") != null -> {
+                            lemmas.add(current)
+                        }
+                    }
+                }
+
+                current.appendChild(it)
             }
 
-            element.selectFirst("ol")?.children()?.forEach {
-                parseDefinition(headword, it)
+            var first = true
+            lemmas.forEach lemma@{ lemma ->
+                val summary = StringBuilder()
+                val ref: String
+
+                val titledef = lemma.selectFirst(".titredef") ?: return@lemma
+
+                summary.append(titledef.text())
+                ref = titledef.id()
+
+                lemma.selectFirst("p")?.let {
+                    summary.append(" ")
+                    summary.append(it.text())
+                }
+
+                pronunciation?.let { lemma.appendChild(it.clone()) }
+                etymology?.let { lemma.appendChild(it.clone()) }
+
+                val newUri = if (first) {
+                    uri
+                } else {
+                    uri.buildUpon().appendQueryParameter("__ref", ref).build()
+                }
+
+                first = false
+
+                val headword = Word(tag, word, word, summary.toString(), cleanpage, newUri,
+                        "https://${shortName}.m.wiktionary.org/",
+                        element,
+                        doc.head().html() + "<body>",
+                        lemma)
+
+                headword.xrefs.add(ref)
+
+                pronunciation?.select("audio")?.forEach audio@{ audio ->
+                    val source = audio.selectFirst("source") ?: return@audio
+                    val url = source.attr("src")
+
+                    headword.audio.add("https:$url")
+                }
+
+                lemma.selectFirst("ol")?.children()?.forEach {
+                    parseDefinition(headword, it)
+                }
+
+                words.add(headword)
             }
 
-            return headword
+            if (words.size > 1) {
+                val homographs = words.map { SearchResult(it.mTitle, it.summary, it.uri) }
+
+                for (word in words) {
+                    word.mHomographs.addAll(homographs)
+                }
+            }
+
+            return words
         }
     }
 }
