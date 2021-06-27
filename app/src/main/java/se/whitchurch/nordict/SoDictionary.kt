@@ -1,9 +1,6 @@
 package se.whitchurch.nordict
 
-import android.database.Cursor
-import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
-import android.text.Html
 import android.util.Log
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -70,7 +67,17 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
 
         val words = SoParser.parse(page, tag)
         if (words.isEmpty()) {
-            return null
+            val urls = SoParser.parseDisambiguation(page)
+            if (urls.isEmpty())
+                return null
+
+            // Just take the first one for now.  In some cases this list contains
+            // links to the same headword (but with different ids in the URL), for
+            // example when searching for "för".  In other cases it contains list
+            // to different headwords, e.g. "illasinnad".  If we grab all the
+            // headwords then we would get duplicate entries for the first case.
+            // We also don't have support for different headwords from this function.
+            return get(urls[0])
         }
 
         val ref = uri.getQueryParameter("ref") ?: return words[0]

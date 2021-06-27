@@ -117,6 +117,18 @@ class SoParser {
             return obj
         }
 
+        fun parseDisambiguation(page: String): List<Uri> {
+            val urls: ArrayList<Uri> = ArrayList()
+            val doc = Jsoup.parse(page, "https://svenska.se/so/")
+            val element = doc.select(".artikel").first()
+
+            element.select("a.slank")?.forEach {
+                urls.add(Uri.parse("https://svenska.se" + it.attr("href")))
+            }
+
+            return urls
+        }
+
         fun parse(page: String, tag: String = "foo"): List<Word> {
             val words: ArrayList<Word> = ArrayList()
             val doc = Jsoup.parse(page, "https://svenska.se/so/")
