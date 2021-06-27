@@ -5,7 +5,9 @@ import org.jsoup.nodes.Element
 import java.util.*
 
 class Word(val dict: String, val mTitle: String, val mSlug: String, val summary: String,
-           val mText: String, internal val uri: Uri, val element: Element,
+           val mText: String, internal val uri: Uri,
+           internal val baseUrl: String,
+           val element: Element,
            val header: String, val lemma: Element? = null,
            val xrefs: ArrayList<String> = ArrayList<String>()) {
     var pos: Pos = Pos.UNKNOWN
@@ -46,6 +48,7 @@ class Word(val dict: String, val mTitle: String, val mSlug: String, val summary:
             } else {
                 var parent = doc.selectFirst("#content-betydninger")
                 if (parent == null)  parent = doc.selectFirst(".artikel")
+                if (parent == null)  parent = doc.selectFirst("ol")
                 parent.appendChild(el)
                 last = el
             }

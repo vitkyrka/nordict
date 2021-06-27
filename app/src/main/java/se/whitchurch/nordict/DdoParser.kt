@@ -77,7 +77,8 @@ class DdoParser {
                 summary.append(span.text().replace("-", word))
             }
 
-            val headword = Word(tag, word, word, summary.toString(), cleanpage, uri, element,
+            val headword = Word(tag, word, word, summary.toString(), cleanpage, uri,
+                    "https://ordnet.dk/ddo/", element,
                     doc.head().html() + "<body>")
 
             doc.select("img[src='speaker.gif']")?.forEach {

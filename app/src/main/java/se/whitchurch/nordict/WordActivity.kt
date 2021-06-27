@@ -252,16 +252,7 @@ class WordActivity : AppCompatActivity() {
 
         builder.append(footer)
 
-        val baseUrl: String
-
-        if (word.uri.host == "svenska.se") {
-            // Required to avoid CORS errors in getCSS
-            baseUrl = "file://"
-        } else {
-            baseUrl = "https://ordnet.dk/ddo/"
-        }
-
-        mWebView!!.loadDataWithBaseURL(baseUrl, builder.toString(),
+        mWebView!!.loadDataWithBaseURL(word.baseUrl, builder.toString(),
                 "text/html", "UTF-8", null)
     }
 
