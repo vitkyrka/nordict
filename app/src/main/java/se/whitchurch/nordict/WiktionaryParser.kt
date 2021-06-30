@@ -16,7 +16,11 @@ class WiktionaryParser {
 
             val def = Word.Definition(clone.text(), li)
 
-            li.select("li")?.forEach {
+            li.select("span.sources")?.forEach {
+                it.remove()
+            }
+
+            li.selectFirst("ul")?.select("li")?.forEach {
                 def.examples.add(it.text())
             }
 
