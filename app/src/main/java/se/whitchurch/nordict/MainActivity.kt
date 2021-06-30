@@ -72,6 +72,12 @@ class MainActivity : AppCompatActivity() {
         mOrdboken!!.prefsEditor.commit()
     }
 
+    override fun onResume() {
+        super.onResume()
+
+        mOrdboken!!.onResume(this)
+    }
+
     fun onListItemClick(l: ListView, v: View, position: Int, id: Long) {
 
     }

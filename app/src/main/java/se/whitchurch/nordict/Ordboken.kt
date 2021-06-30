@@ -9,11 +9,15 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.net.ConnectivityManager
 import android.net.Uri
+import android.util.Log
 import android.util.LruCache
 import android.util.Pair
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.ImageView
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.core.app.NavUtils
@@ -56,6 +60,7 @@ class Ordboken private constructor(context: Context) {
 
             ed.putString("lastWhere", lastWhere!!.toString())
             ed.putString("lastWhat", lastWhat)
+            ed.putInt("currentIndex", currentIndex)
 
             return ed
         }
@@ -104,9 +109,9 @@ class Ordboken private constructor(context: Context) {
         dictionaries = arrayOf(so, ddo, sdo, fr)
         flags = arrayOf(so.flag, ddo.flag, sdo.flag, fr.flag)
 
-        currentIndex = 0
-        currentDictionary = so
-        currentFlag = R.drawable.flag_se
+        currentIndex = mPrefs.getInt("currentIndex", 0)
+        currentDictionary = dictionaries[currentIndex]
+        currentFlag = flags[currentIndex]
 
         dictMap = mapOf(so.tag to so, ddo.tag to ddo, sdo.tag to sdo, fr.tag to fr)
     }
@@ -138,6 +143,33 @@ class Ordboken private constructor(context: Context) {
         return results
     }
 
+    fun onResume(activity: AppCompatActivity) {
+        currentIndex = mPrefs.getInt("currentIndex", 0)
+
+        val group = activity.findViewById<RadioGroup>(R.id.dictRadio)
+        group.removeAllViews()
+
+        flags.forEach {
+            group.addView(RadioButton(activity).apply {
+                this.setCompoundDrawablesWithIntrinsicBounds(it, 0, 0, 0)
+            })
+        }
+
+        group.check(group.getChildAt(currentIndex).id)
+        activity.findViewById<ImageView>(R.id.dictFlag)?.setImageResource(flags[currentIndex])
+
+        group.jumpDrawablesToCurrentState()
+        group.setOnCheckedChangeListener { group, checkedId ->
+            val button = group.findViewById<RadioButton>(checkedId)
+            val index = group.indexOfChild(button)
+
+            currentIndex = index
+            currentDictionary = dictionaries[index]
+            currentFlag = flags[index]
+            activity.findViewById<ImageView>(R.id.dictFlag)?.setImageResource(flags[index])
+        }
+    }
+
     fun initSearchView(activity: AppCompatActivity, menu: Menu, query: String?, focus: Boolean): SearchView {
         val searchManager = activity
                 .getSystemService(Context.SEARCH_SERVICE) as SearchManager
@@ -162,22 +194,6 @@ class Ordboken private constructor(context: Context) {
 
         if (query != null) {
             searchView.setQuery(query, false)
-        }
-
-        val dictItem = menu.findItem(R.id.dictionary_button)
-
-        dictItem.setIcon(flags[currentIndex])
-
-        dictItem.setOnMenuItemClickListener {
-            val index = (currentIndex + 1) % dictionaries.size
-
-            currentIndex = index
-            currentDictionary = dictionaries[index]
-            currentFlag = flags[index].also {
-                dictItem.setIcon(it)
-            }
-
-            false
         }
 
         return searchView

@@ -104,4 +104,16 @@ class HistoryActivity : androidx.appcompat.app.AppCompatActivity() {
         } else super.onOptionsItemSelected(item)
 
     }
+
+    override fun onPause() {
+        super.onPause()
+
+        mOrdboken!!.prefsEditor.commit()
+    }
+
+    override fun onResume() {
+        super.onResume()
+
+        mOrdboken!!.onResume(this)
+    }
 }

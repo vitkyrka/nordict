@@ -526,6 +526,7 @@ class WordActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         mOrdboken!!.currentWord = mWord
+        mOrdboken!!.onResume(this)
 
         if (mWord != null) {
             StarUpdateTask().execute()

@@ -1,10 +1,5 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
-    <item
-        android:id="@+id/dictionary_button"
-        android:title="Dictionary"
-        android:icon="@drawable/flag_se"
-        app:showAsAction="always" />
 
 </menu>
