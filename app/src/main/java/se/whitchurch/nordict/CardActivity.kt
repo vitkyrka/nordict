@@ -93,19 +93,6 @@ class CardActivity : AppCompatActivity() {
                 card.visibility = View.GONE
             }
 
-            card.findViewById<Button>(R.id.card_sentences_button).apply {
-                setOnClickListener {
-                    Intent(this@CardActivity, SentencePicker::class.java).also {
-                        it.putExtra(Intent.EXTRA_TEXT, word.mTitle)
-                        it.putExtra("pos", word.pos.name)
-                        currentDefinition = definition
-                        currentCard = card
-                        startActivityForResult(it, SENTENCE_PICKER_REQUEST)
-                    }
-                }
-                visibility = View.VISIBLE
-            }
-
             card.findViewById<Button>(R.id.card_images_button).apply {
                 setOnClickListener {
                     Intent(this@CardActivity, ImagePicker::class.java).also {
@@ -243,18 +230,6 @@ class CardActivity : AppCompatActivity() {
                     currentCard?.apply {
                         val imagesHolder = findViewById<LinearLayout>(R.id.card_images)
                         showImages(imagesHolder, imagesMap[it.definition]!!)
-                    }
-                }
-            }
-            SENTENCE_PICKER_REQUEST -> {
-                val sentences = data?.getStringArrayListExtra("sentences") ?: return
-                currentDefinition?.let {
-                    sentencesMap.putIfAbsent(it.definition, ArrayList())
-                    sentencesMap[it.definition]?.addAll(sentences)
-
-                    currentCard?.apply {
-                        val sentencesHolder = findViewById<LinearLayout>(R.id.card_sentences)
-                        showSentences(sentencesHolder, sentencesMap[it.definition]!!)
                     }
                 }
             }

@@ -32,12 +32,11 @@ It builds upon ideas previously implemented in
 * **AnkiDroid integration (DDO, SO).** Flashcards can be created directly from
   the app.  Nordict splits the different meanings for the headword, so that
   each card only contains one meaning.  The example sentences from the
-  dictionary entry are automatically parsed and additional example sentences
-  (from [Korp](https://spraakbanken.gu.se/korp/)) or images (from Google Image
-  Search) can be added.  Javascript is used in the card to display a random
-  subset of the examples and images on the front and the formatted definition
-  on the back.  The prounciation audio is also included and works offline in
-  the flashcard.
+  dictionary entry are automatically parsed and added to the card.  Images
+  (from Google Image Search) can also be added.  Javascript is used in the card
+  to display a random subset of the examples and images on the front and the
+  formatted definition on the back.  The pronunciation audio is also included
+  and works offline in the flashcard.
 
 * **Phonetic transcription (DDO).** The official DDO website includes a
   phonetic transcription for each word in a [simplified version of the
