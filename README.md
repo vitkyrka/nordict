@@ -5,6 +5,8 @@ dictionaries.  Major dictionaries of both these languages have official,
 free-of-cost apps, but Nordict has unique features which may be helpful for
 non-native speakers.
 
+Nordict also has some support for Wiktionnaire, the French Wiktionary.
+
 It builds upon ideas previously implemented in
 [Bildkortsappen](https://github.com/vitkyrka/bildkortsappen) and
 [Ordboken](https://github.com/vitkyrka/ordboken).
@@ -23,15 +25,17 @@ It builds upon ideas previously implemented in
 - [Svensk-Dansk Ordbog](https://sdo.dsl.dk/) (SDO).  [Official
   app](https://play.google.com/store/apps/details?id=dk.dsl.ordnet.sdo).
 
+- [Wiktionnaire](https://fr.wiktionary.org/) (FR).
+
 ## Features
 
-* **All words are hyperlinks (DDO, SDO, SO).** Any word in the definition can
+* **All words are hyperlinks (all).** Any word in the definition can
   be clicked to either jump directly to its definition (if there is a unique,
   perfect match) or to put it in the search box to save some typing.
 
-* **AnkiDroid integration (DDO, SO).** Flashcards can be created directly from
-  the app.  Nordict splits the different meanings for the headword, so that
-  each card only contains one meaning.  The example sentences from the
+* **AnkiDroid integration (DDO, FR, SO).** Flashcards can be created directly
+  from the app.  Nordict splits the different meanings for the headword, so
+  that each card only contains one meaning.  The example sentences from the
   dictionary entry are automatically parsed and added to the card.  Images
   (from Google Image Search) can also be added.  Javascript is used in the card
   to display a random subset of the examples and images on the front and the
@@ -65,8 +69,8 @@ It builds upon ideas previously implemented in
   neuter and common gender nouns, in order to aid in applying [the techniques
   described by Olle Kjellin](https://bit.ly/EN-ETT-in-Swedish).
 
-* **Pronunciation auto-play (DDO, SO).**  The recorded pronunciations can be
-  configured to automatically play when the entry is opened.
+* **Pronunciation auto-play (DDO, FR, SO).**  The recorded pronunciations can
+  be configured to automatically play when the entry is opened.
 
 ## License
 
