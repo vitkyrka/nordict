@@ -29,7 +29,7 @@ class CardActivity : AppCompatActivity() {
     private var sentencesMap = HashMap<String, ArrayList<String>>()
     private var currentDefinition: Word.Definition? = null
     private var currentCard: CardView? = null
-    private var mAudio: String = ""
+    private var mAudio = ArrayList<String>()
     private var saveDeckName = true
     private var mLeftCards = 0
 
@@ -89,7 +89,7 @@ class CardActivity : AppCompatActivity() {
                 }
 
                 createCard(word.getPage(listOf(definition), ordboken.currentCss),
-                        examples, images, mAudio)
+                        examples, images, mAudio.elementAtOrElse(0) { _ -> "" })
                 card.visibility = View.GONE
             }
 
@@ -237,28 +237,28 @@ class CardActivity : AppCompatActivity() {
 
     }
 
-    fun getAudio(word: Word) : String {
-        var audio = ""
+    fun getAudio(word: Word) : ArrayList<String> {
+        var audio = ArrayList<String>()
 
-        if (word.audio.isNotEmpty()) {
-            val request = Request.Builder().url(word.audio[0])
+        word.audio.forEach {
+            val request = Request.Builder().url(it)
                     .build()
             val response = ordboken.client.newCall(request).execute()
             if (response.isSuccessful) {
-                audio = Base64.encodeToString(response.body?.bytes(), Base64.DEFAULT)
+                audio.add(Base64.encodeToString(response.body?.bytes(), Base64.DEFAULT))
             }
         }
 
         return audio
     }
 
-    private inner class WordAudioTask : AsyncTask<Word, Void, Pair<Word, String>>() {
-        override fun doInBackground(vararg params: Word): Pair<Word, String> {
+    private inner class WordAudioTask : AsyncTask<Word, Void, Pair<Word, ArrayList<String>>>() {
+        override fun doInBackground(vararg params: Word): Pair<Word, ArrayList<String>> {
             return Pair(params[0], getAudio(params[0]))
         }
 
-        override fun onPostExecute(result: Pair<Word, String>) {
-            mAudio = result.second
+        override fun onPostExecute(result: Pair<Word, ArrayList<String>>) {
+            mAudio.addAll(result.second)
             loadWord(result.first)
         }
     }
