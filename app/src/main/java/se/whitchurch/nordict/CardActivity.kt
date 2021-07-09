@@ -188,7 +188,7 @@ class CardActivity : AppCompatActivity() {
         ordboken = Ordboken.getInstance(this)
         ordboken.images = ArrayList()
         val word = ordboken.currentWord ?: run {
-            WordTask().execute(Uri.parse("https://svenska.se/so/?sok=stycke"))
+            finish()
             return
         }
 
@@ -250,20 +250,6 @@ class CardActivity : AppCompatActivity() {
         }
 
         return audio
-    }
-
-    private inner class WordTask : AsyncTask<Uri, Void, Pair<Word?, String>>() {
-        override fun doInBackground(vararg params: Uri): Pair<Word?, String> {
-            val word = ordboken.getWord(params[0])
-            val audio = word?.let { getAudio(it) } ?: ""
-
-            return Pair(word, audio)
-        }
-
-        override fun onPostExecute(result: Pair<Word?, String>) {
-            mAudio = result.second
-            result.first?.let { loadWord(it) }
-        }
     }
 
     private inner class WordAudioTask : AsyncTask<Word, Void, Pair<Word, String>>() {
