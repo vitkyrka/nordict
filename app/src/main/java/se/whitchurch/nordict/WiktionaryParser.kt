@@ -21,7 +21,10 @@ class WiktionaryParser {
             }
 
             li.selectFirst("ul")?.select("li")?.forEach {
-                def.examples.add(it.text())
+                val example = it.text()
+                if (example.contains("Exemple d’utilisation manquant")) return@forEach
+
+                def.examples.add(example)
             }
 
             headword.definitions.add(def)
