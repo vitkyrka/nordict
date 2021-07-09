@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.media.AudioManager
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.AsyncTask
 import android.os.Bundle
@@ -72,6 +74,34 @@ class CardActivity : AppCompatActivity() {
         }
     }
 
+    private fun playAudio(url: String) {
+        val mediaPlayer = MediaPlayer()
+        mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC)
+
+        try {
+            mediaPlayer.setDataSource(url)
+        } catch (e: Exception) {
+            setProgressBarIndeterminateVisibility(false)
+            Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
+                    .show()
+            return
+        }
+
+        mediaPlayer.setOnPreparedListener { mp ->
+            setProgressBarIndeterminateVisibility(false)
+            mp.start()
+        }
+
+        mediaPlayer.setOnErrorListener { mp, what, extra ->
+            setProgressBarIndeterminateVisibility(false)
+            Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
+                    .show()
+            false
+        }
+
+        mediaPlayer.prepareAsync()
+    }
+
     private fun loadWord(word: Word) {
         this.word = word
 
@@ -88,9 +118,35 @@ class CardActivity : AppCompatActivity() {
                     examples = arrayListOf(word.mTitle)
                 }
 
+                val audioIdx = if (mAudio.size > 1) {
+                    card.findViewById<Spinner>(R.id.card_audio_index).selectedItem.toString().toInt() - 1
+                } else {
+                    0
+                }
+
                 createCard(word.getPage(listOf(definition), ordboken.currentCss),
-                        examples, images, mAudio.elementAtOrElse(0) { _ -> "" })
+                        examples, images, mAudio.elementAtOrElse(audioIdx) { _ -> "" })
                 card.visibility = View.GONE
+            }
+
+            if (mAudio.size > 1) {
+                card.findViewById<Spinner>(R.id.card_audio_index).apply {
+                    ArrayAdapter(context, android.R.layout.simple_spinner_item, (1..mAudio.size).toList()).also { adapter ->
+                        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                        this.adapter = adapter
+                    }
+
+                    visibility = View.VISIBLE
+                    setSelection(0, false)
+                    onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                        override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                            playAudio(word.audio[position])
+                        }
+
+                        override fun onNothingSelected(parent: AdapterView<*>?) {
+                        }
+                    }
+                }
             }
 
             card.findViewById<Button>(R.id.card_images_button).apply {

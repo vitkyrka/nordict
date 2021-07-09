@@ -54,6 +54,16 @@
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toBottomOf="@id/card_images_scroll" />
 
+        <Spinner
+            android:id="@+id/card_audio_index"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="invisible"
+            app:layout_constraintTop_toBottomOf="@id/card_sentences"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintBottom_toBottomOf="parent"
+            />
+
         <Button
             style="@style/Widget.AppCompat.Button.Borderless"
             android:id="@+id/card_images_button"
@@ -66,7 +76,7 @@
             android:paddingEnd="8dp"
             android:text="ADD IMAGES"
             app:layout_constraintTop_toBottomOf="@id/card_sentences"
-            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/card_audio_index"
             app:layout_constraintBottom_toBottomOf="parent"
             />
 
