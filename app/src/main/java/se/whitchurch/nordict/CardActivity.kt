@@ -155,7 +155,21 @@ class CardActivity : AppCompatActivity() {
                         it.putExtra(Intent.EXTRA_TEXT, word.mTitle)
                         currentDefinition = definition
                         currentCard = card
+                        ordboken.images = ArrayList()
                         startActivityForResult(it, IMAGE_PICKER_REQUEST)
+                    }
+                }
+                visibility = View.VISIBLE
+            }
+
+            card.findViewById<Button>(R.id.card_photo_button).apply {
+                setOnClickListener {
+                    Intent(this@CardActivity, CameraActivity::class.java).also {
+                        it.putExtra(Intent.EXTRA_TEXT, word.mTitle)
+                        currentDefinition = definition
+                        currentCard = card
+                        ordboken.images = ArrayList()
+                        startActivityForResult(it, CAMERA_REQUEST)
                     }
                 }
                 visibility = View.VISIBLE
@@ -257,6 +271,7 @@ class CardActivity : AppCompatActivity() {
         for (dataUrl in images) {
             val base64 = dataUrl.split(",")[1]
             val decoded = Base64.decode(base64, Base64.DEFAULT)
+
             val bytes = BitmapFactory.decodeByteArray(decoded, 0, decoded.size)
 
             val imageView = ImageView(this)
@@ -278,7 +293,7 @@ class CardActivity : AppCompatActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         when (requestCode) {
-            IMAGE_PICKER_REQUEST -> {
+            IMAGE_PICKER_REQUEST, CAMERA_REQUEST -> {
                 currentDefinition?.let {
                     imagesMap.putIfAbsent(it.definition, ArrayList())
                     imagesMap[it.definition]?.addAll(ordboken.images)
@@ -322,5 +337,6 @@ class CardActivity : AppCompatActivity() {
     companion object {
         private const val IMAGE_PICKER_REQUEST = 0
         private const val SENTENCE_PICKER_REQUEST = 1
+        private const val CAMERA_REQUEST = 2
     }
 }
