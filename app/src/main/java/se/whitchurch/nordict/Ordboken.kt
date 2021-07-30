@@ -89,7 +89,7 @@ class Ordboken private constructor(context: Context) {
                 .build()
 
         mPrefs = context.getSharedPreferences("ordboken", Context.MODE_PRIVATE)
-        lastWhere = Where.valueOf(mPrefs.getString("lastWhere", Where.MAIN.toString()))
+        lastWhere = Where.valueOf(mPrefs.getString("lastWhere", Where.MAIN.toString())!!)
         lastWhat = mPrefs.getString("lastWhat", "ordbok")
         mConnMgr = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 

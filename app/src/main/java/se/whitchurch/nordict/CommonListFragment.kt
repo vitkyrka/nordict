@@ -95,11 +95,14 @@ abstract class CommonListFragment(private val mTable: String) : Fragment() {
 
     override fun onActivityCreated(savedInstanceState: Bundle?) {
         super.onActivityCreated(savedInstanceState)
-        registerForContextMenu(mListView)
+        registerForContextMenu(mListView!!)
     }
 
-    override fun onCreateContextMenu(menu: ContextMenu, v: View,
-                                     menuInfo: ContextMenu.ContextMenuInfo) {
+    override fun onCreateContextMenu(
+        menu: ContextMenu,
+        v: View,
+        menuInfo: ContextMenu.ContextMenuInfo?
+    ) {
         super.onCreateContextMenu(menu, v, menuInfo)
 
         val inflater = activity!!.menuInflater
@@ -138,14 +141,14 @@ abstract class CommonListFragment(private val mTable: String) : Fragment() {
         return true
     }
 
-    override fun onContextItemSelected(item: MenuItem?): Boolean {
+    override fun onContextItemSelected(item: MenuItem): Boolean {
         // This gets called on all fragments; this hack(?) makes us operate
         // on the correct one only.
         if (!userVisibleHint) {
             return false
         }
 
-        val info = item!!.menuInfo as AdapterContextMenuInfo
+        val info = item.menuInfo as AdapterContextMenuInfo
         val c = mListView?.adapter!!.getItem(info.position) as Cursor
 
         when (item.itemId) {

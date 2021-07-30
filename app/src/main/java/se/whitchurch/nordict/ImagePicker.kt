@@ -42,7 +42,7 @@ class ImagePicker : AppCompatActivity() {
         webView = findViewById(R.id.webView)
         webView.webChromeClient = object : WebChromeClient() {
             override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                Log.d("Webview", consoleMessage?.message())
+                Log.d("Webview", consoleMessage!!.message())
                 return true
             }
         }

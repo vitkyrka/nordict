@@ -156,7 +156,7 @@ class MainActivity : AppCompatActivity() {
         } else if (Intent.ACTION_VIEW == intent.action) {
             val url = intent.dataString
             val word = intent.getStringExtra(SearchManager.EXTRA_DATA_KEY)
-            Ordboken.startWordActivity(this, word, url!!)
+            Ordboken.startWordActivity(this, word!!, url!!)
 
             if (!mSeenResults) {
                 finish()

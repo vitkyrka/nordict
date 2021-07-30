@@ -172,7 +172,7 @@ class Korp(client: OkHttpClient) {
         }
 
         override fun onFailure(call: Call<QueryResponse>, t: Throwable) {
-            Log.e("Blah", t.message)
+            Log.e("Blah", t.message!!)
             callback(ArrayList())
         }
     }

@@ -43,7 +43,7 @@ class NeSuggestionProvider : ContentProvider() {
             return cursor
         }
 
-        val results = Ordboken.getInstance(context!!).search(q, 100)
+        val results = Ordboken.getInstance(context!!).search(q!!, 100)
         val flag = Ordboken.getInstance(context!!).currentFlag
         var j = 0
 
