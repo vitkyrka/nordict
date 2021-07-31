@@ -46,14 +46,6 @@
                 android:orientation="horizontal" />
         </HorizontalScrollView>
 
-        <LinearLayout
-            android:id="@+id/card_sentences"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/card_images_scroll" />
-
         <Spinner
             android:id="@+id/card_audio_index"
             android:layout_width="wrap_content"

@@ -28,7 +28,6 @@ class CardActivity : AppCompatActivity() {
     private var word: Word? = null
     private lateinit var anki: Anki
     private var imagesMap = HashMap<String, ArrayList<String>>()
-    private var sentencesMap = HashMap<String, ArrayList<String>>()
     private var currentDefinition: Word.Definition? = null
     private var currentCard: CardView? = null
     private var mAudio = ArrayList<String>()
@@ -111,8 +110,7 @@ class CardActivity : AppCompatActivity() {
 
             createButton.setOnClickListener {
                 val images = imagesMap[definition.definition] ?: ArrayList()
-                val sentences = sentencesMap[definition.definition] ?: ArrayList()
-                var examples = definition.examples + sentences
+                var examples = definition.examples
 
                 if (examples.isEmpty()) {
                     examples = arrayListOf(word.mTitle)
@@ -181,10 +179,8 @@ class CardActivity : AppCompatActivity() {
                         val empty = arrayListOf<String>()
 
                         imagesMap[definition.definition] = empty
-                        sentencesMap[definition.definition] = empty
 
                         showImages(card.findViewById<LinearLayout>(R.id.card_images), empty)
-                        showSentences(card.findViewById<LinearLayout>(R.id.card_sentences), empty)
                     }
                 }
                 visibility = View.VISIBLE
@@ -281,16 +277,6 @@ class CardActivity : AppCompatActivity() {
         }
     }
 
-    fun showSentences(view: ViewGroup, sentences: ArrayList<String>) {
-        view.removeAllViews()
-
-        sentences.forEach {
-            view.addView(TextView(this).apply {
-                text = Html.fromHtml(it.replace("em>", "strong>"), Html.FROM_HTML_MODE_LEGACY)
-            })
-        }
-    }
-
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         when (requestCode) {
             IMAGE_PICKER_REQUEST, CAMERA_REQUEST -> {
@@ -336,7 +322,6 @@ class CardActivity : AppCompatActivity() {
 
     companion object {
         private const val IMAGE_PICKER_REQUEST = 0
-        private const val SENTENCE_PICKER_REQUEST = 1
         private const val CAMERA_REQUEST = 2
     }
 }
