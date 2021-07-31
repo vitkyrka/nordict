@@ -74,6 +74,19 @@ class WiktionaryParser {
                 if (!preserve) it.remove()
             }
 
+            // Make image loading non-lazy since the lazy stuff doesn't seem to always work
+            // <noscript><img ...></noscript><span class="lazy-image-placeholder" ...>
+            element.select("span.lazy-image-placeholder")?.forEach {
+                it.remove()
+            }
+            element.select("noscript")?.forEach {
+                val outside = it.parent()
+
+                it.select("img").forEach { img ->
+                    img.appendTo(outside)
+                }
+            }
+
             val lemmas = ArrayList<Element>()
             var current = Element("div")
             var etymology: Element? = null
