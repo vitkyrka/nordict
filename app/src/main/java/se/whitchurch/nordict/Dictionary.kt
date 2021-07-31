@@ -8,6 +8,7 @@ import okhttp3.Request
 abstract class Dictionary(val client: OkHttpClient) {
     abstract val tag: String;
     abstract val flag: Int
+    abstract val lang: String
     abstract fun init()
     abstract fun search(query: String): List<SearchResult>
     abstract fun fullSearch(query: String): List<SearchResult>

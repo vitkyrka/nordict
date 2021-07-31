@@ -10,6 +10,7 @@ import org.json.JSONException
 class SoDictionary(client: OkHttpClient) : Dictionary(client) {
     override val tag: String = "SO"
     override val flag: Int = R.drawable.flag_se
+    override val lang: String = "se"
     override fun init() = Unit
 
     private fun searchApiRequest(requestUrl: String): JSONArray {

@@ -84,15 +84,17 @@ class ImagePicker : AppCompatActivity() {
             setText(word)
         }
 
+        val lang = ordboken.currentDictionary.lang
+
         findViewById<Button>(R.id.search_button).apply {
             setOnClickListener {
                 val q = searchText.text.toString()
-                webView.loadUrl("https://www.google.se/search?tbm=isch&q=" + Uri.encode(q))
+                webView.loadUrl("https://www.google.$lang/search?tbm=isch&q=" + Uri.encode(q))
 
             }
         }
 
-        webView.loadUrl("https://www.google.se/search?tbm=isch&q=" + Uri.encode(word))
+        webView.loadUrl("https://www.google.$lang/search?tbm=isch&q=" + Uri.encode(word))
     }
 
     private inner class WcmJsObject {
