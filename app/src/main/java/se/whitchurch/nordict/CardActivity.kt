@@ -41,7 +41,9 @@ class CardActivity : AppCompatActivity() {
         val cardExample = card.findViewById<TextView>(R.id.cardExample)
         cardTitle.text = title
 
-        cardExample.text = examples.joinToString(separator = "; ")
+
+        val examplesText = if (examples.isNotEmpty()) "• " else "";
+        cardExample.text = examplesText + examples.joinToString(separator = "\n• ")
 
         mLeftCards += 1
 
