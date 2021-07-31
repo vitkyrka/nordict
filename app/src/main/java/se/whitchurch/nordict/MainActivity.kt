@@ -82,7 +82,13 @@ class MainActivity : AppCompatActivity() {
 
     }
 
-    private inner class SearchResultAdapter(context: Context, results: Array<SearchResult>) : ArrayAdapter<SearchResult>(context, android.R.layout.simple_list_item_2, android.R.id.text1, results) {
+    private inner class SearchResultAdapter(context: Context, results: Array<SearchResult>) :
+        ArrayAdapter<SearchResult>(
+            context,
+            android.R.layout.simple_list_item_2,
+            android.R.id.text1,
+            results
+        ) {
 
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val view = super.getView(position, convertView, parent)

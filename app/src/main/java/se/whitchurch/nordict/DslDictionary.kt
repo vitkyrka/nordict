@@ -10,15 +10,15 @@ import org.jsoup.Jsoup
 import java.util.regex.Pattern
 
 abstract class DslDictionary(client: OkHttpClient) : Dictionary(client) {
-    abstract val shortName: String;
+    abstract val shortName: String
     override fun init() = Unit
 
     private fun getEntryUri(id: String, paramName: String = "entry_id"): Uri {
         return Uri.parse("https://ordnet.dk/${shortName}/ordbog")
-                .buildUpon()
-                .appendQueryParameter(paramName, id)
-                .appendQueryParameter("query", ".")
-                .build()
+            .buildUpon()
+            .appendQueryParameter(paramName, id)
+            .appendQueryParameter("query", ".")
+            .build()
     }
 
     private fun getApiWord(uri: Uri): Word? {
@@ -31,7 +31,7 @@ abstract class DslDictionary(client: OkHttpClient) : Dictionary(client) {
 
         val id = matcher.group(1)
         val word = getMainSiteWord(Uri.parse("https://ordnet.dk/ddo/ordbog?entry_id=$id&query=."))
-                ?: return null
+            ?: return null
 
         val doc = Jsoup.parse(page, "https://ws.dsl.dk/${shortName}}/")
         val wordLinks = doc.select(".short-result ul li a")
@@ -89,8 +89,12 @@ abstract class DslDictionary(client: OkHttpClient) : Dictionary(client) {
         doc.select(".ar").forEach {
             val id = it.id()
             val k = it.selectFirst(".k") ?: return@forEach
-            results.add(SearchResult(k.text(),
-                    Uri.parse("https://ordnet.dk/${shortName}/ordbog?entry_id=$id&query=.")))
+            results.add(
+                SearchResult(
+                    k.text(),
+                    Uri.parse("https://ordnet.dk/${shortName}/ordbog?entry_id=$id&query=.")
+                )
+            )
         }
 
         return results
@@ -98,8 +102,8 @@ abstract class DslDictionary(client: OkHttpClient) : Dictionary(client) {
 
     private fun publicApiRequest(requestUrl: String): JSONArray {
         val request = Request.Builder().url(requestUrl)
-                .addHeader("Accept", "application/json")
-                .build()
+            .addHeader("Accept", "application/json")
+            .build()
         val response = client.newCall(request).execute()
 
         if (!response.isSuccessful) {
@@ -123,8 +127,18 @@ abstract class DslDictionary(client: OkHttpClient) : Dictionary(client) {
             val words = publicApiRequest(uriBuilder.build().toString())
 
             for (i in 0 until words.length()) {
-                results.add(SearchResult(words.getString(i),
-                        Uri.parse("https://ws.dsl.dk/${shortName}/query?app=android&version=2.1.5&q=${Uri.encode(words.getString(i))}")))
+                results.add(
+                    SearchResult(
+                        words.getString(i),
+                        Uri.parse(
+                            "https://ws.dsl.dk/${shortName}/query?app=android&version=2.1.5&q=${
+                                Uri.encode(
+                                    words.getString(i)
+                                )
+                            }"
+                        )
+                    )
+                )
             }
         } catch (e: JSONException) {
         }
@@ -136,6 +150,7 @@ abstract class DslDictionary(client: OkHttpClient) : Dictionary(client) {
 
     companion object {
         const val NAME = "DDO"
-        private val MAIN_SITE_CONTENT_PATTERN = Pattern.compile("class=\"ar(?:tikel)?\" id=\"([0-9]+)\"", Pattern.DOTALL)
+        private val MAIN_SITE_CONTENT_PATTERN =
+            Pattern.compile("class=\"ar(?:tikel)?\" id=\"([0-9]+)\"", Pattern.DOTALL)
     }
 }

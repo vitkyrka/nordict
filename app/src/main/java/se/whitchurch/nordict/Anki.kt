@@ -30,20 +30,29 @@ class Anki(val context: Context) {
             }
         }
 
-        return api.addNewCustomModel(Model.NAME, Model.FIELDS, Model.CARD_NAMES,
-                Model.getQuestionFormats(context),
-                Model.AFMT, null, null, null)
+        return api.addNewCustomModel(
+            Model.NAME, Model.FIELDS, Model.CARD_NAMES,
+            Model.getQuestionFormats(context),
+            Model.AFMT, null, null, null
+        )
     }
 
-    fun createCard(deck: String, text: String, examples: List<String>, images: List<String>, audio: String): Long? {
+    fun createCard(
+        deck: String,
+        text: String,
+        examples: List<String>,
+        images: List<String>,
+        audio: String
+    ): Long? {
         // Anki centers text by default, which is not optimal for large HTML pages.
         val back = "<div style=\"text-align: left\">$text</div>"
 
         val fields = arrayOf(
-                JSONArray(images).toString(),
-                JSONArray(examples).toString(),
-                audio,
-                back)
+            JSONArray(images).toString(),
+            JSONArray(examples).toString(),
+            audio,
+            back
+        )
 
         return api.addNote(getModelId()!!, getDeckId(deck)!!, fields, null)
     }

@@ -15,9 +15,9 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
 
     private fun searchApiRequest(requestUrl: String): JSONArray {
         val request = Request.Builder().url(requestUrl)
-                // Server uses Referer to determine whether to link to so/ or tre/
-                .addHeader("Referer", "https://svenska.se/so/")
-                .build()
+            // Server uses Referer to determine whether to link to so/ or tre/
+            .addHeader("Referer", "https://svenska.se/so/")
+            .build()
         val response = client.newCall(request).execute()
 
         if (!response.isSuccessful) {
@@ -42,7 +42,7 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
             val words = searchApiRequest(uriBuilder.build().toString())
 
             for (i in 0 until words.length()) {
-                val word = words.getJSONObject(i);
+                val word = words.getJSONObject(i)
                 val label = word.getString("label")
                 val link = word.getString("link")
                 results.add(SearchResult(label, Uri.parse("https://svenska.se/$link")))

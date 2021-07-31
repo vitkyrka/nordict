@@ -19,6 +19,7 @@ class OrdbokenContract {
     abstract class FavoritesEntry : BaseColumns {
         companion object {
             val TABLE_NAME = "favorites"
+
             /* Must match HistoryEntry because of CommonListFragment */
             val _ID = "_id"
             val COLUMN_NAME_DICT = "dict"

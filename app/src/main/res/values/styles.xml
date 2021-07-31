@@ -5,8 +5,7 @@
         <item name="actionBarStyle">@style/ActionBarStyle</item>
     </style>
 
-    <style name="ActionBarStyle">
-    </style>
+    <style name="ActionBarStyle"></style>
 
     <style name="AppTheme.NoActionBar">
         <item name="windowActionBar">false</item>

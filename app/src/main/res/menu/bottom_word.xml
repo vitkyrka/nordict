@@ -3,24 +3,24 @@
 
     <item
         android:id="@+id/menu_autoplay"
-        android:icon="@drawable/autoplay_off"
-        app:showAsAction="ifRoom"
-        android:visible="true"
         android:checkable="true"
-        android:title="Autoplay audio" />
+        android:icon="@drawable/autoplay_off"
+        android:title="Autoplay audio"
+        android:visible="true"
+        app:showAsAction="ifRoom" />
 
     <item
         android:id="@+id/menu_share"
         android:icon="@drawable/add_card"
-        app:showAsAction="always"
+        android:title="Add card"
         android:visible="true"
-        android:title="Add card" />
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/menu_play"
         android:icon="@drawable/play"
-        app:showAsAction="always"
+        android:title="Play audio"
         android:visible="true"
-        android:title="Play audio" />
+        app:showAsAction="always" />
 
 </menu>

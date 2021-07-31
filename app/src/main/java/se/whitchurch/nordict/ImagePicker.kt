@@ -119,9 +119,11 @@ class ImagePicker : AppCompatActivity() {
         @JavascriptInterface
         fun pushPickerHtml(html: String) {
             runOnUiThread(Runnable {
-                webView.loadDataWithBaseURL(GSTATIC_SERVER,
-                        html + "<script>" + getImagePickerJs() + "</script>",
-                        "text/html", "UTF-8", null)
+                webView.loadDataWithBaseURL(
+                    GSTATIC_SERVER,
+                    html + "<script>" + getImagePickerJs() + "</script>",
+                    "text/html", "UTF-8", null
+                )
             })
         }
     }

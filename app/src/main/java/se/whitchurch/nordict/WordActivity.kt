@@ -252,8 +252,10 @@ class WordActivity : AppCompatActivity() {
 
         builder.append(footer)
 
-        mWebView!!.loadDataWithBaseURL(word.baseUrl, builder.toString(),
-                "text/html", "UTF-8", null)
+        mWebView!!.loadDataWithBaseURL(
+            word.baseUrl, builder.toString(),
+            "text/html", "UTF-8", null
+        )
     }
 
     private fun updateStar() {
@@ -273,19 +275,19 @@ class WordActivity : AppCompatActivity() {
             val results = mOrdboken?.currentDictionary?.search(q) ?: return fake
 
             if (results.isEmpty()) {
-                return fake;
+                return fake
             }
 
             val first = results[0]
             if (first.mTitle != q) {
-                return fake;
+                return fake
             }
 
             if (results.size == 1 || results[1].mTitle != first.mTitle) {
-                return first;
+                return first
             }
 
-            return fake;
+            return fake
         }
 
         override fun onPostExecute(result: SearchResult) {
@@ -308,7 +310,8 @@ class WordActivity : AppCompatActivity() {
         }
     }
 
-    private inner class WordTask : AsyncTask<Triple<Uri, WordList, Boolean>, Void, Pair<Word?, WordList>>() {
+    private inner class WordTask :
+        AsyncTask<Triple<Uri, WordList, Boolean>, Void, Pair<Word?, WordList>>() {
         override fun doInBackground(vararg params: Triple<Uri, WordList, Boolean>): Pair<Word?, WordList> {
             val wordList = params[0].second
             var word: Word? = null
@@ -363,11 +366,11 @@ class WordActivity : AppCompatActivity() {
             mediaPlayer.setDataSource(urls[0])
         } catch (e: Exception) {
             Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
-                    .show()
+                .show()
             return
         }
 
-        var current = 0;
+        var current = 0
         mediaPlayer.setOnCompletionListener {
             current += 1
             if (urls.size <= current) {
@@ -385,7 +388,7 @@ class WordActivity : AppCompatActivity() {
 
         mediaPlayer.setOnErrorListener { mp, what, extra ->
             Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
-                    .show()
+                .show()
             false
         }
 
@@ -401,7 +404,7 @@ class WordActivity : AppCompatActivity() {
         } catch (e: Exception) {
             setProgressBarIndeterminateVisibility(false)
             Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
-                    .show()
+                .show()
             return
         }
 
@@ -413,7 +416,7 @@ class WordActivity : AppCompatActivity() {
         mediaPlayer.setOnErrorListener { mp, what, extra ->
             setProgressBarIndeterminateVisibility(false)
             Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
-                    .show()
+                .show()
             false
         }
 
@@ -447,9 +450,11 @@ class WordActivity : AppCompatActivity() {
             }
 
         protected fun isStarred(db: SQLiteDatabase): Boolean {
-            val cursor = db.query(FavoritesEntry.TABLE_NAME, null,
-                    FavoritesEntry.COLUMN_NAME_URL + "=?",
-                    arrayOf(mWord!!.uri.toString()), null, null, null, "1")
+            val cursor = db.query(
+                FavoritesEntry.TABLE_NAME, null,
+                FavoritesEntry.COLUMN_NAME_URL + "=?",
+                arrayOf(mWord!!.uri.toString()), null, null, null, "1"
+            )
             val count = cursor.count
 
             cursor.close()
@@ -481,9 +486,11 @@ class WordActivity : AppCompatActivity() {
             val starred = isStarred(db)
 
             if (starred) {
-                db.delete(FavoritesEntry.TABLE_NAME,
-                        FavoritesEntry.COLUMN_NAME_URL + "=?",
-                        arrayOf(mWord!!.uri.toString()))
+                db.delete(
+                    FavoritesEntry.TABLE_NAME,
+                    FavoritesEntry.COLUMN_NAME_URL + "=?",
+                    arrayOf(mWord!!.uri.toString())
+                )
             } else {
                 val values = ContentValues()
 

@@ -25,9 +25,9 @@
                 android:id="@+id/toolbar"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:layout_collapseMode="pin"
                 android:background="?attr/colorPrimary"
                 android:theme="@style/ThemeOverlay.MaterialComponents.ActionBar"
+                app:layout_collapseMode="pin"
                 app:popupTheme="@style/AppTheme.PopupOverlay" />
 
         </com.google.android.material.appbar.CollapsingToolbarLayout>
@@ -47,21 +47,20 @@
 
             <EditText
                 android:id="@+id/deckName"
-                android:layout_margin="10dp"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content" />
+                android:layout_height="wrap_content"
+                android:layout_margin="10dp" />
 
             <LinearLayout
                 android:id="@+id/cardHolder"
-                android:orientation="vertical"
-                android:padding="10dp"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent">
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:padding="10dp">
 
             </LinearLayout>
 
         </LinearLayout>
-
 
 
     </androidx.core.widget.NestedScrollView>

@@ -2,44 +2,44 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".MainActivity" >
+    tools:context=".MainActivity">
 
-   <ListView
+    <ListView
         android:id="@android:id/list"
         android:layout_width="fill_parent"
         android:layout_height="match_parent" />
 
-   <LinearLayout
-       android:id="@+id/list_empty"
-       android:layout_width="fill_parent"
-       android:layout_height="fill_parent"
-       android:layout_gravity="center"
-       android:gravity="center"
-       android:orientation="vertical" >
+    <LinearLayout
+        android:id="@+id/list_empty"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:layout_gravity="center"
+        android:gravity="center"
+        android:orientation="vertical">
 
-       <ProgressBar
-           android:id="@+id/main_progress"
-           style="?android:attr/progressBarStyleLarge"
-           android:layout_width="wrap_content"
-           android:layout_height="wrap_content"
-           android:layout_marginBottom="8dp" />
+        <ProgressBar
+            android:id="@+id/main_progress"
+            style="?android:attr/progressBarStyleLarge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp" />
 
-       <TextView
-           android:id="@+id/main_status"
-           android:layout_width="wrap_content"
-           android:layout_height="wrap_content"
-           android:layout_marginBottom="16dp"
-           android:fontFamily="sans-serif-light"
-           android:text="@string/loading"
-           android:textAppearance="?android:attr/textAppearanceMedium" />
+        <TextView
+            android:id="@+id/main_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:fontFamily="sans-serif-light"
+            android:text="@string/loading"
+            android:textAppearance="?android:attr/textAppearanceMedium" />
 
-       <Button
-           android:id="@+id/main_retry"
-           android:layout_width="wrap_content"
-           android:layout_height="wrap_content"
-           android:text="@string/tryagain"
-           android:onClick="doSearchAgain"
-           android:visibility="gone" />
+        <Button
+            android:id="@+id/main_retry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:onClick="doSearchAgain"
+            android:text="@string/tryagain"
+            android:visibility="gone" />
     </LinearLayout>
 
 </RelativeLayout>

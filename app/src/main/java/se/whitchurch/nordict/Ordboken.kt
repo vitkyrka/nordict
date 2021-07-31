@@ -9,7 +9,6 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.net.ConnectivityManager
 import android.net.Uri
-import android.util.Log
 import android.util.LruCache
 import android.util.Pair
 import android.view.Menu
@@ -72,21 +71,22 @@ class Ordboken private constructor(context: Context) {
     init {
         val cache = Cache(context.cacheDir, (50 * 1024 * 1024).toLong())
         client = OkHttpClient.Builder()
-                .cache(cache)
-                .addInterceptor {
-                    var request = it.request()
+            .cache(cache)
+            .addInterceptor {
+                var request = it.request()
 
-                    if (isOnline) {
-                        request = request.newBuilder().header("Cache-Control", "public, max-age=86400, max-stale=86400").build()
-                    } else {
-                        request = request.newBuilder()
-                                .cacheControl(CacheControl.FORCE_CACHE).build()
-                    }
-
-                    it.proceed(request)
+                if (isOnline) {
+                    request = request.newBuilder()
+                        .header("Cache-Control", "public, max-age=86400, max-stale=86400").build()
+                } else {
+                    request = request.newBuilder()
+                        .cacheControl(CacheControl.FORCE_CACHE).build()
                 }
-                .readTimeout(120, TimeUnit.SECONDS)
-                .build()
+
+                it.proceed(request)
+            }
+            .readTimeout(120, TimeUnit.SECONDS)
+            .build()
 
         mPrefs = context.getSharedPreferences("ordboken", Context.MODE_PRIVATE)
         lastWhere = Where.valueOf(mPrefs.getString("lastWhere", Where.MAIN.toString())!!)
@@ -170,13 +170,24 @@ class Ordboken private constructor(context: Context) {
         }
     }
 
-    fun initSearchView(activity: AppCompatActivity, menu: Menu, query: String?, focus: Boolean): SearchView {
+    fun initSearchView(
+        activity: AppCompatActivity,
+        menu: Menu,
+        query: String?,
+        focus: Boolean
+    ): SearchView {
         val searchManager = activity
-                .getSystemService(Context.SEARCH_SERVICE) as SearchManager
+            .getSystemService(Context.SEARCH_SERVICE) as SearchManager
         val searchView = activity.findViewById<View>(R.id.mySearchView) as SearchView
 
-        searchView.setSearchableInfo(searchManager.getSearchableInfo(ComponentName(activity,
-                MainActivity::class.java)))
+        searchView.setSearchableInfo(
+            searchManager.getSearchableInfo(
+                ComponentName(
+                    activity,
+                    MainActivity::class.java
+                )
+            )
+        )
 
         // Hack to get the magnifying glass icon inside the EditText
         searchView.setIconifiedByDefault(true)
@@ -204,8 +215,8 @@ class Ordboken private constructor(context: Context) {
             val upIntent = NavUtils.getParentActivityIntent(activity)
             if (NavUtils.shouldUpRecreateTask(activity, upIntent!!)) {
                 TaskStackBuilder.create(activity)
-                        .addNextIntentWithParentStack(upIntent)
-                        .startActivities()
+                    .addNextIntentWithParentStack(upIntent)
+                    .startActivities()
             } else {
                 NavUtils.navigateUpFromSameTask(activity)
             }

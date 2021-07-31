@@ -8,7 +8,8 @@ import se.whitchurch.nordict.OrdbokenContract.FavoritesEntry
 import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
 import java.util.*
 
-class OrdbokenDbHelper(context: Context) : SQLiteOpenHelper(context, DATBASE_NAME, null, DATABASE_VERSION) {
+class OrdbokenDbHelper(context: Context) :
+    SQLiteOpenHelper(context, DATBASE_NAME, null, DATABASE_VERSION) {
 
     override fun onCreate(db: SQLiteDatabase) {
         db.execSQL(SQL_CREATE_HISTORY)
@@ -25,7 +26,10 @@ class OrdbokenDbHelper(context: Context) : SQLiteOpenHelper(context, DATBASE_NAM
         db.insert(HistoryEntry.TABLE_NAME, null, ContentValues().apply {
             put(HistoryEntry.COLUMN_NAME_TITLE, "ordbog")
             put(HistoryEntry.COLUMN_NAME_DICT, "DDO")
-            put(HistoryEntry.COLUMN_NAME_URL, "https://ordnet.dk/ddo/ordbog?entry_id=11037894&query=.")
+            put(
+                HistoryEntry.COLUMN_NAME_URL,
+                "https://ordnet.dk/ddo/ordbog?entry_id=11037894&query=."
+            )
             put(HistoryEntry.COLUMN_NAME_SUMMARY, "")
             put(HistoryEntry.COLUMN_NAME_DATE, Date().time)
         })

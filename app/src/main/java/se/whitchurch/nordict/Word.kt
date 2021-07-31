@@ -4,12 +4,14 @@ import android.net.Uri
 import org.jsoup.nodes.Element
 import java.util.*
 
-class Word(val dict: String, val mTitle: String, val mSlug: String, val summary: String,
-           val mText: String, internal val uri: Uri,
-           internal val baseUrl: String,
-           val element: Element,
-           val header: String, val lemma: Element? = null,
-           val xrefs: ArrayList<String> = ArrayList<String>()) {
+class Word(
+    val dict: String, val mTitle: String, val mSlug: String, val summary: String,
+    val mText: String, internal val uri: Uri,
+    internal val baseUrl: String,
+    val element: Element,
+    val header: String, val lemma: Element? = null,
+    val xrefs: ArrayList<String> = ArrayList<String>()
+) {
     var pos: Pos = Pos.UNKNOWN
     var gender: String = ""
     val mHomographs: ArrayList<SearchResult>

@@ -26,11 +26,18 @@ class NeSuggestionProvider : ContentProvider() {
         return false
     }
 
-    override fun query(uri: Uri, projection: Array<String>?, selection: String?, selectionArgs: Array<String>?,
-                       sortOrder: String?): Cursor? {
-        val columns = arrayOf(BaseColumns._ID, SearchManager.SUGGEST_COLUMN_TEXT_1, SearchManager.SUGGEST_COLUMN_TEXT_2,
-                SearchManager.SUGGEST_COLUMN_ICON_1,
-                SearchManager.SUGGEST_COLUMN_INTENT_DATA, SearchManager.SUGGEST_COLUMN_INTENT_EXTRA_DATA)
+    override fun query(
+        uri: Uri, projection: Array<String>?, selection: String?, selectionArgs: Array<String>?,
+        sortOrder: String?
+    ): Cursor? {
+        val columns = arrayOf(
+            BaseColumns._ID,
+            SearchManager.SUGGEST_COLUMN_TEXT_1,
+            SearchManager.SUGGEST_COLUMN_TEXT_2,
+            SearchManager.SUGGEST_COLUMN_ICON_1,
+            SearchManager.SUGGEST_COLUMN_INTENT_DATA,
+            SearchManager.SUGGEST_COLUMN_INTENT_EXTRA_DATA
+        )
         val cursor = MatrixCursor(columns)
         val q = uri.lastPathSegment
 
@@ -48,7 +55,16 @@ class NeSuggestionProvider : ContentProvider() {
         var j = 0
 
         for (result in results) {
-            cursor.addRow(arrayOf(j, result.mTitle, result.mSummary, flag, result.uri, result.mTitle))
+            cursor.addRow(
+                arrayOf(
+                    j,
+                    result.mTitle,
+                    result.mSummary,
+                    flag,
+                    result.uri,
+                    result.mTitle
+                )
+            )
             j += 1
         }
 

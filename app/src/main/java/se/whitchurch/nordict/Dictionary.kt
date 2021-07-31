@@ -6,7 +6,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 
 abstract class Dictionary(val client: OkHttpClient) {
-    abstract val tag: String;
+    abstract val tag: String
     abstract val flag: Int
     abstract val lang: String
     abstract fun init()

@@ -7,11 +7,9 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
-import org.jsoup.Jsoup
-import java.util.regex.Pattern
 
 abstract class Wiktionary(client: OkHttpClient) : Dictionary(client) {
-    abstract val shortName: String;
+    abstract val shortName: String
     override fun init() = Unit
 
     override fun get(uri: Uri): Word? {
@@ -40,8 +38,8 @@ abstract class Wiktionary(client: OkHttpClient) : Dictionary(client) {
 
     private fun publicApiRequest(requestUrl: String): JSONArray {
         val request = Request.Builder().url(requestUrl)
-                .addHeader("Accept", "application/json")
-                .build()
+            .addHeader("Accept", "application/json")
+            .build()
         val response = client.newCall(request).execute()
 
         if (!response.isSuccessful) {
@@ -55,7 +53,8 @@ abstract class Wiktionary(client: OkHttpClient) : Dictionary(client) {
 
     override fun search(query: String): List<SearchResult> {
         val results = ArrayList<SearchResult>()
-        val uriBuilder = Uri.parse("https://${shortName}.wiktionary.org/w/rest.php/v1/search/title").buildUpon()
+        val uriBuilder =
+            Uri.parse("https://${shortName}.wiktionary.org/w/rest.php/v1/search/title").buildUpon()
 
         uriBuilder.appendQueryParameter("q", query)
         uriBuilder.appendQueryParameter("limit", 10.toString())
@@ -68,8 +67,12 @@ abstract class Wiktionary(client: OkHttpClient) : Dictionary(client) {
                 val title = page.getString("title")
                 val id = page.getInt("id")
 
-                results.add(SearchResult(title,
-                        Uri.parse("https://${shortName}.m.wiktionary.org/?curid=${id}")))
+                results.add(
+                    SearchResult(
+                        title,
+                        Uri.parse("https://${shortName}.m.wiktionary.org/?curid=${id}")
+                    )
+                )
             }
         } catch (e: JSONException) {
         }

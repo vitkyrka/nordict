@@ -50,7 +50,7 @@ class WiktionaryParser {
                     it.remove()
                 }
 
-                preserve = false;
+                preserve = false
 
                 // <span class="sectionlangue" id="fr">Français</span>
                 it.selectFirst("#$shortName")?.let {
@@ -65,7 +65,7 @@ class WiktionaryParser {
                     Log.i("foo", headline.id())
                     if (headline.id().startsWith("Traductions")) {
                         it.remove()
-                        preserve = false;
+                        preserve = false
                         return@forEach
                     }
                 }
@@ -137,11 +137,13 @@ class WiktionaryParser {
 
                 first = false
 
-                val headword = Word(tag, word, word, summary.toString(), cleanpage, newUri,
-                        "https://${shortName}.m.wiktionary.org/",
-                        element,
-                        doc.head().html() + "<body>",
-                        lemma)
+                val headword = Word(
+                    tag, word, word, summary.toString(), cleanpage, newUri,
+                    "https://${shortName}.m.wiktionary.org/",
+                    element,
+                    doc.head().html() + "<body>",
+                    lemma
+                )
 
                 headword.xrefs.add(ref)
 

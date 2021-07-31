@@ -6,10 +6,8 @@ import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.media.AudioManager
 import android.media.MediaPlayer
-import android.net.Uri
 import android.os.AsyncTask
 import android.os.Bundle
-import android.text.Html
 import android.util.Base64
 import android.view.View
 import android.view.ViewGroup
@@ -42,7 +40,7 @@ class CardActivity : AppCompatActivity() {
         cardTitle.text = title
 
 
-        val examplesText = if (examples.isNotEmpty()) "• " else "";
+        val examplesText = if (examples.isNotEmpty()) "• " else ""
         cardExample.text = examplesText + examples.joinToString(separator = "\n• ")
 
         mLeftCards += 1
@@ -50,12 +48,19 @@ class CardActivity : AppCompatActivity() {
         return card as CardView
     }
 
-    private fun createCard(text: String, examples: List<String>, images: List<String>, audio: String) {
+    private fun createCard(
+        text: String,
+        examples: List<String>,
+        images: List<String>,
+        audio: String
+    ) {
         val deckName = findViewById<EditText>(R.id.deckName).text.toString()
         val id = anki.createCard(deckName, text, examples, images, audio)
 
-        Toast.makeText(this, if (id == null) "Fail" else "Card added to $deckName",
-                Toast.LENGTH_SHORT).show()
+        Toast.makeText(
+            this, if (id == null) "Fail" else "Card added to $deckName",
+            Toast.LENGTH_SHORT
+        ).show()
 
         if (id != null) {
             mLeftCards -= 1
@@ -84,7 +89,7 @@ class CardActivity : AppCompatActivity() {
         } catch (e: Exception) {
             setProgressBarIndeterminateVisibility(false)
             Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
-                    .show()
+                .show()
             return
         }
 
@@ -96,7 +101,7 @@ class CardActivity : AppCompatActivity() {
         mediaPlayer.setOnErrorListener { mp, what, extra ->
             setProgressBarIndeterminateVisibility(false)
             Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
-                    .show()
+                .show()
             false
         }
 
@@ -119,19 +124,24 @@ class CardActivity : AppCompatActivity() {
                 }
 
                 val audioIdx = if (mAudio.size > 1) {
-                    card.findViewById<Spinner>(R.id.card_audio_index).selectedItem.toString().toInt() - 1
+                    card.findViewById<Spinner>(R.id.card_audio_index).selectedItem.toString()
+                        .toInt() - 1
                 } else {
                     0
                 }
 
                 createCard(word.getPage(listOf(definition), ordboken.currentCss),
-                        examples, images, mAudio.elementAtOrElse(audioIdx) { _ -> "" })
+                    examples, images, mAudio.elementAtOrElse(audioIdx) { _ -> "" })
                 card.visibility = View.GONE
             }
 
             if (mAudio.size > 1) {
                 card.findViewById<Spinner>(R.id.card_audio_index).apply {
-                    ArrayAdapter(context, android.R.layout.simple_spinner_item, (1..mAudio.size).toList()).also { adapter ->
+                    ArrayAdapter(
+                        context,
+                        android.R.layout.simple_spinner_item,
+                        (1..mAudio.size).toList()
+                    ).also { adapter ->
                         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
                         this.adapter = adapter
                     }
@@ -139,7 +149,12 @@ class CardActivity : AppCompatActivity() {
                     visibility = View.VISIBLE
                     setSelection(0, false)
                     onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                        override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                        override fun onItemSelected(
+                            parent: AdapterView<*>?,
+                            view: View?,
+                            position: Int,
+                            id: Long
+                        ) {
                             playAudio(word.audio[position])
                         }
 
@@ -217,21 +232,29 @@ class CardActivity : AppCompatActivity() {
         setSupportActionBar(toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
-        if (ContextCompat.checkSelfPermission(this,
-                        AddContentApi.READ_WRITE_PERMISSION) != PackageManager.PERMISSION_GRANTED) {
+        if (ContextCompat.checkSelfPermission(
+                this,
+                AddContentApi.READ_WRITE_PERMISSION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
 
             // Permission is not granted
             // Should we show an explanation?
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
-                            AddContentApi.READ_WRITE_PERMISSION)) {
+            if (ActivityCompat.shouldShowRequestPermissionRationale(
+                    this,
+                    AddContentApi.READ_WRITE_PERMISSION
+                )
+            ) {
                 // Show an explanation to the user *asynchronously* -- don't block
                 // this thread waiting for the user's response! After the user
                 // sees the explanation, try again to request the permission.
             } else {
                 // No explanation needed; request the permission
-                ActivityCompat.requestPermissions(this,
-                        arrayOf(AddContentApi.READ_WRITE_PERMISSION),
-                        1)
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(AddContentApi.READ_WRITE_PERMISSION),
+                    1
+                )
 
                 // MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
                 // app-defined int constant. The callback method gets the
@@ -243,7 +266,8 @@ class CardActivity : AppCompatActivity() {
 
         anki = Anki(this)
 
-        var deckName = getPreferences(Context.MODE_PRIVATE)?.getString("deckName", "Nordict") ?: "Nordict"
+        var deckName =
+            getPreferences(Context.MODE_PRIVATE)?.getString("deckName", "Nordict") ?: "Nordict"
 
         intent?.getStringExtra("deckName")?.let {
             saveDeckName = false
@@ -296,12 +320,12 @@ class CardActivity : AppCompatActivity() {
 
     }
 
-    fun getAudio(word: Word) : ArrayList<String> {
+    fun getAudio(word: Word): ArrayList<String> {
         var audio = ArrayList<String>()
 
         word.audio.forEach {
             val request = Request.Builder().url(it)
-                    .build()
+                .build()
             val response = ordboken.client.newCall(request).execute()
             if (response.isSuccessful) {
                 audio.add(Base64.encodeToString(response.body?.bytes(), Base64.DEFAULT))

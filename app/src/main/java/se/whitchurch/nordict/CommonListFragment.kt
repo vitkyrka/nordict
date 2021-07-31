@@ -18,7 +18,11 @@ abstract class CommonListFragment(private val mTable: String) : Fragment() {
     private var mListView: ListView? = null
     private var mEmpty: TextView? = null
 
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
+    override fun onCreateView(
+        inflater: LayoutInflater,
+        container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
         val view = inflater.inflate(R.layout.fragment_list, container, false)
 
         mEmpty = view.findViewById<View>(android.R.id.empty) as TextView
@@ -27,7 +31,7 @@ abstract class CommonListFragment(private val mTable: String) : Fragment() {
         mListView?.setOnItemClickListener { parent, view, position, id ->
             val c = (parent as ListView).getItemAtPosition(position) as Cursor
             val title = c
-                    .getString(c.getColumnIndex(HistoryEntry.COLUMN_NAME_TITLE))
+                .getString(c.getColumnIndex(HistoryEntry.COLUMN_NAME_TITLE))
             val url = c.getString(c.getColumnIndex(HistoryEntry.COLUMN_NAME_URL))
 
             Ordboken.startWordActivity(activity as AppCompatActivity, title, url)
@@ -56,11 +60,15 @@ abstract class CommonListFragment(private val mTable: String) : Fragment() {
             val cursor = getCursor(db)
             val ordboken = Ordboken.getInstance(activity!!)
 
-            return object : SimpleCursorAdapter(activity,
-                    R.layout.word_list_item, cursor,
-                    arrayOf(HistoryEntry.COLUMN_NAME_TITLE, HistoryEntry.COLUMN_NAME_SUMMARY,
-                            HistoryEntry.COLUMN_NAME_DICT),
-                    intArrayOf(R.id.text1, R.id.text2), 0) {
+            return object : SimpleCursorAdapter(
+                activity,
+                R.layout.word_list_item, cursor,
+                arrayOf(
+                    HistoryEntry.COLUMN_NAME_TITLE, HistoryEntry.COLUMN_NAME_SUMMARY,
+                    HistoryEntry.COLUMN_NAME_DICT
+                ),
+                intArrayOf(R.id.text1, R.id.text2), 0
+            ) {
 
                 override fun newView(context: Context?, cursor: Cursor?, parent: ViewGroup?): View {
                     val view = super.newView(context, cursor, parent)
@@ -75,7 +83,8 @@ abstract class CommonListFragment(private val mTable: String) : Fragment() {
                     super.bindView(view, context, cursor)
 
                     val imageView = view?.tag as ImageView
-                    val dict = cursor?.getString(cursor.getColumnIndex(HistoryEntry.COLUMN_NAME_DICT))
+                    val dict =
+                        cursor?.getString(cursor.getColumnIndex(HistoryEntry.COLUMN_NAME_DICT))
                             ?: return
                     val flag = ordboken.dictMap[dict]?.flag ?: return
 

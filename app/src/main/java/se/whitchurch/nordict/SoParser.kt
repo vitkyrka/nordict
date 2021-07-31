@@ -37,11 +37,12 @@ class SoParser {
             val neutr = bojning.indexOf("neutr.")
             val ngenus = bojning.indexOf("n-genus")
 
-            headword.gender = if (definite.endsWith("t") || neutr >= 0 && (ngenus < 0 || neutr < ngenus)) {
-                "t"
-            } else {
-                "n"
-            }
+            headword.gender =
+                if (definite.endsWith("t") || neutr >= 0 && (ngenus < 0 || neutr < ngenus)) {
+                    "t"
+                } else {
+                    "n"
+                }
 
             // Highlight the plural for common gender but the definite form singular for neuter
             // nouns, to help in applying the technique described in https://bit.ly/EN-ETT-in-Swedish.
@@ -70,12 +71,15 @@ class SoParser {
 
                 if (plural.isNotEmpty()) {
                     if (addPlural) {
-                        html = html.replaceFirst(plural, "<span class=\"tempmm\">plur.</span> $plural")
+                        html =
+                            html.replaceFirst(plural, "<span class=\"tempmm\">plur.</span> $plural")
                     }
 
                     if (headword.gender == "n") {
-                        html = html.replaceFirst("<span class=\"tempmm\">plur.</span> $plural",
-                                "<span class=\"tempmm\">plur.</span> <strong>$plural</strong>")
+                        html = html.replaceFirst(
+                            "<span class=\"tempmm\">plur.</span> $plural",
+                            "<span class=\"tempmm\">plur.</span> <strong>$plural</strong>"
+                        )
                     }
                 }
 
@@ -85,8 +89,10 @@ class SoParser {
                     if (plural.isNotEmpty()) {
                         // Third declension neuter nouns
                         if (!headword.mTitle.endsWith("er") && plural.endsWith("er")) {
-                            html = html.replaceFirst("<span class=\"tempmm\">plur.</span> $plural",
-                                    "<span class=\"tempmm\">plur.</span> <strong>$plural</strong>")
+                            html = html.replaceFirst(
+                                "<span class=\"tempmm\">plur.</span> $plural",
+                                "<span class=\"tempmm\">plur.</span> <strong>$plural</strong>"
+                            )
                         }
                     }
                 }
@@ -139,7 +145,7 @@ class SoParser {
             val header = doc.head().html() + "<body>"
 
             val selfUrl = doc.select(".gold").first().parent().attr("href")
-                    ?: return words
+                ?: return words
             val uri = Uri.parse(selfUrl)
             val id = uri.getQueryParameter("id") ?: return words
 
@@ -149,7 +155,7 @@ class SoParser {
                 xrefs.add(lemma.attr("id"))
 
                 val grundform = lemma.select("span.orto").first()?.text()
-                        ?: return words
+                    ?: return words
                 val word = grundform.replace("`", "").replace("´", "")
 
                 val summary = StringBuilder(grundform)
@@ -192,11 +198,13 @@ class SoParser {
                     audio.add(url)
                 }
 
-                val headword = Word(tag, word, word, summary.toString(), cleanpage,
-                        Uri.parse("https://svenska.se/so/?id=$id&ref=${xrefs[0]}"),
-                        // Required to avoid CORS errors in getCSS
-                        "file://",
-                        element, header, lemma)
+                val headword = Word(
+                    tag, word, word, summary.toString(), cleanpage,
+                    Uri.parse("https://svenska.se/so/?id=$id&ref=${xrefs[0]}"),
+                    // Required to avoid CORS errors in getCSS
+                    "file://",
+                    element, header, lemma
+                )
 
                 parseGrammar(headword, lemma)
 

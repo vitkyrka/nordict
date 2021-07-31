@@ -77,14 +77,17 @@ class DdoParser {
                 summary.append(span.text().replace("-", word))
             }
 
-            val headword = Word(tag, word, word, summary.toString(), cleanpage, uri,
-                    "https://ordnet.dk/ddo/", element,
-                    doc.head().html() + "<body>")
+            val headword = Word(
+                tag, word, word, summary.toString(), cleanpage, uri,
+                "https://ordnet.dk/ddo/", element,
+                doc.head().html() + "<body>"
+            )
 
             doc.select("img[src='speaker.gif']")?.forEach {
                 val onClick = it.attr("onclick")
                 val mp3id = mp3Regex.find(onClick)?.groupValues?.get(1) ?: return@forEach
-                val url = "https://static.ordnet.dk/mp3/" + mp3id.substring(0, 5) + "/" + mp3id + ".mp3";
+                val url =
+                    "https://static.ordnet.dk/mp3/" + mp3id.substring(0, 5) + "/" + mp3id + ".mp3"
 
                 headword.audio.add(url)
             }
@@ -134,7 +137,7 @@ class DdoParser {
                         defExamples.addAll(el.select(".citat").map { it.text() })
                     } else if (el.className() == "definitionBox") {
                         if (defText != null) {
-                            val def = Word.Idiom(idiomTitle, defText!!)
+                            val def = Word.Idiom(idiomTitle, defText)
                             def.examples.addAll(defExamples)
                             headword.idioms.add(def)
 
@@ -147,7 +150,7 @@ class DdoParser {
                 }
 
                 if (defText != null) {
-                    val def = Word.Idiom(idiomTitle, defText!!)
+                    val def = Word.Idiom(idiomTitle, defText)
                     def.examples.addAll(defExamples)
                     headword.idioms.add(def)
                 }
