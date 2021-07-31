@@ -27,7 +27,7 @@
                 android:layout_height="wrap_content"
                 app:layout_collapseMode="pin"
                 android:background="?attr/colorPrimary"
-                android:theme="@style/ThemeOverlay.AppCompat.ActionBar"
+                android:theme="@style/ThemeOverlay.MaterialComponents.ActionBar"
                 app:popupTheme="@style/AppTheme.PopupOverlay" />
 
         </com.google.android.material.appbar.CollapsingToolbarLayout>
