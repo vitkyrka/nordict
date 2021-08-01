@@ -35,7 +35,12 @@ var toggleSelected = function (img) {
     updateSelected();
 };
 
-var getPickerHtml = function() {
+var imgElement = function(src) {
+    var onclick = "toggleSelected(this);";
+    return '<img src="' + src + '" onclick="' + onclick + '">';
+};
+
+var getPickerHtml = function(...args) {
     var html = '<style>' +
         'img { padding: 0.1em; margin: 1em; border: 0.5em solid white; }' +
         'img.selected { border: 0.5em solid blue; box-shadow: 0px 12px 22px 1px #333; }' +
@@ -43,7 +48,11 @@ var getPickerHtml = function() {
         '</style>' +
         '<canvas id="canvas"></canvas>';
     var els = document.getElementsByTagName('img');
-    var onclick = "toggleSelected(this);";
+
+    for (i = 0; i < args.length; i++) {
+        var src = args[i];
+        html += imgElement(src);
+    }
 
     for (i = 0; i < els.length; i++) {
         var src = '';
@@ -72,7 +81,7 @@ var getPickerHtml = function() {
         console.log("data-src: " + els[i].dataset.src);
 
         if (src && (src.substr(0, 5) == 'data:' || src.indexOf('q=tbn') != -1)) {
-            html += '<img src="' + src + '" onclick="' + onclick + '">';
+            html += imgElement(src);
         }
     }
 

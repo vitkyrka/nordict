@@ -29,6 +29,7 @@ class CardActivity : AppCompatActivity() {
     private var currentDefinition: Word.Definition? = null
     private var currentCard: CardView? = null
     private var mAudio = ArrayList<String>()
+    private var mDictImages = ArrayList<String>()
     private var saveDeckName = true
     private var mLeftCards = 0
 
@@ -168,6 +169,7 @@ class CardActivity : AppCompatActivity() {
                 setOnClickListener {
                     Intent(this@CardActivity, ImagePicker::class.java).also {
                         it.putExtra(Intent.EXTRA_TEXT, word.mTitle)
+                        it.putExtra("dictionaryImages", mDictImages)
                         currentDefinition = definition
                         currentCard = card
                         ordboken.images = ArrayList()
@@ -320,28 +322,37 @@ class CardActivity : AppCompatActivity() {
 
     }
 
-    fun getAudio(word: Word): ArrayList<String> {
-        var audio = ArrayList<String>()
+    fun urlsToData(urls: ArrayList<String>): ArrayList<String> {
+        var data = ArrayList<String>()
 
-        word.audio.forEach {
+        urls.forEach {
             val request = Request.Builder().url(it)
                 .build()
             val response = ordboken.client.newCall(request).execute()
-            if (response.isSuccessful) {
-                audio.add(Base64.encodeToString(response.body?.bytes(), Base64.DEFAULT))
+            if (!response.isSuccessful) return@forEach
+
+            response.body?.let { body ->
+                val type = body.contentType()
+                val base64 = Base64.encodeToString(body.bytes(), Base64.DEFAULT)
+
+                data.add("data:$type;base64,$base64")
             }
         }
 
-        return audio
+        return data
     }
 
-    private inner class WordAudioTask : AsyncTask<Word, Void, Pair<Word, ArrayList<String>>>() {
-        override fun doInBackground(vararg params: Word): Pair<Word, ArrayList<String>> {
-            return Pair(params[0], getAudio(params[0]))
+    private inner class WordAudioTask :
+        AsyncTask<Word, Void, Triple<Word, ArrayList<String>, ArrayList<String>>>() {
+        override fun doInBackground(vararg params: Word): Triple<Word, ArrayList<String>, ArrayList<String>> {
+            val word = params[0]
+
+            return Triple(word, urlsToData(word.audio), urlsToData(word.images))
         }
 
-        override fun onPostExecute(result: Pair<Word, ArrayList<String>>) {
+        override fun onPostExecute(result: Triple<Word, ArrayList<String>, ArrayList<String>>) {
             mAudio.addAll(result.second)
+            mDictImages.addAll(result.third)
             loadWord(result.first)
         }
     }

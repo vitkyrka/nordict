@@ -39,7 +39,8 @@ It builds upon ideas previously implemented in
     only contains one meaning.
   * The example sentences from the dictionary entry are automatically parsed and
     added to the card.
-  * Images (from Google Image Search) can also be selected.
+  * Images from Google Image Search (or from the dictionary entry itself if
+    present there) can also be added to the card.
   * Javascript is used in the card to display a random subset of the examples
     and images on the front.
   * The pronunciation audio is also included and works offline and plays

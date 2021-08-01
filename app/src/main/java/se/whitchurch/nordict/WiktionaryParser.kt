@@ -74,6 +74,8 @@ class WiktionaryParser {
                 if (!preserve) it.remove()
             }
 
+            val images = ArrayList<String>()
+
             // Make image loading non-lazy since the lazy stuff doesn't seem to always work
             // <noscript><img ...></noscript><span class="lazy-image-placeholder" ...>
             element.select("span.lazy-image-placeholder")?.forEach {
@@ -82,8 +84,16 @@ class WiktionaryParser {
             element.select("noscript")?.forEach {
                 val outside = it.parent()
 
-                it.select("img").forEach { img ->
+                it.select("img").forEach img@{ img ->
+                    val src = "https:${img.attr("src")}"
+
+                    // Ignore CentralAutoLogin web beacon
+                    if (!src.contains("upload.wikimedia.org")) {
+                        return@img
+                    }
+
                     img.appendTo(outside)
+                    images.add(src)
                 }
             }
 
@@ -145,6 +155,7 @@ class WiktionaryParser {
                     lemma
                 )
 
+                headword.images.addAll(images)
                 headword.xrefs.add(ref)
 
                 pronunciation?.select("audio")?.forEach audio@{ audio ->

@@ -31,6 +31,11 @@ class ImagePicker : AppCompatActivity() {
         val intentWord = intent?.getStringExtra(Intent.EXTRA_TEXT)
         val word = intentWord ?: "spritsa"
 
+        val dictImages = ArrayList<String>()
+        intent?.getStringArrayListExtra("dictionaryImages")?.let {
+            dictImages.addAll(it)
+        }
+
         ordboken = Ordboken.getInstance(this)
 
         findViewById<Button>(R.id.ok_button).setOnClickListener {
@@ -57,6 +62,7 @@ class ImagePicker : AppCompatActivity() {
         }
 
         webView.setInitialScale(100)
+        val arg = dictImages.joinToString(",") { it -> "\"$it\"" }
 
         webView.webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String) {
@@ -70,7 +76,7 @@ class ImagePicker : AppCompatActivity() {
                     timer.schedule(object : TimerTask() {
                         override fun run() {
                             runOnUiThread(Runnable {
-                                view.loadUrl("javascript:" + getImagePickerJs() + "getPickerHtml();")
+                                view.loadUrl("javascript:" + getImagePickerJs() + "getPickerHtml($arg);")
                             })
                         }
                     }, 1000)

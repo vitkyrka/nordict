@@ -19,6 +19,7 @@ class Word(
     val idioms: ArrayList<Idiom> = ArrayList()
     val definitions: ArrayList<Definition> = ArrayList()
     val audio: ArrayList<String> = ArrayList()
+    val images: ArrayList<String> = ArrayList()
 
     class Idiom(val idiom: String, val definition: String) {
         val examples: ArrayList<String> = ArrayList()
