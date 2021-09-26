@@ -44,6 +44,14 @@
                 android:orientation="horizontal" />
         </HorizontalScrollView>
 
+        <CheckBox
+            android:id="@+id/card_merge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/card_images_scroll"
+            />
+
         <Spinner
             android:id="@+id/card_audio_index"
             android:layout_width="wrap_content"
@@ -55,7 +63,7 @@
             android:paddingStart="8dp"
             android:paddingEnd="8dp"
             android:visibility="invisible"
-            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintStart_toEndOf="@id/card_merge"
             app:layout_constraintTop_toBottomOf="@id/card_images_scroll" />
 
         <Button

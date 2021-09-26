@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.AsyncTask
@@ -30,6 +31,8 @@ class CardActivity : AppCompatActivity() {
     private var currentCard: CardView? = null
     private var mAudio = ArrayList<String>()
     private var mDictImages = ArrayList<String>()
+    private var selectedDefinitions = ArrayList<Word.Definition>()
+    private var defToCard = HashMap<Word.Definition, View>()
     private var saveDeckName = true
     private var mLeftCards = 0
 
@@ -118,11 +121,7 @@ class CardActivity : AppCompatActivity() {
 
             createButton.setOnClickListener {
                 val images = imagesMap[definition.definition] ?: ArrayList()
-                var examples = definition.examples
-
-                if (examples.isEmpty()) {
-                    examples = arrayListOf(word.mTitle)
-                }
+                var examples = ArrayList<String>()
 
                 val audioIdx = if (mAudio.size > 1) {
                     card.findViewById<Spinner>(R.id.card_audio_index).selectedItem.toString()
@@ -131,9 +130,23 @@ class CardActivity : AppCompatActivity() {
                     0
                 }
 
-                createCard(word.getPage(listOf(definition), ordboken.currentCss),
+                if (selectedDefinitions.isEmpty()) {
+                    selectedDefinitions.add(definition)
+                }
+
+                selectedDefinitions.forEach {
+                    examples.addAll(it.examples)
+                }
+
+                if (examples.isEmpty()) {
+                    examples = arrayListOf(word.mTitle)
+                }
+
+                createCard(word.getPage(selectedDefinitions, ordboken.currentCss),
                     examples, images, mAudio.elementAtOrElse(audioIdx) { _ -> "" })
                 card.visibility = View.GONE
+                selectedDefinitions.forEach { defToCard[it]?.visibility = View.GONE }
+                selectedDefinitions.clear()
             }
 
             if (mAudio.size > 1) {
@@ -205,6 +218,19 @@ class CardActivity : AppCompatActivity() {
                 visibility = View.VISIBLE
             }
 
+            card.findViewById<CheckBox>(R.id.card_merge).apply {
+                setOnCheckedChangeListener { _, checked ->
+                    if (checked) {
+                        card.setBackgroundColor(Color.YELLOW)
+                        selectedDefinitions.add(definition)
+                    } else {
+                        card.setBackgroundColor(Color.WHITE)
+                        selectedDefinitions.remove(definition)
+                    }
+                }
+            }
+
+            defToCard[definition] = card
             cardHolder.addView(card)
         }
 
