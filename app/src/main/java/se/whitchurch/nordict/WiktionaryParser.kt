@@ -92,6 +92,8 @@ class WiktionaryParser {
                         return@img
                     }
 
+                    // Add https: since Anki needs it
+                    img.attr("src", src)
                     img.appendTo(outside)
                     images.add(src)
                 }
