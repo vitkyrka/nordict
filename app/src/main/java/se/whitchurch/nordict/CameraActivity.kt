@@ -2,22 +2,22 @@ package se.whitchurch.nordict
 
 import android.Manifest
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Bundle
 import android.util.Base64
 import android.util.Log
 import android.util.Size
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageCapture
-import androidx.camera.core.ImageCaptureException
-import androidx.camera.core.Preview
+import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.theartofdev.edmodo.cropper.CropImage
 import kotlinx.android.synthetic.main.activity_camera.*
-import java.io.ByteArrayOutputStream
+import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -31,8 +31,6 @@ class CameraActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_camera)
 
-        val ordboken = Ordboken.getInstance(this)
-
         if (allPermissionsGranted()) {
             startCamera()
         } else {
@@ -44,10 +42,13 @@ class CameraActivity : AppCompatActivity() {
         camera_capture_button.setOnClickListener {
             val imageCapture = imageCapture ?: return@setOnClickListener
 
-            val outputStream = ByteArrayOutputStream()
+            val file = File(
+                cacheDir,
+                "foo.jpg"
+            )
 
             imageCapture.takePicture(
-                ImageCapture.OutputFileOptions.Builder(outputStream).build(),
+                ImageCapture.OutputFileOptions.Builder(file).build(),
                 ContextCompat.getMainExecutor(this),
                 object : ImageCapture.OnImageSavedCallback {
                     override fun onError(exc: ImageCaptureException) {
@@ -55,16 +56,28 @@ class CameraActivity : AppCompatActivity() {
                     }
 
                     override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                        val base64 =
-                            Base64.encodeToString(outputStream.toByteArray(), Base64.DEFAULT)
-                        ordboken.images = arrayListOf("data:image/jpeg;base64,$base64")
-                        setResult(Activity.RESULT_OK)
-                        finish()
+                        CropImage.activity(Uri.parse(file.toURI().toString()))
+                            .start(this@CameraActivity)
                     }
                 })
         }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+
+        if (requestCode == CropImage.CROP_IMAGE_ACTIVITY_REQUEST_CODE) {
+            val result = CropImage.getActivityResult(data)
+            if (resultCode == RESULT_OK) {
+                val base64 =
+                    Base64.encodeToString(File(result.uri.path).readBytes(), Base64.DEFAULT)
+                Ordboken.getInstance(this).images = arrayListOf("data:image/jpeg;base64,$base64")
+                setResult(Activity.RESULT_OK)
+                finish()
+            }
+        }
     }
 
     private fun startCamera() {
