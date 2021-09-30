@@ -12,7 +12,7 @@ android {
         implementation 'com.squareup.retrofit2:retrofit:2.0.1'
         implementation 'com.google.code.gson:gson:2.8.5'
         implementation 'com.squareup.retrofit2:converter-gson:2.0.1'
-        implementation "com.squareup.okhttp3:okhttp:4.1.0"
+        implementation "com.squareup.okhttp3:okhttp:4.9.1"
         implementation 'androidx.test.espresso:espresso-idling-resource:3.2.0'
         implementation "androidx.camera:camera-camera2:1.0.1"
         implementation "androidx.camera:camera-lifecycle:1.0.1"
