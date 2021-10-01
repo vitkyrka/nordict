@@ -4,7 +4,9 @@ import android.annotation.SuppressLint
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.database.sqlite.SQLiteDatabase
+import android.graphics.Color
 import android.graphics.Typeface
 import android.media.AudioManager
 import android.media.MediaPlayer
@@ -23,6 +25,10 @@ import androidx.appcompat.app.ActionBar
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
 import androidx.test.espresso.idling.CountingIdlingResource
+import androidx.webkit.WebSettingsCompat
+import androidx.webkit.WebSettingsCompat.FORCE_DARK_OFF
+import androidx.webkit.WebSettingsCompat.FORCE_DARK_ON
+import androidx.webkit.WebViewFeature
 import com.google.android.material.bottomappbar.BottomAppBar
 import se.whitchurch.nordict.OrdbokenContract.FavoritesEntry
 import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
@@ -30,6 +36,7 @@ import java.io.StringReader
 import java.io.UnsupportedEncodingException
 import java.net.URLDecoder
 import java.util.*
+
 
 class WordActivity : AppCompatActivity() {
     internal val loadResource: CountingIdlingResource = CountingIdlingResource("search")
@@ -100,7 +107,9 @@ class WordActivity : AppCompatActivity() {
             }
         }
 
-        mWebView = findViewById<View>(R.id.webView) as WebView
+
+        val webView = findViewById<View>(R.id.webView) as WebView ?: return
+        mWebView = webView
         mWebView!!.webChromeClient = WebChromeClient()
         val settings = mWebView!!.settings.apply {
             builtInZoomControls = true
@@ -110,6 +119,19 @@ class WordActivity : AppCompatActivity() {
             allowFileAccessFromFileURLs = true
             allowUniversalAccessFromFileURLs = true
             allowContentAccess = true
+        }
+
+        if (WebViewFeature.isFeatureSupported(WebViewFeature.FORCE_DARK)) {
+            when (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) {
+                Configuration.UI_MODE_NIGHT_YES -> {
+                    WebSettingsCompat.setForceDark(webView.settings, FORCE_DARK_ON)
+                }
+                Configuration.UI_MODE_NIGHT_NO, Configuration.UI_MODE_NIGHT_UNDEFINED -> {
+                    WebSettingsCompat.setForceDark(webView.settings, FORCE_DARK_OFF)
+                }
+                else -> {
+                }
+            }
         }
 
         mWebView!!.setInitialScale(mOrdboken!!.mPrefs.getInt("scale", 0))
@@ -152,6 +174,18 @@ class WordActivity : AppCompatActivity() {
             }
 
             override fun onPageFinished(view: WebView, url: String) {
+                if (!mPageFinished) {
+                    webView.setBackgroundColor(Color.GREEN)
+                    webView.visibility = View.VISIBLE
+                    mStatusLayout!!.visibility = View.INVISIBLE
+
+                    if (autoPlay) mWord?.audio?.let { audio ->
+                        playAudio(audio)
+                    }
+
+                    loadResource.decrement()
+                }
+
                 mPageFinished = true
                 updateStar()
             }
@@ -161,20 +195,6 @@ class WordActivity : AppCompatActivity() {
             @JavascriptInterface
             fun toggleStar() {
                 StarToggleTask().execute()
-            }
-
-            @JavascriptInterface
-            fun loaded() {
-                runOnUiThread {
-                    mWebView!!.visibility = View.VISIBLE
-                    mStatusLayout!!.visibility = View.GONE
-
-                    if (autoPlay) mWord?.audio?.let { audio ->
-                        playAudio(audio)
-                    }
-
-                    loadResource.decrement()
-                }
             }
         }
         mWebView!!.addJavascriptInterface(OrdbokenJsObject(), "ordboken")
