@@ -72,6 +72,16 @@ a.normal {
     font-size: 95%;
 }
 
+#bodyContent h3  {
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+#bodyContent .titredef .inserted-article {
+    font-size: 80%;
+    font-weight: normal;
+}
+
 #bodyContent .pos {
     font-size: 80%;
     text-transform: lowercase;
@@ -83,6 +93,18 @@ a.normal {
     font-size: 110%;
     color: currentColor;
     text-decoration: none;
+}
+
+#bodyContent .feminine {
+    background: #fee;
+}
+
+#bodyContent .masculine {
+    background: #eef;
+}
+
+#bodyContent p.lemma-heading b {
+    font-size: 120%;
 }
 
 #bodyContent table a[href*="Prononciation/"]::before {

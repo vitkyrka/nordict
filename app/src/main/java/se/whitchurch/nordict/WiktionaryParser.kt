@@ -139,6 +139,28 @@ class WiktionaryParser {
                 lemma.selectFirst("p")?.let {
                     summary.append(" ")
                     summary.append(it.text())
+                    it.addClass("lemma-heading")
+                }
+
+                if (pos.contains("Nom commun")) {
+                    var masculine = false;
+
+                    val masculin = summary.indexOf("masculin")
+                    val feminin = summary.indexOf("féminin")
+
+                    if (masculin >= 0 && (feminin < 0 || masculin < feminin)) {
+                        masculine = true;
+                    }
+
+                    if (masculin >= 0 || feminin >= 0) {
+                        val article = if (masculine) "un " else "une "
+                        lemma.selectFirst("p")?.let {
+                            it.prepend(article)
+                        }
+
+                        titledef.prepend("<span class=\"inserted-article\">$article</span>")
+                        lemma.addClass(if (masculine) "masculine" else "feminine")
+                    }
                 }
 
                 pronunciation?.let { lemma.appendChild(it.clone()) }
