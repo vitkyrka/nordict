@@ -231,6 +231,7 @@ class WordActivity : AppCompatActivity() {
         WordTask().execute(Triple(mUrl!!, mWordList, forceUrl))
     }
 
+    @SuppressLint("SetTextI18n")
     private fun loadHomographs(word: Word) {
         val linearLayout = findViewById<LinearLayout>(R.id.linear_layout)
 
@@ -245,13 +246,13 @@ class WordActivity : AppCompatActivity() {
             val text = TextView(this)
 
             text.setPadding(20, 10, 0, 10)
-            text.textSize = 19f
+            text.textSize = 15f
 
             if (homograph.uri == word.uri) {
-                text.text = "☑ " + homograph.mTitle + " " + homograph.mSummary
+                text.text = """▶ ${homograph.mSummary}"""
                 text.setTypeface(null, Typeface.BOLD)
             } else {
-                text.text = "☐ " + homograph.mTitle + " " + homograph.mSummary
+                text.text = """  ${homograph.mSummary}"""
             }
 
             text.setOnClickListener {
