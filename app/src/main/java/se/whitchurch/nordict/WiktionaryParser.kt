@@ -4,6 +4,7 @@ import android.net.Uri
 import android.util.Log
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
+import kotlin.math.max
 
 class WiktionaryParser {
     companion object {
@@ -142,28 +143,52 @@ class WiktionaryParser {
                     it.addClass("lemma-heading")
                 }
 
-                if (pos.contains("Nom commun")) {
-                    var masculine = false;
+                var poslower = pos.lowercase()
+
+                if (poslower.contains("nom commun") || poslower.contains("locution nominale")) {
+                    var addArticle = !poslower.contains("forme de");
+                    var addColor = true
                     var masculin = -1
                     var feminin = -1
+                    var article: String? = null
 
                     lemma.selectFirst("p")?.selectFirst("span.ligne-de-forme")?.let {
-                        masculin = it.text().indexOf("masculin")
-                        feminin = it.text().indexOf("féminin")
-                    }
+                        val genderInfo = it.text()
 
-                    if (masculin >= 0 && (feminin < 0 || masculin < feminin)) {
-                        masculine = true;
+                        masculin = genderInfo.indexOf("masculin")
+                        feminin = genderInfo.indexOf("féminin")
+
+                        val genderPos = max(masculin, feminin)
+
+                        if (genderPos >= 0 && genderInfo.indexOf("identique") > genderPos) {
+                            article = "un/une"
+                        } else if (masculin >= 0 && feminin < 0) {
+                            article = "un"
+                        } else if (feminin >= 0 && masculin < 0) {
+                            article = "une"
+                        }
+
+                        if (addArticle) {
+                            // Eg. voies respiratoires
+                            if (genderInfo.indexOf("pluriel") > genderPos) {
+                                addArticle = false
+                            }
+                        }
                     }
 
                     if (masculin >= 0 || feminin >= 0) {
-                        val article = if (masculine) "un " else "une "
-                        lemma.selectFirst("p")?.let {
-                            it.prepend(article)
+                        if (article != null && addArticle) {
+                            lemma.selectFirst("p")?.let {
+                                it.prepend("$article ")
+                            }
+                            titledef.prepend("<span class=\"inserted-article\">$article </span>")
                         }
 
-                        titledef.prepend("<span class=\"inserted-article\">$article</span>")
-                        lemma.addClass(if (masculine) "masculine" else "feminine")
+                        if (article == "un") {
+                            lemma.addClass("masculine")
+                        } else if (article == "une") {
+                            lemma.addClass("feminine")
+                        }
                     }
                 }
 
