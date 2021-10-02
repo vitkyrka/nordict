@@ -144,9 +144,13 @@ class WiktionaryParser {
 
                 if (pos.contains("Nom commun")) {
                     var masculine = false;
+                    var masculin = -1
+                    var feminin = -1
 
-                    val masculin = summary.indexOf("masculin")
-                    val feminin = summary.indexOf("féminin")
+                    lemma.selectFirst("p")?.selectFirst("span.ligne-de-forme")?.let {
+                        masculin = it.text().indexOf("masculin")
+                        feminin = it.text().indexOf("féminin")
+                    }
 
                     if (masculin >= 0 && (feminin < 0 || masculin < feminin)) {
                         masculine = true;
