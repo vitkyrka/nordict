@@ -37,7 +37,7 @@ class WiktionaryParser {
 
             val heading = doc.selectFirst("#section_0") ?: return words
             val word = heading.text()
-            val element = doc.selectFirst("#content")
+            val element = doc.selectFirst("#bodyContent")
             val content = element.outerHtml()
             val cleanpage = doc.head().html() + "<body>" + content
 
@@ -130,8 +130,11 @@ class WiktionaryParser {
 
                 val titledef = lemma.selectFirst(".titredef") ?: return@lemma
 
-                summary.append(titledef.text())
+                val pos = titledef.text()
+                summary.append(pos)
                 ref = titledef.id()
+
+                titledef.html("$word <span class=\"pos\">${pos}</span>")
 
                 lemma.selectFirst("p")?.let {
                     summary.append(" ")

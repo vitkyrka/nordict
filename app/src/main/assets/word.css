@@ -64,6 +64,56 @@ a.normal {
 
 /* Wiktionary */
 
+#bodyContent {
+    margin: 0 1em;
+}
+
+#bodyContent {
+    font-size: 95%;
+}
+
+#bodyContent .pos {
+    font-size: 80%;
+    text-transform: lowercase;
+    font-weight: normal;
+    font-style: oblique;
+}
+
+#bodyContent a[href*="Prononciation/"] {
+    font-size: 110%;
+    color: currentColor;
+    text-decoration: none;
+}
+
+#bodyContent table a[href*="Prononciation/"]::before {
+    content: " ";
+}
+
+#bodyContent table {
+    border-collapse: collapse;
+}
+
+#bodyContent td, #bodyContent th {
+    border: 1px solid grey;
+    padding: 0.25em;
+    text-align: center;
+}
+
+#bodyContent th {
+    text-transform: lowercase;
+    font-size: 90%;
+    font-weight: normal;
+}
+
+#bodyContent td br {
+    display: inline;
+    content: "";
+}
+
+#bodyContent ol {
+    padding-left: 1.25em;
+}
+
 nav.page-actions-menu {
     display: none;
 }
