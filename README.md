@@ -25,7 +25,7 @@ It builds upon ideas previously implemented in
 - [Svensk-Dansk Ordbog](https://sdo.dsl.dk/) (SDO).  [Official
   app](https://play.google.com/store/apps/details?id=dk.dsl.ordnet.sdo).
 
-- [Wiktionnaire](https://fr.wiktionary.org/) (FR).
+- [Wiktionnaire](https://fr.wiktionary.org/) (WFR).
 
 ## Features
 
@@ -33,7 +33,7 @@ It builds upon ideas previously implemented in
   be clicked to either jump directly to its definition (if there is a unique,
   perfect match) or to put it in the search box to save some typing.
 
-* **AnkiDroid integration (DDO, FR, SO).** [AnkiDroid](https://github.com/ankidroid/Anki-Android)
+* **AnkiDroid integration (DDO, WFR, SO).** [AnkiDroid](https://github.com/ankidroid/Anki-Android)
   flashcards can be created directly from the app:
   * The different meanings for the headword are split so that each flashcard
     only contains one meaning.
@@ -73,7 +73,7 @@ It builds upon ideas previously implemented in
   neuter and common gender nouns, in order to aid in applying [the techniques
   described by Olle Kjellin](https://bit.ly/EN-ETT-in-Swedish).
 
-* **Pronunciation auto-play (DDO, FR, SO).**  The recorded pronunciations can
+* **Pronunciation auto-play (DDO, WFR, SO).**  The recorded pronunciations can
   be configured to automatically play when the entry is opened.
 
 ## License
