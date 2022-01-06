@@ -1,6 +1,7 @@
 package se.whitchurch.nordict
 
 import android.net.Uri
+import android.text.Html
 import android.util.Log
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -49,15 +50,18 @@ class LeRobertDictionary(client: OkHttpClient) : Dictionary(client) {
 
             for (i in 0 until items.length()) {
                 val item = items.getJSONObject(i)
-                val title = item.getString("display")
-                val page = item.getString("page")
+                val display = item.getString("display")
+                var page = item.getString("page")
+                val title = StringBuilder(
+                    Html.fromHtml(display, Html.FROM_HTML_MODE_LEGACY).toString()
+                ).toString()
 
-                results.add(
-                    SearchResult(
-                        title,
-                        Uri.parse("https://dictionnaire.lerobert.com${page}")
-                    )
-                )
+                if (page.startsWith("/conjugaison/")) {
+                    page = page.replace("/conjugaison/", "/definition/")
+                }
+
+                val uri = Uri.parse("https://dictionnaire.lerobert.com${page}")
+                results.add(SearchResult(title, uri))
             }
         } catch (e: JSONException) {
         }
