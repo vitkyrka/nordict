@@ -106,14 +106,17 @@ class Ordboken private constructor(context: Context) {
         val fr = FrWiktionary(client)
         fr.init()
 
-        dictionaries = arrayOf(so, ddo, sdo, fr)
-        flags = arrayOf(so.flag, ddo.flag, sdo.flag, fr.flag)
+        val rob = LeRobertDictionary(client)
+        rob.init()
+
+        dictionaries = arrayOf(so, ddo, sdo, fr, rob)
+        flags = arrayOf(so.flag, ddo.flag, sdo.flag, fr.flag, rob.flag)
 
         currentIndex = mPrefs.getInt("currentIndex", 0)
         currentDictionary = dictionaries[currentIndex]
         currentFlag = flags[currentIndex]
 
-        dictMap = mapOf(so.tag to so, ddo.tag to ddo, sdo.tag to sdo, fr.tag to fr)
+        dictMap = mapOf(so.tag to so, ddo.tag to ddo, sdo.tag to sdo, fr.tag to fr, rob.tag to rob)
     }
 
     fun getWord(uri: Uri): Word? {
