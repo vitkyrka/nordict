@@ -36,7 +36,13 @@ class WiktionaryParser {
             val words: ArrayList<Word> = ArrayList()
             val doc = Jsoup.parse(page, "https://${shortName}.m.wiktionary.org")
 
-            val heading = doc.selectFirst("#section_0") ?: return words
+            var heading = doc.selectFirst("#section_0")
+            if (heading == null) {
+                heading = doc.selectFirst("#firstHeading")
+            }
+            if (heading == null)
+                return words;
+
             val word = heading.text()
             val element = doc.selectFirst("#bodyContent")
             val content = element.outerHtml()
