@@ -28,6 +28,14 @@ class LeRobertParser {
                 doc.head().html() + "<body>"
             )
 
+            main.select("audio")?.forEach audio@{ audio ->
+                val source = audio.selectFirst("source") ?: return@audio
+                val src = source.attr("src")
+                val url = "https://dictionnaire.lerobert.com$src"
+
+                headword.audio.add(url)
+            }
+
             words.add(headword)
             return words
         }
