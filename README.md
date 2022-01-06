@@ -5,7 +5,8 @@ dictionaries.  Major dictionaries of both these languages have official,
 free-of-cost apps, but Nordict has unique features which may be helpful for
 non-native speakers.
 
-Nordict also has some support for Wiktionnaire, the French Wiktionary.
+Nordict also has some support for Wiktionnaire (the French Wiktionary)
+and Dico en ligne Le Robert.
 
 It builds upon ideas previously implemented in
 [Bildkortsappen](https://github.com/vitkyrka/bildkortsappen) and
@@ -27,13 +28,15 @@ It builds upon ideas previously implemented in
 
 - [Wiktionnaire](https://fr.wiktionary.org/) (WFR).
 
+- [Dico en ligne Le Robert](https://dictionnaire.lerobert.com/) (ROB).
+
 ## Features
 
 * **All words are hyperlinks (all).** Any word in the definition can
   be clicked to either jump directly to its definition (if there is a unique,
   perfect match) or to put it in the search box to save some typing.
 
-* **AnkiDroid integration (DDO, WFR, SO).** [AnkiDroid](https://github.com/ankidroid/Anki-Android)
+* **AnkiDroid integration (DDO, SO, WFR).** [AnkiDroid](https://github.com/ankidroid/Anki-Android)
   flashcards can be created directly from the app:
   * The different meanings for the headword are split so that each flashcard
     only contains one meaning.
@@ -60,6 +63,13 @@ It builds upon ideas previously implemented in
   back button after navigating to another word via a hyperlink.  This is fixed
   in Nordict.
 
+* **Better order of information (WFR).** The mobile Wiktionnaire site has several
+  flaws which make it hard to use: for example, in words with more than one
+  meaning, there is no overview so one is forced to scroll throw a large amount
+  of content (such as translations to dozens of languages) to jump between meanings.
+  Also, the (sometimes quite large) Etymology section is placed at the top, even
+  before the definitions, which is unhelpful.  These problems are fixed in Nordict.
+
 * **Smooth inter-dictionary navigation (SDO).**  The official SDO app shows a
   dialog whenever a link from SDO to DDO is clicked, but this is not present in
   Nordict.
@@ -73,8 +83,8 @@ It builds upon ideas previously implemented in
   neuter and common gender nouns, in order to aid in applying [the techniques
   described by Olle Kjellin](https://bit.ly/EN-ETT-in-Swedish).
 
-* **Pronunciation auto-play (DDO, WFR, SO).**  The recorded pronunciations can
-  be configured to automatically play when the entry is opened.
+* **Pronunciation auto-play (DDO, ROB, SO, WFR).**  The recorded pronunciations
+  can be configured to automatically play when the entry is opened.
 
 ## License
 
