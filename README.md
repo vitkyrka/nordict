@@ -30,6 +30,8 @@ It builds upon ideas previously implemented in
 
 - [Dico en ligne Le Robert](https://dictionnaire.lerobert.com/) (ROB).
 
+- [Collins French-English dictionary](https://www.collinsdictionary.com/dictionary/french-english) (COLFREN).
+
 ## Features
 
 * **All words are hyperlinks (all).** Any word in the definition can
