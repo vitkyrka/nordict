@@ -143,3 +143,13 @@ nav.page-actions-menu {
 span.mw-editsection {
     display: none !important;
 }
+
+/* Collins */
+
+main {
+    padding-top: 0px !important;
+}
+
+.res_cell_center_content>.wnv {
+    margin-top: 0px !important;
+}
