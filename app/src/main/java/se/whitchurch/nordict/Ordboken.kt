@@ -14,6 +14,7 @@ import android.util.Pair
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.RadioButton
 import android.widget.RadioGroup
@@ -162,13 +163,26 @@ class Ordboken private constructor(context: Context) {
         val group = activity.findViewById<RadioGroup>(R.id.dictRadio)
         group.removeAllViews()
 
-        flags.forEach {
+        var prevFlag = 0
+        for ((index, it) in flags.withIndex()) {
             group.addView(RadioButton(activity).apply {
+                if (it == prevFlag) {
+                    this.text = "\u00A0" + dictionaries[index].tag[0]
+                }
                 this.setCompoundDrawablesWithIntrinsicBounds(it, 0, 0, 0)
             })
+
+            prevFlag = it
         }
 
         group.check(group.getChildAt(currentIndex).id)
+
+        val radioScroll = activity.findViewById<HorizontalScrollView>(R.id.radioScroll)
+        radioScroll.post(Runnable {
+            val view = group.getChildAt(currentIndex)
+            radioScroll.scrollTo((view.left + view.right - radioScroll.width) / 2, 0)
+        })
+
         activity.findViewById<ImageView>(R.id.dictFlag)?.setImageResource(flags[currentIndex])
 
         group.jumpDrawablesToCurrentState()

@@ -40,14 +40,20 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-        <RadioGroup
-            android:id="@+id/dictRadio"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal">
+        <HorizontalScrollView
+            android:id="@+id/radioScroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
 
-        </RadioGroup>
+            <RadioGroup
+                android:id="@+id/dictRadio"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
 
+            </RadioGroup>
+
+        </HorizontalScrollView>
     </androidx.appcompat.widget.LinearLayoutCompat>
 
 

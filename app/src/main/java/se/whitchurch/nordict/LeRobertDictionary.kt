@@ -11,7 +11,7 @@ import org.json.JSONException
 class LeRobertDictionary(client: OkHttpClient) : Dictionary(client) {
     override val tag: String = "ROB"
     override val lang: String = "fr"
-    override val flag: Int = R.drawable.flag_rob
+    override val flag: Int = R.drawable.flag_fr
     override fun init() = Unit
 
     override fun get(uri: Uri): Word? {
