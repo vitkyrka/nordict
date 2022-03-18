@@ -15,12 +15,27 @@ class LeRobertDictionary(client: OkHttpClient) : Dictionary(client) {
     override fun init() = Unit
 
     override fun get(uri: Uri): Word? {
-        val page = fetch(uri.toString())
+        val builder = uri.buildUpon()
+        builder.clearQuery()
+        uri.queryParameterNames.forEach {
+            if (it != REFPARAM)
+                builder.appendQueryParameter(it, uri.getQueryParameter(it))
+        }
+        val newUri = builder.build()
 
-        val words = LeRobertParser.parse(page, uri, tag)
+        val page = fetch(newUri.toString())
+
+        val words = LeRobertParser.parse(page, newUri, tag)
         if (words.isEmpty()) return null
 
-        return words[0]
+        val ref = uri.getQueryParameter(REFPARAM) ?: return words[0]
+
+        val candidates = words.filter { ref in it.xrefs }
+        if (candidates.isEmpty()) {
+            return words[0]
+        }
+
+        return candidates[0]
     }
 
     private fun publicApiRequest(requestUrl: String): JSONArray {
@@ -73,5 +88,6 @@ class LeRobertDictionary(client: OkHttpClient) : Dictionary(client) {
 
     companion object {
         const val NAME = "LeRobert"
+        const val REFPARAM = "__ref"
     }
 }

@@ -21,22 +21,67 @@ class LeRobertParser {
 
             Log.i("foo", cleanpage);
 
-            val headword = Word(
-                tag, word, word, word.toString(), cleanpage, uri,
-                "https://dictionnaire.lerobert.com/",
-                main,
-                doc.head().html() + "<body>"
-            )
+            var first = true
+            var ref = 0
+            main.select("section.def")?.select("div.b")?.forEach lemma@{ lemma ->
+                ref += 1
 
-            main.select("audio")?.forEach audio@{ audio ->
-                val source = audio.selectFirst("source") ?: return@audio
-                val src = source.attr("src")
-                val url = "https://dictionnaire.lerobert.com$src"
+                val newUri = if (first) {
+                    uri
+                } else {
+                    uri.buildUpon().appendQueryParameter("__ref", ref.toString()).build()
+                }
 
-                headword.audio.add(url)
+                first = false
+
+                val headword = Word(
+                    tag, word, word, word.toString(), cleanpage, newUri,
+                    "https://dictionnaire.lerobert.com/",
+                    main,
+                    doc.head().html() + "<body>",
+                    lemma
+                )
+
+                headword.xrefs.add(ref.toString())
+
+                lemma.select("audio")?.forEach audio@{ audio ->
+                    val source = audio.selectFirst("source") ?: return@audio
+                    val src = source.attr("src")
+                    val url = "https://dictionnaire.lerobert.com$src"
+
+                    headword.audio.add(url)
+                }
+
+                lemma.select("div.d_ptma")?.select("div.d_dvn")?.forEach dvn@ { dvn ->
+                    val def = Word.Definition(dvn.text(), dvn)
+
+                    dvn.remove()
+                    headword.definitions.add(def)
+                }
+
+                if (headword.definitions.isEmpty()) {
+                    var dvn = Element("div")
+
+                    lemma.selectFirst("div.d_ptma")?.children()?.forEach {
+                        dvn.appendChild(it)
+                    }
+
+                    val def = Word.Definition(dvn.text(), dvn)
+                    headword.definitions.add(def)
+                }
+
+                lemma.remove()
+                words.add(headword)
             }
 
-            words.add(headword)
+            if (words.size > 1) {
+                val homographs = words.map { SearchResult(it.mTitle, it.summary, it.uri) }
+
+                for (word in words) {
+                    word.mHomographs.addAll(homographs)
+                }
+            }
+
             return words
         }
     }
