@@ -358,7 +358,12 @@ class CardActivity : AppCompatActivity() {
             if (!response.isSuccessful) return@forEach
 
             response.body?.let { body ->
-                val type = body.contentType()
+                val type = if (it.endsWith(".mp3")) {
+                    "audio/mpeg"
+                } else {
+                    body.contentType()
+                }
+
                 val base64 = Base64.encodeToString(body.bytes(), Base64.DEFAULT)
 
                 data.add("data:$type;base64,$base64")
