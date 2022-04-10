@@ -27,7 +27,7 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
 
         val body = response.body?.string() ?: return JSONArray()
 
-        return JSONArray(body.substring(1, body.length - 1))
+        return JSONArray(body)
     }
 
     override fun search(query: String): List<SearchResult> {
