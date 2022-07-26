@@ -59,6 +59,8 @@ class Word(
                 if (parent == null) parent = doc.selectFirst("div.d_ptma")
                 if (parent == null) parent = doc.selectFirst(".artikel")
                 if (parent == null) parent = doc.selectFirst("ol")
+                // Linguee
+                if (parent == null) parent = doc.selectFirst("div.exact")
                 parent.appendChild(el)
                 last = el
             }

@@ -104,6 +104,9 @@ class Ordboken private constructor(context: Context) {
         val sdo = SdoDictionary(client)
         sdo.init()
 
+        val lingpt = LingueeDictionary(client)
+        lingpt.init()
+
         val wfr = FrWiktionary(client)
         wfr.init()
 
@@ -113,11 +116,11 @@ class Ordboken private constructor(context: Context) {
         val colfren = CollinsFrenchEnglishDictionary(client)
         colfren.init()
 
-        var islex = IslexDictionary(client)
+        val islex = IslexDictionary(client)
         islex.init()
 
-        dictionaries = arrayOf(so, ddo, sdo, wfr, rob, colfren, islex)
-        flags = arrayOf(so.flag, ddo.flag, sdo.flag, wfr.flag, rob.flag, colfren.flag, islex.flag)
+        dictionaries = arrayOf(so, ddo, sdo, lingpt, wfr, rob, colfren, islex)
+        flags = arrayOf(so.flag, ddo.flag, sdo.flag, lingpt.flag, wfr.flag, rob.flag, colfren.flag, islex.flag)
 
         currentIndex = mPrefs.getInt("currentIndex", 0)
         currentDictionary = dictionaries[currentIndex]
@@ -127,6 +130,7 @@ class Ordboken private constructor(context: Context) {
             so.tag to so,
             ddo.tag to ddo,
             sdo.tag to sdo,
+            lingpt.tag to lingpt,
             wfr.tag to wfr,
             rob.tag to rob,
             colfren.tag to colfren,

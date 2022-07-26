@@ -153,3 +153,37 @@ main {
 .res_cell_center_content>.wnv {
     margin-top: 0px !important;
 }
+
+/* Linguee */
+
+.l_deepl_ad_container {
+    display: none;
+}
+
+#ip_page_wrapper .lMainNavbar {
+    display: none;
+}
+
+#ip_page_wrapper .l_header {
+    display: none;
+}
+
+#ip_page_wrapper .footer {
+    display: none;
+}
+
+div.masculine h2.lemma_desc:before {
+    content: "um ";
+}
+
+div.feminine h2.lemma_desc:before {
+    content: "uma ";
+}
+
+div.masculine {
+    background: #eef;
+}
+
+div.feminine {
+    background: #fee;
+}
