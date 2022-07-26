@@ -94,7 +94,6 @@ class Ordboken private constructor(context: Context) {
         lastWhat = mPrefs.getString("lastWhat", "ordbok")
         mConnMgr = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
-
         val so = SoDictionary(client)
         so.init()
 
@@ -117,21 +116,12 @@ class Ordboken private constructor(context: Context) {
         colfren.init()
 
         dictionaries = arrayOf(so, ddo, sdo, lingpt, wfr, rob, colfren)
-        flags = arrayOf(so.flag, ddo.flag, sdo.flag, lingpt.flag, wfr.flag, rob.flag, colfren.flag)
+        flags = dictionaries.map { it.flag }.toTypedArray()
+        dictMap = dictionaries.associateBy { it.tag }
 
         currentIndex = mPrefs.getInt("currentIndex", 0)
         currentDictionary = dictionaries[currentIndex]
         currentFlag = flags[currentIndex]
-
-        dictMap = mapOf(
-            so.tag to so,
-            ddo.tag to ddo,
-            sdo.tag to sdo,
-            lingpt.tag to lingpt,
-            wfr.tag to wfr,
-            rob.tag to rob,
-            colfren.tag to colfren
-        )
     }
 
     fun getWord(uri: Uri): Word? {
