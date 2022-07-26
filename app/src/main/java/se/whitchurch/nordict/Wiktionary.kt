@@ -13,6 +13,10 @@ abstract class Wiktionary(client: OkHttpClient) : Dictionary(client) {
     override fun init() = Unit
 
     override fun get(uri: Uri): Word? {
+        if (uri.host != "${shortName}.m.wiktionary.org") {
+            return null;
+        }
+
         val page = fetch(uri.toString())
 
         val builder = uri.buildUpon()

@@ -15,6 +15,10 @@ class CollinsFrenchEnglishDictionary(client: OkHttpClient) : Dictionary(client) 
     override fun init() = Unit
 
     override fun get(uri: Uri): Word? {
+        if (uri.host != "www.collinsdictionary.com") {
+            return null;
+        }
+
         val page = fetch(uri.toString())
 
         val words = CollinsParser.parse(page, uri, tag)

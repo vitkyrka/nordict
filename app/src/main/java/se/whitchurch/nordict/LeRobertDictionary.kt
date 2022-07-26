@@ -15,6 +15,10 @@ class LeRobertDictionary(client: OkHttpClient) : Dictionary(client) {
     override fun init() = Unit
 
     override fun get(uri: Uri): Word? {
+        if (uri.host != "dictionnaire.lerobert.com") {
+            return null;
+        }
+
         val builder = uri.buildUpon()
         builder.clearQuery()
         uri.queryParameterNames.forEach {

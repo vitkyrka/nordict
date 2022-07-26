@@ -25,6 +25,10 @@ class LingueeDictionary(client: OkHttpClient) : Dictionary(client) {
     override fun fullSearch(query: String): List<SearchResult> = search(query)
 
     override fun get(uri: Uri): Word? {
+        if (uri.host != "www.linguee.pt") {
+            return null
+        }
+
         val builder = uri.buildUpon()
         builder.clearQuery()
         uri.queryParameterNames.forEach {
