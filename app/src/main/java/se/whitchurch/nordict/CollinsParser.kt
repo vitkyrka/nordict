@@ -1,25 +1,20 @@
 package se.whitchurch.nordict
 
 import android.net.Uri
-import android.util.Log
 import org.jsoup.Jsoup
-import org.jsoup.nodes.Element
-import kotlin.math.max
 
 class CollinsParser {
     companion object {
         fun parse(page: String, uri: Uri, tag: String): List<Word> {
             val words: ArrayList<Word> = ArrayList()
-            val doc = Jsoup.parse(page, "https://www.collinsdictionary.com/dictionary/french-english/")
-
+            val doc =
+                Jsoup.parse(page, "https://www.collinsdictionary.com/dictionary/french-english/")
 
             var main = doc.selectFirst("main") ?: return words
             val word = main.selectFirst("span.orth")?.text() ?: return words
             val cleanpage = doc.head().html() + "<body>" + main
 
             main.selectFirst("div.topslot_container")?.remove()
-
-            Log.i("foo", cleanpage);
 
             val headword = Word(
                 tag, word, word, word.toString(), cleanpage, uri,
