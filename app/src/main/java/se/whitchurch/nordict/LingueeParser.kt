@@ -36,15 +36,17 @@ class LingueeParser {
                 if (type.isNotEmpty()) {
                     summary.append(" ($type)")
 
-                    if (type.contains("plural")) {
-                        lemma.addClass("plural")
-                    } else {
-                        lemma.addClass("singular")
-                    }
-                    if (type.contains("feminino")) {
-                        lemma.addClass("feminine")
-                    } else if (type.contains("masculino")) {
-                        lemma.addClass("masculine")
+                    if (type.contains("subst")) {
+                        if (type.contains("plural")) {
+                            lemma.addClass("plural")
+                        } else {
+                            lemma.addClass("singular")
+                        }
+                        if (type.contains("masculino")) {
+                            lemma.addClass("masculine")
+                        } else if (type.contains("feminino")) {
+                            lemma.addClass("feminine")
+                        }
                     }
                 }
 
