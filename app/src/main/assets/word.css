@@ -172,12 +172,20 @@ main {
     display: none;
 }
 
-div.masculine h2.lemma_desc:before {
-    content: "um ";
+div.masculine.singular h2.lemma_desc:before {
+    content: "o ";
 }
 
-div.feminine h2.lemma_desc:before {
-    content: "uma ";
+div.feminine.singular h2.lemma_desc:before {
+    content: "a ";
+}
+
+div.masculine.plural h2.lemma_desc:before {
+    content: "os ";
+}
+
+div.feminine.plural h2.lemma_desc:before {
+    content: "as ";
 }
 
 div.masculine {
