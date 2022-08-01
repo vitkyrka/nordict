@@ -38,7 +38,7 @@ class LingueeDictionary(client: OkHttpClient) : Dictionary(client) {
         val newUri = builder.build()
         val page = fetch(newUri.toString())
 
-        val words = LingueeParser.parse(page, uri, tag)
+        val words = LingueeParser.parse(page, newUri, tag)
         if (words.isEmpty()) return null
 
         val ref = uri.getQueryParameter(REFPARAM) ?: return words[0]
