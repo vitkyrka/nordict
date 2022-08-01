@@ -28,7 +28,8 @@ class LingueeParser {
 
                 first = false
 
-                val word = lemma.selectFirst("a.dictLink")?.text() ?: return@forEach
+                val taglemma = lemma.selectFirst("span.tag_lemma") ?: return@forEach;
+                val word = taglemma.select("a.dictLink").map { it.text() }.joinToString(" ")
                 val summary = StringBuilder(word)
 
                 val type = lemma.selectFirst(".tag_wordtype")?.text() ?: ""
