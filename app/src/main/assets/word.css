@@ -195,3 +195,9 @@ div.masculine {
 div.feminine {
     background: #fee;
 }
+
+/* Infopedia */
+
+.area-dictionaries main {
+    margin-top: 0px !important;
+}

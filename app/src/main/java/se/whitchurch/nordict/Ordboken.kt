@@ -106,6 +106,9 @@ class Ordboken private constructor(context: Context) {
         val lingpt = LingueeDictionary(client)
         lingpt.init()
 
+        val infopedia = InfopediaDictionary(client)
+        infopedia.init()
+
         val wfr = FrWiktionary(client)
         wfr.init()
 
@@ -115,7 +118,7 @@ class Ordboken private constructor(context: Context) {
         val colfren = CollinsFrenchEnglishDictionary(client)
         colfren.init()
 
-        dictionaries = arrayOf(so, ddo, sdo, lingpt, wfr, rob, colfren)
+        dictionaries = arrayOf(so, ddo, sdo, lingpt, infopedia, wfr, rob, colfren)
         flags = dictionaries.map { it.flag }.toTypedArray()
         dictMap = dictionaries.associateBy { it.tag }
 

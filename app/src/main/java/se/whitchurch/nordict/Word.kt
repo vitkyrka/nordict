@@ -61,6 +61,8 @@ class Word(
                 if (parent == null) parent = doc.selectFirst("ol")
                 // Linguee
                 if (parent == null) parent = doc.selectFirst("div.exact")
+                // Infopedia
+                if (parent == null) parent = doc.selectFirst("div.dol-col-60")
                 parent.appendChild(el)
                 last = el
             }
