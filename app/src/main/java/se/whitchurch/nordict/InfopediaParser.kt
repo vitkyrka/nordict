@@ -5,6 +5,7 @@ import org.jsoup.Jsoup
 
 class InfopediaParser {
     companion object {
+
         fun parse(page: String, uri: Uri, tag: String): List<Word> {
             val words: ArrayList<Word> = ArrayList()
             val doc = Jsoup.parse(page)
@@ -75,12 +76,17 @@ class InfopediaParser {
                     "https://www.infopedia.pt/",
                     doc,
                     "",
+                    lemma,
                 )
 
                 headword.xrefs.add(ref.toString())
-                val meanings = word
-                val definition = Word.Definition(meanings, lemma)
-                headword.definitions.add(definition)
+
+                lemma.select(".dolAcepsRow").forEach { el ->
+                    val def = Word.Definition(el.text(), el)
+                    headword.definitions.add(def)
+                    el.remove()
+                }
+
 //
 //                lemma.select(".example .tag_s").forEach {
 //                    definition.examples.add(it.text())

@@ -37,6 +37,9 @@ class Word(
                 doc.selectFirst(".mw-parser-output")?.appendChild(it.clone())
             } else if (doc.selectFirst("section.def") != null) {
                 doc.selectFirst("section.def")?.appendChild(it.clone())
+            } else if (doc.selectFirst("div.dol-col-60") != null) {
+                // Infopedia
+                doc.selectFirst("div.dol-col-60")?.appendChild(it.clone())
             } else {
                 doc.select(".artikel").first().appendChild(it.clone())
             }
@@ -62,7 +65,7 @@ class Word(
                 // Linguee
                 if (parent == null) parent = doc.selectFirst("div.exact")
                 // Infopedia
-                if (parent == null) parent = doc.selectFirst("div.dol-col-60")
+                if (parent == null) parent = doc.selectFirst("div.dolCatgramAceps")
                 parent.appendChild(el)
                 last = el
             }
