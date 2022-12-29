@@ -5,8 +5,8 @@ dictionaries.  Major dictionaries of both these languages have official,
 free-of-cost apps, but Nordict has unique features which may be helpful for
 non-native speakers.
 
-Nordict also has some support for Wiktionnaire (the French Wiktionary)
-and Dico en ligne Le Robert.
+Nordict also has varying degrees of support for various French, Portuguese and
+Spanish dictionaries.
 
 It builds upon ideas previously implemented in
 [Bildkortsappen](https://github.com/vitkyrka/bildkortsappen) and
@@ -31,6 +31,12 @@ It builds upon ideas previously implemented in
 - [Dico en ligne Le Robert](https://dictionnaire.lerobert.com/) (ROB).
 
 - [Collins French-English dictionary](https://www.collinsdictionary.com/dictionary/french-english) (COLFREN).
+
+- [Linguee (Portuguese<->English)](https://www.linguee.pt/) (LINGPT).
+
+- [Infopédia](https://www.infopedia.pt/) (INFOPEDIA).
+
+- [Diccionario de la lengua española](https://dle.rae.es/) (DLE).
 
 ## Features
 
