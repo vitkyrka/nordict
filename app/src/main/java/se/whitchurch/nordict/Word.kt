@@ -66,6 +66,8 @@ class Word(
                 if (parent == null) parent = doc.selectFirst("div.exact")
                 // Infopedia
                 if (parent == null) parent = doc.selectFirst("div.dolCatgramAceps")
+                // DLE
+                if (parent == null) parent = doc.selectFirst("#resultados")
                 parent.appendChild(el)
                 last = el
             }
