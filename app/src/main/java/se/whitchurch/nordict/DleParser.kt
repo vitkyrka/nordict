@@ -2,6 +2,7 @@ package se.whitchurch.nordict
 
 import android.net.Uri
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 
 class DleParser {
     companion object {
@@ -68,10 +69,32 @@ class DleParser {
 
                 headword.xrefs.add(ref.toString())
 
+                var title = headword.mTitle
+                var wrapper: Element? = null
+
                 lemma.select("p").forEach { meaning ->
-                    val definition = Word.Definition(meaning.text(), meaning)
-                    headword.definitions.add(definition)
-                    meaning.remove()
+                    if (meaning.className().startsWith("l")) {
+                        // Links
+                        meaning.remove()
+                        return@forEach
+                    }
+                    if (meaning.className() == "k5") {
+                        title = meaning.text()
+                        wrapper = Element("div")
+                        wrapper?.appendChild(meaning)
+                        return@forEach
+                    }
+                    val w = wrapper?.clone()
+
+                    if (w != null) {
+                        w.appendChild(meaning)
+                        val definition = Word.Definition(meaning.text(), w, title)
+                        headword.definitions.add(definition)
+                    } else {
+                        val definition = Word.Definition(meaning.text(), meaning)
+                        headword.definitions.add(definition)
+                        meaning.remove()
+                    }
                 }
 
 //                lemma.select(".example .tag_s").forEach {
