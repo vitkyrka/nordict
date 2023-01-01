@@ -116,7 +116,8 @@ class CardActivity : AppCompatActivity() {
         this.word = word
 
         for (definition in word.definitions) {
-            val card = createCard("${word.mTitle}: ${definition.definition}", definition.examples)
+            val title = definition.title ?: word.mTitle
+            val card = createCard("${title}: ${definition.definition}", definition.examples)
             val createButton = card.findViewById<Button>(R.id.card_create_button)
 
             createButton.setOnClickListener {
@@ -139,7 +140,7 @@ class CardActivity : AppCompatActivity() {
                 }
 
                 if (examples.isEmpty()) {
-                    examples = arrayListOf(word.mTitle)
+                    examples = arrayListOf(title)
                 }
 
                 createCard(word.getPage(selectedDefinitions, ordboken.currentCss),
@@ -181,7 +182,7 @@ class CardActivity : AppCompatActivity() {
             card.findViewById<Button>(R.id.card_images_button).apply {
                 setOnClickListener {
                     Intent(this@CardActivity, ImagePicker::class.java).also {
-                        it.putExtra(Intent.EXTRA_TEXT, word.mTitle)
+                        it.putExtra(Intent.EXTRA_TEXT, title)
                         it.putExtra("dictionaryImages", mDictImages)
                         currentDefinition = definition
                         currentCard = card
@@ -195,7 +196,7 @@ class CardActivity : AppCompatActivity() {
             card.findViewById<Button>(R.id.card_photo_button).apply {
                 setOnClickListener {
                     Intent(this@CardActivity, CameraActivity::class.java).also {
-                        it.putExtra(Intent.EXTRA_TEXT, word.mTitle)
+                        it.putExtra(Intent.EXTRA_TEXT, title)
                         currentDefinition = definition
                         currentCard = card
                         ordboken.images = ArrayList()

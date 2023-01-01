@@ -25,7 +25,7 @@ class Word(
         val examples: ArrayList<String> = ArrayList()
     }
 
-    class Definition(val definition: String, val element: Element) {
+    class Definition(val definition: String, val element: Element, val title: String? = null) {
         val examples: ArrayList<String> = ArrayList()
     }
 
