@@ -40,6 +40,9 @@ class Word(
             } else if (doc.selectFirst("div.dol-col-60") != null) {
                 // Infopedia
                 doc.selectFirst("div.dol-col-60")?.appendChild(it.clone())
+            } else if (doc.selectFirst("#resultados") != null) {
+                // DLE
+                doc.selectFirst("#resultados")?.appendChild(it.clone())
             } else {
                 doc.select(".artikel").first().appendChild(it.clone())
             }

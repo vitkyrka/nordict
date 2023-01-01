@@ -63,11 +63,12 @@ class DleParser {
                     "https://dle.rae.es/",
                     doc,
                     "",
+                    lemma
                 )
 
                 headword.xrefs.add(ref.toString())
 
-                lemma.select("p.j").forEach { meaning ->
+                lemma.select("p").forEach { meaning ->
                     val definition = Word.Definition(meaning.text(), meaning)
                     headword.definitions.add(definition)
                     meaning.remove()
