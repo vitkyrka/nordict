@@ -23,7 +23,7 @@ var getPos = function(regex, html) {
 var createLinks = function(el) {
 	var regex = /([ >/"'(])([A-Za-z\u0080-\u00FF-]+)(?![^<]*>)/g;
 	var html = el.innerHTML;
-	var astarts = getPos(/<a/gi, html);
+	var astarts = getPos(/<a[\s]/gi, html);
 	var aends = getPos(/\/a>/gi, html);
 	var apos = 0;
 
@@ -43,7 +43,7 @@ var createLinks = function(el) {
 		// U+00AD SOFT HYPHEN in SO
 		a = a.replace('­', '');
 
-		return before + '<a class="normal" href="/search/' + a + '">' + a + "</a>";
+		return before + '<a class="normal" href="/search/' + a.toLowerCase() + '">' + a + "</a>";
 	});
 };
 
