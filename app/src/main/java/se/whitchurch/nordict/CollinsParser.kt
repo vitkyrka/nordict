@@ -5,10 +5,10 @@ import org.jsoup.Jsoup
 
 class CollinsParser {
     companion object {
-        fun parse(page: String, uri: Uri, tag: String): List<Word> {
+        fun parse(page: String, uri: Uri, tag: String, dictCode: String): List<Word> {
             val words: ArrayList<Word> = ArrayList()
             val doc =
-                Jsoup.parse(page, "https://www.collinsdictionary.com/dictionary/french-english/")
+                Jsoup.parse(page, "https://www.collinsdictionary.com/dictionary/${dictCode}")
 
             var main = doc.selectFirst("main") ?: return words
             val word = main.selectFirst("span.orth")?.text() ?: return words
