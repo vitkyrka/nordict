@@ -78,23 +78,29 @@ class DleParser {
                         meaning.remove()
                         return@forEach
                     }
-                    if (meaning.className() == "k5") {
+                    if (meaning.className().startsWith("k")) {
                         title = meaning.text()
                         wrapper = Element("div")
                         wrapper?.appendChild(meaning)
                         return@forEach
                     }
                     val w = wrapper?.clone()
+                    var definition: Word.Definition? = null
 
                     if (w != null) {
                         w.appendChild(meaning)
-                        val definition = Word.Definition(meaning.text(), w, title)
-                        headword.definitions.add(definition)
+                        definition = Word.Definition(meaning.text(), w, title)
+                        // appendChild moves the node so no need to remove it
                     } else {
-                        val definition = Word.Definition(meaning.text(), meaning)
-                        headword.definitions.add(definition)
+                        definition = Word.Definition(meaning.text(), meaning)
                         meaning.remove()
                     }
+
+                    meaning.select(".h").forEach { example ->
+                        definition.examples.add(example.text())
+                    }
+
+                    headword.definitions.add(definition)
                 }
 
 //                lemma.select(".example .tag_s").forEach {
