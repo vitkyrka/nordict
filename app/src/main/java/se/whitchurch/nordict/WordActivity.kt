@@ -8,6 +8,7 @@ import android.content.res.Configuration
 import android.database.sqlite.SQLiteDatabase
 import android.graphics.Color
 import android.graphics.Typeface
+import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
@@ -29,6 +30,8 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebSettingsCompat.FORCE_DARK_OFF
 import androidx.webkit.WebSettingsCompat.FORCE_DARK_ON
 import androidx.webkit.WebViewFeature
+import com.google.android.exoplayer2.ExoPlayer
+import com.google.android.exoplayer2.MediaItem
 import com.google.android.material.bottomappbar.BottomAppBar
 import se.whitchurch.nordict.OrdbokenContract.FavoritesEntry
 import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
@@ -269,6 +272,7 @@ class WordActivity : AppCompatActivity() {
         val footer = ("<script src='file:///android_asset/jquery.min.js'></script>"
                 + "<link rel='stylesheet' type='text/css' href='file:///android_asset/word.css'>"
                 + "<script src='file:///android_asset/word.js'></script>")
+
         val builder = StringBuilder(text.replace("/speaker.png", "https://svenska.se/speaker.png"))
 
         builder.append(footer)
@@ -380,68 +384,14 @@ class WordActivity : AppCompatActivity() {
             return
         }
 
-        val mediaPlayer = MediaPlayer()
-        mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC)
-
-        try {
-            mediaPlayer.setDataSource(urls[0])
-        } catch (e: Exception) {
-            Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
-                .show()
-            return
-        }
-
-        var current = 0
-        mediaPlayer.setOnCompletionListener {
-            current += 1
-            if (urls.size <= current) {
-                return@setOnCompletionListener
-            }
-
-            it.reset()
-            it.setDataSource(urls[current])
-            it.prepareAsync()
-        }
-
-        mediaPlayer.setOnPreparedListener { mp ->
-            mp.start()
-        }
-
-        mediaPlayer.setOnErrorListener { mp, what, extra ->
-            Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
-                .show()
-            false
-        }
-
-        mediaPlayer.prepareAsync()
+        val player: ExoPlayer = ExoPlayer.Builder(this).build()
+        urls.forEach { player.addMediaItem(MediaItem.fromUri(it)) }
+        player.prepare()
+        player.play()
     }
 
     private fun playAudio(url: String) {
-        val mediaPlayer = MediaPlayer()
-        mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC)
-
-        try {
-            mediaPlayer.setDataSource(url)
-        } catch (e: Exception) {
-            setProgressBarIndeterminateVisibility(false)
-            Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
-                .show()
-            return
-        }
-
-        mediaPlayer.setOnPreparedListener { mp ->
-            setProgressBarIndeterminateVisibility(false)
-            mp.start()
-        }
-
-        mediaPlayer.setOnErrorListener { mp, what, extra ->
-            setProgressBarIndeterminateVisibility(false)
-            Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
-                .show()
-            false
-        }
-
-        mediaPlayer.prepareAsync()
+        playAudio(arrayListOf(url))
     }
 
     private inner class HistorySaveTask : AsyncTask<Void, Void, Void>() {
