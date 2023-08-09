@@ -43,7 +43,7 @@ var createLinks = function(el) {
 		// U+00AD SOFT HYPHEN in SO
 		a = a.replace('­', '');
 
-		return before + '<a class="normal" href="/search/' + a.toLowerCase() + '">' + a + "</a>";
+		return before + '<a class="normalx" href="/search/' + a.toLowerCase() + '">' + a + "</a>";
 	});
 };
 
