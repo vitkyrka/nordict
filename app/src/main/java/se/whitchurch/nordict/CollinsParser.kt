@@ -23,7 +23,7 @@ class CollinsParser {
                 doc.head().html() + "<body>"
             )
 
-            main.select("div.he a.sound")?.forEach audio@{ audio ->
+            main.select("div.he a.hwd_sound")?.forEach audio@{ audio ->
                 val src = audio.attr("data-src-mp3")
 
                 headword.audio.add(src)
