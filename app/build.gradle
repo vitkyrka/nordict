@@ -3,10 +3,10 @@ apply plugin: 'kotlin-android'
 apply plugin: 'kotlin-android-extensions'
 
 android {
-    compileSdkVersion 30
+    compileSdkVersion 33
 
     dependencies {
-        implementation "com.android.support:support-v4:30.0.0"
+        implementation "com.android.support:support-v4:33.0.0"
         implementation "org.jsoup:jsoup:1.12.1"
         implementation 'com.github.ankidroid:Anki-Android:api-v1.1.0'
         implementation 'com.squareup.retrofit2:retrofit:2.0.1'
@@ -18,12 +18,13 @@ android {
         implementation "androidx.camera:camera-lifecycle:1.0.1"
         implementation "androidx.camera:camera-view:1.0.0-alpha27"
         implementation 'com.theartofdev.edmodo:android-image-cropper:2.8.0'
+        implementation 'com.google.android.exoplayer:exoplayer:2.18.2'
     }
 
     defaultConfig {
         applicationId "se.whitchurch.nordict"
         minSdkVersion 28
-        targetSdkVersion 30
+        targetSdkVersion 33
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -46,6 +47,7 @@ android {
     kotlinOptions {
         jvmTarget = "1.8"
     }
+    namespace 'se.whitchurch.nordict'
 }
 repositories {
     mavenCentral()
