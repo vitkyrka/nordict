@@ -38,6 +38,8 @@ It builds upon ideas previously implemented in
 
 - [Diccionario de la lengua española](https://dle.rae.es/) (DLE).
 
+- [Collins Spanish-English dictionary](https://www.collinsdictionary.com/dictionary/spanish-english) (COLSPAN).
+
 ## Features
 
 * **All words are hyperlinks (all).** Any word in the definition can
