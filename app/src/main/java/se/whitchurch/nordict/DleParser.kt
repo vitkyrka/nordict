@@ -22,6 +22,9 @@ class DleParser {
             doc.selectFirst(".region-header")?.remove()
             doc.selectFirst("p.o")?.remove()
             doc.selectFirst("footer")?.remove()
+            // Remove this since they end up before the definitions.  The same information
+            // is also present separately for each definition which is better.
+            doc.select(".div-sin-ant").forEach { it.remove() }
 
             var first = true
             var ref = 0
@@ -71,8 +74,9 @@ class DleParser {
 
                 var title = headword.mTitle
                 var wrapper: Element? = null
+                var lastdef: Word.Definition? = null
 
-                lemma.select("p").forEach { meaning ->
+                lemma.select("p, div.sin-inline").forEach { meaning ->
                     if (meaning.className().startsWith("l")) {
                         // Links
                         meaning.remove()
@@ -84,6 +88,17 @@ class DleParser {
                         wrapper?.appendChild(meaning)
                         return@forEach
                     }
+
+                    // Empty <p> between definitions
+                    if (meaning.className().isEmpty()) {
+                        return@forEach
+                    }
+
+                    if (meaning.tagName() == "div") {
+                        lastdef?.element?.appendChild(meaning)
+                        return@forEach
+                    }
+
                     val w = wrapper?.clone()
                     var definition: Word.Definition? = null
 
@@ -92,8 +107,9 @@ class DleParser {
                         definition = Word.Definition(meaning.text(), w, title)
                         // appendChild moves the node so no need to remove it
                     } else {
-                        definition = Word.Definition(meaning.text(), meaning)
-                        meaning.remove()
+                        val tmp = Element("div")
+                        tmp.appendChild(meaning)
+                        definition = Word.Definition(meaning.text(), tmp)
                     }
 
                     meaning.select(".h").forEach { example ->
@@ -101,6 +117,7 @@ class DleParser {
                     }
 
                     headword.definitions.add(definition)
+                    lastdef = definition
                 }
 
 //                lemma.select(".example .tag_s").forEach {
