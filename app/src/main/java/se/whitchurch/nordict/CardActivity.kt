@@ -18,8 +18,10 @@ import androidx.cardview.widget.CardView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.ichi2.anki.api.AddContentApi
-import kotlinx.android.synthetic.main.activity_card.*
 import okhttp3.Request
+import se.whitchurch.nordict.databinding.ActivityCameraBinding
+import se.whitchurch.nordict.databinding.ActivityCardBinding
+import java.util.concurrent.ExecutorService
 
 
 class CardActivity : AppCompatActivity() {
@@ -36,8 +38,12 @@ class CardActivity : AppCompatActivity() {
     private var saveDeckName = true
     private var mLeftCards = 0
 
+
+    private lateinit var binding: ActivityCardBinding
+
+
     private fun createCard(title: String, examples: List<String>): CardView {
-        val card = layoutInflater.inflate(R.layout.card, cardHolder, false)
+        val card = layoutInflater.inflate(R.layout.card, binding.cardHolder, false)
 
         val cardTitle = card.findViewById<TextView>(R.id.cardTitle)
         val cardExample = card.findViewById<TextView>(R.id.cardExample)
@@ -232,7 +238,7 @@ class CardActivity : AppCompatActivity() {
             }
 
             defToCard[definition] = card
-            cardHolder.addView(card)
+            binding.cardHolder.addView(card)
         }
 
         for (idiom in word.idioms) {
@@ -251,14 +257,17 @@ class CardActivity : AppCompatActivity() {
                 card.visibility = View.GONE
             }
 
-            cardHolder.addView(card)
+            binding.cardHolder.addView(card)
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_card)
-        setSupportActionBar(toolbar)
+
+        binding = ActivityCardBinding.inflate(layoutInflater)
+        val view = binding.root
+        setContentView(view)
+        setSupportActionBar(binding.toolbar)
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
         if (ContextCompat.checkSelfPermission(

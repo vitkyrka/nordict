@@ -16,7 +16,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.theartofdev.edmodo.cropper.CropImage
-import kotlinx.android.synthetic.main.activity_camera.*
+import se.whitchurch.nordict.databinding.ActivityCameraBinding
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -24,12 +24,16 @@ import java.util.concurrent.Executors
 // Heavily based on https://developer.android.com/codelabs/camerax-getting-started
 class CameraActivity : AppCompatActivity() {
     private var imageCapture: ImageCapture? = null
+    private lateinit var binding: ActivityCameraBinding
 
     private lateinit var cameraExecutor: ExecutorService
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_camera)
+
+        binding = ActivityCameraBinding.inflate(layoutInflater)
+        val view = binding.root
+        setContentView(view)
 
         if (allPermissionsGranted()) {
             startCamera()
@@ -39,7 +43,7 @@ class CameraActivity : AppCompatActivity() {
             )
         }
 
-        camera_capture_button.setOnClickListener {
+        binding.cameraCaptureButton.setOnClickListener {
             val imageCapture = imageCapture ?: return@setOnClickListener
 
             val file = File(
@@ -89,7 +93,7 @@ class CameraActivity : AppCompatActivity() {
             val preview = Preview.Builder()
                 .build()
                 .also {
-                    it.setSurfaceProvider(viewFinder.surfaceProvider)
+                    it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
                 }
 
             imageCapture = ImageCapture.Builder()
