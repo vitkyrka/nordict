@@ -10,6 +10,14 @@ class CollinsParser {
             val doc =
                 Jsoup.parse(page, "https://www.collinsdictionary.com/dictionary/${dictCode}")
 
+            doc.select("iframe").forEach { it.remove() }
+            doc.select("script").forEach { it.remove() }
+            doc.select("link[rel=preload]").forEach { it.remove() }
+            doc.select("link[rel=preconnect]").forEach { it.remove() }
+            doc.select("div.mpuslot_b-container").forEach { it.remove() }
+            doc.selectFirst("div.carousel")?.remove()
+            doc.selectFirst("div.navigation")?.remove()
+
             var main = doc.selectFirst("main") ?: return words
             val word = main.selectFirst("span.orth")?.text() ?: return words
             val cleanpage = doc.head().html() + "<body>" + main
