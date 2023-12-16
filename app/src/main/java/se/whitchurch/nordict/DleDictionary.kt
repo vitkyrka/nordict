@@ -38,7 +38,9 @@ class DleDictionary(client: OkHttpClient) : Dictionary(client) {
             val items = publicApiRequest(uriBuilder.build().toString())
 
             for (i in 0 until items.length()) {
-                val item = items.getString(i).split("|").first();
+                // Tag strip for eg. ballet
+                val item = items.getString(i).split("|").first()
+                    .replace("<[^>]+?>".toRegex(), "")
 
                 val uri = Uri.parse("https://dle.rae.es/${item}")
                 results.add(SearchResult(item, uri))
