@@ -67,6 +67,21 @@
             app:layout_constraintTop_toBottomOf="@id/card_images_scroll" />
 
         <Button
+            android:id="@+id/card_clipboard_button"
+            style="@style/Widget.MaterialComponents.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:minWidth="0dp"
+            android:paddingStart="8dp"
+            android:paddingEnd="8dp"
+            android:text="Clipboard"
+            android:visibility="invisible"
+            app:layout_constraintEnd_toStartOf="@id/card_images_button"
+            app:layout_constraintTop_toBottomOf="@id/card_images_scroll" />
+
+        <Button
             android:id="@+id/card_images_button"
             style="@style/Widget.MaterialComponents.Button.TextButton.Icon"
             android:layout_width="wrap_content"
@@ -76,7 +91,6 @@
             android:minWidth="0dp"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"
-            android:text="Images"
             android:visibility="invisible"
             app:icon="@drawable/ic_add_image"
             app:layout_constraintEnd_toStartOf="@id/card_photo_button"
@@ -92,7 +106,6 @@
             android:minWidth="0dp"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"
-            android:text="Photo"
             android:visibility="invisible"
             app:icon="@drawable/ic_add_camera"
             app:layout_constraintEnd_toEndOf="parent"

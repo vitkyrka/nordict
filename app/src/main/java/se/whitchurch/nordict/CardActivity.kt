@@ -1,5 +1,6 @@
 package se.whitchurch.nordict
 
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -123,6 +124,7 @@ class CardActivity : AppCompatActivity() {
             val title = definition.title ?: word.mTitle
             val card = createCardView("${title}: ${definition.definition}", definition.examples)
             val createButton = card.findViewById<Button>(R.id.card_create_button)
+            val extraExamples = ArrayList<String>()
 
             createButton.setOnClickListener {
                 val images = imagesMap[definition.definition] ?: ArrayList()
@@ -142,6 +144,8 @@ class CardActivity : AppCompatActivity() {
                 selectedDefinitions.forEach {
                     examples.addAll(it.examples)
                 }
+
+                examples.addAll(extraExamples)
 
                 if (examples.isEmpty()) {
                     examples = arrayListOf(title)
@@ -197,6 +201,22 @@ class CardActivity : AppCompatActivity() {
                 visibility = View.VISIBLE
             }
 
+            card.findViewById<Button>(R.id.card_clipboard_button).apply {
+                setOnClickListener {
+                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    val item = clipboard.primaryClip?.getItemAt(0)
+                    val pasteData = item?.text
+
+                    if (pasteData != null) {
+                        val cardExample = card.findViewById<TextView>(R.id.cardExample)
+
+                        cardExample.text = cardExample.text.toString() + "\n• " + pasteData
+                        extraExamples.add(pasteData.toString())
+                    }
+                }
+                visibility = View.VISIBLE
+            }
+
             card.findViewById<Button>(R.id.card_photo_button).apply {
                 setOnClickListener {
                     Intent(this@CardActivity, CameraActivity::class.java).also {
@@ -216,6 +236,11 @@ class CardActivity : AppCompatActivity() {
                         val empty = arrayListOf<String>()
 
                         imagesMap[definition.definition] = empty
+                        extraExamples.clear()
+
+                        val cardExample = card.findViewById<TextView>(R.id.cardExample)
+                        val examplesText = if (definition.examples.isNotEmpty()) "• " else ""
+                        cardExample.text = examplesText + definition.examples.joinToString(separator = "\n• ")
 
                         showImages(card.findViewById<LinearLayout>(R.id.card_images), empty)
                     }
