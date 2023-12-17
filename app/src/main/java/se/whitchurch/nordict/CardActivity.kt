@@ -19,9 +19,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.ichi2.anki.api.AddContentApi
 import okhttp3.Request
-import se.whitchurch.nordict.databinding.ActivityCameraBinding
 import se.whitchurch.nordict.databinding.ActivityCardBinding
-import java.util.concurrent.ExecutorService
 
 
 class CardActivity : AppCompatActivity() {
@@ -42,7 +40,7 @@ class CardActivity : AppCompatActivity() {
     private lateinit var binding: ActivityCardBinding
 
 
-    private fun createCard(title: String, examples: List<String>): CardView {
+    private fun createCardView(title: String, examples: List<String>): CardView {
         val card = layoutInflater.inflate(R.layout.card, binding.cardHolder, false)
 
         val cardTitle = card.findViewById<TextView>(R.id.cardTitle)
@@ -123,7 +121,7 @@ class CardActivity : AppCompatActivity() {
 
         for (definition in word.definitions) {
             val title = definition.title ?: word.mTitle
-            val card = createCard("${title}: ${definition.definition}", definition.examples)
+            val card = createCardView("${title}: ${definition.definition}", definition.examples)
             val createButton = card.findViewById<Button>(R.id.card_create_button)
 
             createButton.setOnClickListener {
@@ -242,7 +240,7 @@ class CardActivity : AppCompatActivity() {
         }
 
         for (idiom in word.idioms) {
-            val card = createCard("${idiom.idiom}: ${idiom.definition}", idiom.examples)
+            val card = createCardView("${idiom.idiom}: ${idiom.definition}", idiom.examples)
             val createButton = card.findViewById<Button>(R.id.card_create_button)
 
             createButton.setOnClickListener {
