@@ -29,6 +29,13 @@ class DleParser {
             var first = true
             var ref = 0
 
+            doc.select("abbr").forEach { el ->
+                val title = el.attr("title")
+                if (title.isNotEmpty()) {
+                    el.text(title)
+                }
+            }
+
             doc.select("article").forEach { lemma ->
                 ref += 1
 
@@ -101,6 +108,18 @@ class DleParser {
 
                     val w = wrapper?.clone()
                     var definition: Word.Definition? = null
+
+                    val genderEl = meaning.selectFirst("abbr")
+                    if (genderEl != null) {
+                        val gender = genderEl.attr("title")
+                        if (gender == "nombre femenino" || gender == "nombre femenino plural") {
+                            genderEl.addClass("feminine")
+                            genderEl.addClass("rae")
+                        } else if (gender == "nombre masculino" || gender == "nombre masculino plural") {
+                            genderEl.addClass("masculine")
+                            genderEl.addClass("rae")
+                        }
+                    }
 
                     if (w != null) {
                         w.appendChild(meaning)

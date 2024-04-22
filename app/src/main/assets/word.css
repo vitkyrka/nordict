@@ -201,3 +201,18 @@ div.feminine {
 .area-dictionaries main {
     margin-top: 0px !important;
 }
+
+/* RAE */
+
+.feminine.rae {
+    background: #fee;
+}
+
+
+.masculine.rae {
+    background: #eef;
+}
+
+header.f {
+    color: #000;
+}
