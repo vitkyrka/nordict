@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.util.Base64
@@ -15,18 +16,36 @@ import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.theartofdev.edmodo.cropper.CropImage
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
+import com.canhub.cropper.CropImageView
 import se.whitchurch.nordict.databinding.ActivityCameraBinding
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
-// Heavily based on https://developer.android.com/codelabs/camerax-getting-started
+// Heavily based on https://developer.android.com/codelabs/camerax-getting-started and https://canato.medium.com/android-cropping-image-from-camera-or-gallery-fbe732800b08
 class CameraActivity : AppCompatActivity() {
     private var imageCapture: ImageCapture? = null
     private lateinit var binding: ActivityCameraBinding
 
     private lateinit var cameraExecutor: ExecutorService
+
+    private val cropImage = registerForActivityResult(CropImageContract()) { result ->
+        if (result.isSuccessful) {
+            val filePath = result.getUriFilePath(this)
+            if (filePath != null) {
+                val base64 = Base64.encodeToString(File(filePath).readBytes(), Base64.DEFAULT)
+                Ordboken.getInstance(this).images = arrayListOf("data:image/jpeg;base64,$base64")
+                setResult(Activity.RESULT_OK)
+                finish()
+            }
+        } else {
+            val exception = result.error
+            Log.e("CropImage", "Crop error: ${exception?.message}", exception)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,28 +79,24 @@ class CameraActivity : AppCompatActivity() {
                     }
 
                     override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                        CropImage.activity(Uri.parse(file.toURI().toString()))
-                            .start(this@CameraActivity)
+                        val cropImageOptions = CropImageOptions()
+                        cropImageOptions.aspectRatioX = 1
+                        cropImageOptions.aspectRatioY = 1
+                        cropImageOptions.cropShape = CropImageView.CropShape.RECTANGLE
+                        cropImageOptions.fixAspectRatio = true
+                        cropImageOptions.outputCompressFormat = Bitmap.CompressFormat.JPEG
+                        
+                        cropImage.launch(
+                            CropImageContractOptions(
+                                uri = Uri.fromFile(file),
+                                cropImageOptions = cropImageOptions
+                            )
+                        )
                     }
                 })
         }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-
-        if (requestCode == CropImage.CROP_IMAGE_ACTIVITY_REQUEST_CODE) {
-            val result = CropImage.getActivityResult(data)
-            if (resultCode == RESULT_OK) {
-                val base64 =
-                    Base64.encodeToString(File(result.uri.path).readBytes(), Base64.DEFAULT)
-                Ordboken.getInstance(this).images = arrayListOf("data:image/jpeg;base64,$base64")
-                setResult(Activity.RESULT_OK)
-                finish()
-            }
-        }
     }
 
     private fun startCamera() {
@@ -102,10 +117,15 @@ class CameraActivity : AppCompatActivity() {
 
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
 
-            cameraProvider.unbindAll()
-            cameraProvider.bindToLifecycle(
-                this, cameraSelector, preview, imageCapture
-            )
+            try {
+                cameraProvider.unbindAll()
+
+                cameraProvider.bindToLifecycle(
+                    this, cameraSelector, preview, imageCapture
+                )
+            } catch (e: Exception) {
+                Log.e("CameraActivity", "Use case binding failed", e)
+            }
         }, ContextCompat.getMainExecutor(this))
     }
 
@@ -113,6 +133,7 @@ class CameraActivity : AppCompatActivity() {
         requestCode: Int, permissions: Array<String>, grantResults:
         IntArray
     ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (requestCode == REQUEST_CODE_PERMISSIONS) {
             if (allPermissionsGranted()) {
                 startCamera()
