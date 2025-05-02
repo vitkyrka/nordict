@@ -4,6 +4,7 @@ import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Bundle
 import android.util.Base64
@@ -15,7 +16,11 @@ import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.theartofdev.edmodo.cropper.CropImage
+import com.canhub.cropper.CropImage
+import com.canhub.cropper.CropImageContract
+import com.canhub.cropper.CropImageContractOptions
+import com.canhub.cropper.CropImageOptions
+import com.canhub.cropper.CropImageView
 import se.whitchurch.nordict.databinding.ActivityCameraBinding
 import java.io.File
 import java.util.concurrent.ExecutorService
@@ -43,6 +48,26 @@ class CameraActivity : AppCompatActivity() {
             )
         }
 
+        val cropImage = registerForActivityResult(CropImageContract()) { result ->
+            if (result.isSuccessful) {
+                val croppedImageFilePath =
+                    result.getUriFilePath(this@CameraActivity.applicationContext)
+                val base64 =
+                    Base64.encodeToString(
+                        File(croppedImageFilePath).readBytes(),
+                        Base64.DEFAULT
+                    )
+                Ordboken.getInstance(this).images =
+                    arrayListOf("data:image/jpeg;base64,$base64")
+                setResult(Activity.RESULT_OK)
+                finish()
+            } else {
+                // An error occurred.
+                val exception = result.error
+                // Handle the error.
+            }
+        }
+
         binding.cameraCaptureButton.setOnClickListener {
             val imageCapture = imageCapture ?: return@setOnClickListener
 
@@ -60,28 +85,20 @@ class CameraActivity : AppCompatActivity() {
                     }
 
                     override fun onImageSaved(output: ImageCapture.OutputFileResults) {
-                        CropImage.activity(Uri.parse(file.toURI().toString()))
-                            .start(this@CameraActivity)
+                        cropImage.launch(
+                            CropImageContractOptions(
+                                uri = Uri.parse(file.toURI().toString()),
+                                cropImageOptions = CropImageOptions(
+                                    guidelines = CropImageView.Guidelines.ON,
+                                    outputCompressFormat = Bitmap.CompressFormat.PNG
+                                )
+                            )
+                        )
                     }
                 })
         }
 
         cameraExecutor = Executors.newSingleThreadExecutor()
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-
-        if (requestCode == CropImage.CROP_IMAGE_ACTIVITY_REQUEST_CODE) {
-            val result = CropImage.getActivityResult(data)
-            if (resultCode == RESULT_OK) {
-                val base64 =
-                    Base64.encodeToString(File(result.uri.path).readBytes(), Base64.DEFAULT)
-                Ordboken.getInstance(this).images = arrayListOf("data:image/jpeg;base64,$base64")
-                setResult(Activity.RESULT_OK)
-                finish()
-            }
-        }
     }
 
     private fun startCamera() {
