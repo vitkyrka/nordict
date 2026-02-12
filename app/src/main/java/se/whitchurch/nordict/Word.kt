@@ -70,7 +70,7 @@ class Word(
                 // Infopedia
                 if (parent == null) parent = doc.selectFirst("div.dolCatgramAceps")
                 // DLE
-                if (parent == null) parent = doc.selectFirst("#resultados")
+                if (parent == null) parent = doc.selectFirst("ol.c-definitions")
                 parent.appendChild(el)
                 last = el
             }

@@ -1,6 +1,7 @@
 package se.whitchurch.nordict
 
 import android.net.Uri
+import android.util.Log
 import org.jsoup.Jsoup
 
 class CollinsParser {
@@ -23,6 +24,7 @@ class CollinsParser {
             val cleanpage = doc.head().html() + "<body>" + main
 
             main.selectFirst("div.topslot_container")?.remove()
+            main.selectFirst("div.am-dictionary")?.remove()
 
             val headword = Word(
                 tag, word, word, word.toString(), cleanpage, uri,
