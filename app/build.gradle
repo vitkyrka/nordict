@@ -20,6 +20,19 @@ android {
         implementation 'com.google.android.exoplayer:exoplayer:2.19.1'
     }
 
+    dependencies {
+        // Required -- JUnit 4 framework
+        testImplementation "junit:junit:4.13.2"
+        // Optional -- Robolectric environment
+        testImplementation "androidx.test:core:1.7.0"
+        // Optional -- Mockito framework
+        testImplementation "org.mockito:mockito-core:5.21.0"
+        // Optional -- mockito-kotlin
+        testImplementation "org.mockito.kotlin:mockito-kotlin:6.2.3"
+        // Optional -- Mockk framework
+        testImplementation "io.mockk:mockk:1.14.9"
+    }
+
     defaultConfig {
         applicationId "se.whitchurch.nordict"
         minSdkVersion 28
