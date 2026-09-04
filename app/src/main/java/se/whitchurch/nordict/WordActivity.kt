@@ -119,8 +119,8 @@ class WordActivity : AppCompatActivity() {
             displayZoomControls = false
             javaScriptEnabled = true
             allowFileAccess = true
-            allowFileAccessFromFileURLs = true
-            allowUniversalAccessFromFileURLs = true
+            allowFileAccessFromFileURLs = false
+            allowUniversalAccessFromFileURLs = false
             allowContentAccess = true
         }
 
