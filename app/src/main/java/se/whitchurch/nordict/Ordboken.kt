@@ -26,7 +26,7 @@ import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
-class Ordboken private constructor(context: Context) {
+class Ordboken private constructor(context: Context, val client: OkHttpClient) {
     private val mConnMgr: ConnectivityManager
     val mPrefs: SharedPreferences
     var images = ArrayList<String>()
@@ -35,7 +35,6 @@ class Ordboken private constructor(context: Context) {
         private set
     var lastWhat: String? = null
         private set
-    val client: OkHttpClient
     var currentCss: String = ""
     lateinit var currentDictionary: Dictionary
     var currentFlag: Int = R.drawable.flag_se
@@ -70,58 +69,39 @@ class Ordboken private constructor(context: Context) {
     }
 
     init {
-        val cache = Cache(context.cacheDir, (50 * 1024 * 1024).toLong())
-        client = OkHttpClient.Builder()
-            .cache(cache)
-            .addInterceptor {
-                var request = it.request()
-
-                if (isOnline) {
-                    request = request.newBuilder()
-                        .header("Cache-Control", "public, max-age=86400, max-stale=86400").build()
-                } else {
-                    request = request.newBuilder()
-                        .cacheControl(CacheControl.FORCE_CACHE).build()
-                }
-
-                it.proceed(request)
-            }
-            .readTimeout(120, TimeUnit.SECONDS)
-            .build()
-
         mPrefs = context.getSharedPreferences("ordboken", Context.MODE_PRIVATE)
         lastWhere = Where.valueOf(mPrefs.getString("lastWhere", Where.MAIN.toString())!!)
         lastWhat = mPrefs.getString("lastWhat", "ordbok")
         mConnMgr = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
-        val so = SoDictionary(client)
+        val so = SoDictionary(this.client)
         so.init()
 
-        val ddo = DdoDictionary(client)
+        val ddo = DdoDictionary(this.client)
         ddo.init()
 
-        val sdo = SdoDictionary(client)
+        val sdo = SdoDictionary(this.client)
         sdo.init()
 
-        val dle = DleDictionary(client)
+        val dle = DleDictionary(this.client)
         dle.init()
 
-        val colspan = CollinsSpanishEnglishDictionary(client)
+        val colspan = CollinsSpanishEnglishDictionary(this.client)
         colspan.init()
 
-        val lingpt = LingueeDictionary(client)
+        val lingpt = LingueeDictionary(this.client)
         lingpt.init()
 
-        val infopedia = InfopediaDictionary(client)
+        val infopedia = InfopediaDictionary(this.client)
         infopedia.init()
 
-        val wfr = FrWiktionary(client)
+        val wfr = FrWiktionary(this.client)
         wfr.init()
 
-        val rob = LeRobertDictionary(client)
+        val rob = LeRobertDictionary(this.client)
         rob.init()
 
-        val colfren = CollinsFrenchEnglishDictionary(client)
+        val colfren = CollinsFrenchEnglishDictionary(this.client)
         colfren.init()
 
         dictionaries = arrayOf(so, ddo, sdo, dle, colspan, lingpt, infopedia, wfr, rob, colfren)
@@ -264,14 +244,45 @@ class Ordboken private constructor(context: Context) {
     companion object {
         private var sInstance: Ordboken? = null
 
-        fun getInstance(context: Context): Ordboken {
+        fun getInstance(context: Context, client: OkHttpClient? = null): Ordboken {
             var instance = sInstance
             if (instance == null) {
-                instance = Ordboken(context)
+                val effectiveClient = client ?: createDefaultClient(context)
+                instance = Ordboken(context, effectiveClient)
                 sInstance = instance
             }
 
             return instance
+        }
+
+        private fun createDefaultClient(context: Context): OkHttpClient {
+            val cache = Cache(context.cacheDir, (50 * 1024 * 1024).toLong())
+            val connMgr = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+
+            return OkHttpClient.Builder()
+                .cache(cache)
+                .addInterceptor {
+                    val networkInfo = connMgr.activeNetworkInfo
+                    val isOnline = networkInfo != null && networkInfo.isConnected
+                    var request = it.request()
+
+                    if (isOnline) {
+                        request = request.newBuilder()
+                            .header("Cache-Control", "public, max-age=86400, max-stale=86400")
+                            .build()
+                    } else {
+                        request = request.newBuilder()
+                            .cacheControl(CacheControl.FORCE_CACHE).build()
+                    }
+
+                    it.proceed(request)
+                }
+                .readTimeout(120, TimeUnit.SECONDS)
+                .build()
+        }
+
+        fun reset() {
+            sInstance = null
         }
 
         fun startWordActivity(activity: AppCompatActivity, word: String, uri: Uri) {

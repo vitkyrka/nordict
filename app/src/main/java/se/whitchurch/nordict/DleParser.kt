@@ -6,9 +6,11 @@ import org.jsoup.nodes.Element
 
 class DleParser {
     companion object {
-        fun parse(page: String, uri: Uri, tag: String): List<Word> {
+        fun parse(page: String, uri: Uri, tag: String, baseUrl: String = "https://dle.rae.es/"): List<Word> {
             val words: ArrayList<Word> = ArrayList()
             var doc = Jsoup.parse(page)
+
+            val finalBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
 
             val element = doc.selectFirst("#resultados")
 
@@ -68,7 +70,7 @@ class DleParser {
 
                 val headword = Word(
                     tag, word, word, summary.toString(), page, newUri,
-                    "https://dle.rae.es/",
+                    finalBaseUrl,
                     doc,
                     "",
                     lemma

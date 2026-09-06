@@ -7,7 +7,7 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONException
 
-class DleDictionary(client: OkHttpClient) : Dictionary(client) {
+class DleDictionary(client: OkHttpClient, private val baseUrl: String = "https://dle.rae.es") : Dictionary(client) {
     override val tag: String = "DLE"
     override val flag: Int = R.drawable.flag_es
     override val lang: String = "es"
@@ -30,7 +30,7 @@ class DleDictionary(client: OkHttpClient) : Dictionary(client) {
     override fun search(query: String): List<SearchResult> {
         val results = ArrayList<SearchResult>()
         val uriBuilder =
-            Uri.parse("https://dle.rae.es/srv/keys").buildUpon()
+            Uri.parse("$baseUrl/srv/keys").buildUpon()
 
         uriBuilder.appendQueryParameter("q", query)
 
@@ -42,7 +42,7 @@ class DleDictionary(client: OkHttpClient) : Dictionary(client) {
                 val item = items.getString(i).split("|").first()
                     .replace("<[^>]+?>".toRegex(), "")
 
-                val uri = Uri.parse("https://dle.rae.es/${item}")
+                val uri = Uri.parse("$baseUrl/${item}")
                 results.add(SearchResult(item, uri))
             }
         } catch (e: JSONException) {
@@ -54,7 +54,7 @@ class DleDictionary(client: OkHttpClient) : Dictionary(client) {
     override fun fullSearch(query: String): List<SearchResult> = search(query)
 
     override fun get(uri: Uri): Word? {
-        if (uri.host != "dle.rae.es") {
+        if (uri.host != Uri.parse(baseUrl).host) {
             return null
         }
 
@@ -67,7 +67,7 @@ class DleDictionary(client: OkHttpClient) : Dictionary(client) {
         val newUri = builder.build()
         val page = fetch(newUri.toString())
 
-        val words = DleParser.parse(page, newUri, tag)
+        val words = DleParser.parse(page, newUri, tag, baseUrl)
         if (words.isEmpty()) return null
 
         val ref = uri.getQueryParameter(REFPARAM) ?: return words[0]
