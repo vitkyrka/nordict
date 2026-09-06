@@ -230,6 +230,13 @@ span.domain {
     text-transform: capitalize;
 }
 
+span.geo {
+    color: #2e8b57;
+    font-weight: bold;
+    font-style: italic;
+    text-transform: capitalize;
+}
+
 ul.examples {
     list-style-type: none;
     padding-left: 1em;

@@ -24,12 +24,15 @@ class Word(
 
     class Idiom(val idiom: String, val definition: String) {
         val examples: ArrayList<String> = ArrayList()
+        var grammar: String = ""
+        var geo: String = ""
     }
 
     class Definition(val definition: String, @Transient val element: Element, val title: String? = null) {
         val examples: ArrayList<String> = ArrayList()
         var grammar: String = ""
         var domain: String = ""
+        var geo: String = ""
     }
 
     fun getPage(chosenDefs: List<Definition>? = null, css: String? = null): String {

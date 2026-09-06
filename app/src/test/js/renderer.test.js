@@ -58,7 +58,36 @@ test('renders domain with distinctive element', () => {
     expect($('h1').text()).toBe('frente');
 });
 
-test('omits domain element when no domain is present', () => {
+test('renders geo for definition and idiom', () => {
+    const word = {
+        mTitle: 'frente',
+        definitions: [
+            {
+                grammar: 'nombre masculino',
+                geo: 'América',
+                definition: 'Enfrente.',
+                examples: []
+            }
+        ],
+        idioms: [
+            {
+                idiom: 'al frente',
+                grammar: 'locución adverbial',
+                geo: 'América',
+                definition: 'Enfrente.',
+                examples: []
+            }
+        ]
+    };
+
+    renderWord(word);
+
+    expect($('.definitions li .geo').text()).toBe('América');
+    expect($('.idiom-list li .geo').text()).toBe('América');
+    expect($('.idiom-list li .grammar').text()).toBe('locución adverbial');
+});
+
+test('omits domain and geo elements when absent', () => {
     const word = {
         mTitle: 'frente',
         definitions: [
@@ -74,4 +103,5 @@ test('omits domain element when no domain is present', () => {
     renderWord(word);
 
     expect($('.definitions li .domain').length).toBe(0);
+    expect($('.definitions li .geo').length).toBe(0);
 });

@@ -27,13 +27,16 @@ class EstParserTest {
         val definition: String,
         val examples: List<String>,
         val grammar: String,
-        val domain: String
+        val domain: String,
+        val geo: String
     )
 
     data class IdiomData(
         val idiom: String,
         val definition: String,
-        val examples: List<String>
+        val examples: List<String>,
+        val grammar: String,
+        val geo: String
     )
 
     private fun Word.toData(): WordData {
@@ -47,14 +50,17 @@ class EstParserTest {
                     definition = def.definition,
                     examples = def.examples,
                     grammar = def.grammar,
-                    domain = def.domain
+                    domain = def.domain,
+                    geo = def.geo
                 )
             },
             idioms = idioms.map { idiom ->
                 IdiomData(
                     idiom = idiom.idiom,
                     definition = idiom.definition,
-                    examples = idiom.examples
+                    examples = idiom.examples,
+                    grammar = idiom.grammar,
+                    geo = idiom.geo
                 )
             },
             xrefs = xrefs

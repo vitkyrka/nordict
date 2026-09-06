@@ -61,6 +61,8 @@ class EstParser {
                     definition.grammar = meaning.selectFirst(".gram")?.text() ?: ""
                     val domainEl = meaning.selectFirst(".domain")
                     definition.domain = domainEl?.attr("title") ?: ""
+                    val geoEl = meaning.selectFirst(".geo")
+                    definition.geo = geoEl?.attr("title") ?: ""
 
                     meaning.select(".ejemplo").forEach { example ->
                         definition.examples.add(example.text())
@@ -75,6 +77,9 @@ class EstParser {
                     fc.select(".acep").forEach { meaning ->
                         val defText = meaning.selectFirst(".def")?.text() ?: meaning.text()
                         val idiom = Word.Idiom(idiomName, defText)
+                        idiom.grammar = meaning.selectFirst(".gram")?.text() ?: ""
+                        val geoEl = meaning.selectFirst(".geo")
+                        idiom.geo = geoEl?.attr("title") ?: ""
                         meaning.select(".ejemplo").forEach { example ->
                             idiom.examples.add(example.text())
                         }

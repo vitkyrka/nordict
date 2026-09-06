@@ -7,6 +7,7 @@ const template = (word) => `
                     <li>
                         ${def.grammar ? `<span class="grammar">${def.grammar}</span> ` : ''}
                         ${def.domain ? `<span class="domain">${def.domain}</span> ` : ''}
+                        ${def.geo ? `<span class="geo">${def.geo}</span> ` : ''}
                         <span class="definition">${def.definition}</span>
                         ${def.examples && def.examples.length > 0 ? `
                             <ul class="examples">
@@ -24,6 +25,8 @@ const template = (word) => `
                     ${word.idioms.map(idiom => `
                         <li>
                             <b class="idiom-name">${idiom.idiom}</b>:
+                            ${idiom.grammar ? `<span class="grammar">${idiom.grammar}</span> ` : ''}
+                            ${idiom.geo ? `<span class="geo">${idiom.geo}</span> ` : ''}
                             <span class="idiom-definition">${idiom.definition}</span>
                             ${idiom.examples && idiom.examples.length > 0 ? `
                                 <ul class="examples">
