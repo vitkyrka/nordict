@@ -3,6 +3,17 @@
  * Legacy dictionaries that render original source HTML use word.css
  * instead; keep the two files independent. */
 
+#content {
+    font-family: sans-serif;
+    font-size: 1em;
+}
+
+a.normalx {
+    text-decoration: inherit !important;
+    color: inherit !important;
+    cursor: default !important;
+}
+
 span.grammar {
     color: #a52a2a;
     font-weight: bold;
@@ -44,16 +55,14 @@ ul.idiom-list li.masculine {
     background: #eef;
 }
 
-/* Compact layout for small screens */
+/* Compact layout */
 
-@media (max-width: 480px) {
-    #content header h1 {
-        margin-top: 0.3em;
-    }
+#content header h1 {
+    margin-top: 0.3em;
+}
 
-    ol.definitions,
-    ul.idiom-list {
-        padding-left: 0;
-        list-style-position: inside;
-    }
+ol.definitions,
+ul.idiom-list {
+    padding-left: 0;
+    list-style-position: inside;
 }
