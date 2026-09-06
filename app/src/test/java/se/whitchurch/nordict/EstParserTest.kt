@@ -29,7 +29,8 @@ class EstParserTest {
         val grammar: String,
         val domain: String,
         val geo: String,
-        val gender: String
+        val gender: String,
+        val plev: String
     )
 
     data class IdiomData(
@@ -38,7 +39,8 @@ class EstParserTest {
         val examples: List<String>,
         val grammar: String,
         val geo: String,
-        val gender: String
+        val gender: String,
+        val plev: String
     )
 
     private fun Word.toData(): WordData {
@@ -54,7 +56,8 @@ class EstParserTest {
                     grammar = def.grammar,
                     domain = def.domain,
                     geo = def.geo,
-                    gender = def.gender
+                    gender = def.gender,
+                    plev = def.plev
                 )
             },
             idioms = idioms.map { idiom ->
@@ -64,7 +67,8 @@ class EstParserTest {
                     examples = idiom.examples,
                     grammar = idiom.grammar,
                     geo = idiom.geo,
-                    gender = idiom.gender
+                    gender = idiom.gender,
+                    plev = idiom.plev
                 )
             },
             xrefs = xrefs
@@ -90,6 +94,40 @@ class EstParserTest {
         File("../testdata/est.json").writeText(gson.toJson(wordsData))
 
         val expectedJson = File("../testdata/est.json").readText()
+        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
+
+        assertThat(wordsData).isEqualTo(expectedData)
+    }
+
+    @Test
+    fun testParseEstCagar() {
+        val htmlFile = File("../testdata/est/cagar.html")
+        val page = htmlFile.readText()
+        val uri = Uri.parse("https://www.rae.es/diccionario-estudiante/cagar")
+        val words = EstParser.parse(page, uri, "EST")
+
+        assertThat(words).hasSize(1)
+        val word = words[0]
+
+        assertThat(word.mTitle).isEqualTo("cagar")
+        assertThat(word.definitions).hasSize(4)
+        assertThat(word.idioms).hasSize(3)
+
+        assertThat(word.definitions.map { it.plev }).containsExactly(
+            "malsonante", "malsonante", "malsonante", "malsonante"
+        )
+        assertThat(word.idioms.map { it.plev }).containsExactly(
+            "malsonante", "malsonante", "malsonante"
+        )
+
+        assertThat(word.definitions[0].grammar).isEqualTo("verbo intransitivo")
+        assertThat(word.idioms[0].grammar).isEqualTo("locución verbal")
+
+        val gson = GsonBuilder().setPrettyPrinting().create()
+        val wordsData = words.map { it.toData() }
+        File("../testdata/est/cagar.json").writeText(gson.toJson(wordsData))
+
+        val expectedJson = File("../testdata/est/cagar.json").readText()
         val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
 
         assertThat(wordsData).isEqualTo(expectedData)

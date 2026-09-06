@@ -34,6 +34,12 @@ span.geo {
     text-transform: capitalize;
 }
 
+span.plev {
+    color: #c00;
+    font-weight: bold;
+    font-style: italic;
+}
+
 ul.examples {
     list-style-type: none;
     padding-left: 1em;

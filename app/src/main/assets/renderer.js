@@ -20,6 +20,7 @@ const template = (word) => `
                         ${def.grammar ? `<span class="grammar">${def.grammar}</span> ` : ''}
                         ${def.domain ? `<span class="domain">${def.domain}</span> ` : ''}
                         ${def.geo ? `<span class="geo">${def.geo}</span> ` : ''}
+                        ${def.plev ? `<span class="plev">${def.plev}</span> ` : ''}
                         <span class="definition">${def.definition}</span>
                         ${def.examples && def.examples.length > 0 ? `
                             <ul class="examples">
@@ -39,6 +40,7 @@ const template = (word) => `
                             <b class="idiom-name">${idiom.idiom}</b>:
                             ${idiom.grammar ? `<span class="grammar">${idiom.grammar}</span> ` : ''}
                             ${idiom.geo ? `<span class="geo">${idiom.geo}</span> ` : ''}
+                            ${idiom.plev ? `<span class="plev">${idiom.plev}</span> ` : ''}
                             <span class="idiom-definition">${idiom.definition}</span>
                             ${idiom.examples && idiom.examples.length > 0 ? `
                                 <ul class="examples">

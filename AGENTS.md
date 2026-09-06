@@ -114,12 +114,15 @@ for browser preview.
 - Definitions are the lemma's direct `> div.acep` children; idioms come from
   `.locs .fc` -> `.acep`. Fields captured per definition: `grammar` (`.gram`),
   `domain` (`.domain` abbr `title`, e.g. `meteorología`), `geo` (`.geo` abbr
-  `title`, e.g. `América`), `examples` (`.ejemplo`). Idioms carry
-  `grammar`, `geo`, and `examples` too.
+  `title`, e.g. `América`), `plev` (`.plev` abbr `title`, e.g. `malsonante`),
+  `examples` (`.ejemplo`). Idioms carry
+  `grammar`, `geo`, `plev`, and `examples` too.
 
 Relevant files: `EstParser.kt`, `EstDictionary.kt`, `Word.kt`,
 `assets/renderer.js`, `assets/renderer.css`, `EstParserTest.kt`,
-`EstIntegrationTest.kt`, `testdata/est.{html,json,search.json}`.
+`EstIntegrationTest.kt`, `testdata/est.{html,json,search.json}`,
+`testdata/est/cagar.{html,json}` (golden test for the `plev` "malsonante"
+marker: 4 definitions + 3 idioms).
 
 ## DLE dictionary (RAE Diccionario de la lengua española)
 

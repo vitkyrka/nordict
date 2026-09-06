@@ -106,6 +106,59 @@ test('omits domain and geo elements when absent', () => {
     expect($('.definitions li .geo').length).toBe(0);
 });
 
+test('renders plev for definition and idiom', () => {
+    const word = {
+        mTitle: 'cagar',
+        definitions: [
+            {
+                grammar: 'verbo intransitivo',
+                plev: 'malsonante',
+                definition: 'Evacuar el vientre.',
+                examples: []
+            }
+        ],
+        idioms: [
+            {
+                idiom: 'cagarla',
+                grammar: 'locución verbal',
+                plev: 'malsonante',
+                definition: 'Cometer un error de difícil solución.',
+                examples: []
+            }
+        ]
+    };
+
+    renderWord(word);
+
+    expect($('.definitions li .plev').text()).toBe('malsonante');
+    expect($('.idiom-list li .plev').text()).toBe('malsonante');
+});
+
+test('omits plev element when absent', () => {
+    const word = {
+        mTitle: 'frente',
+        definitions: [
+            {
+                grammar: 'nombre femenino',
+                definition: 'Parte superior de la cara.',
+                examples: []
+            }
+        ],
+        idioms: [
+            {
+                idiom: 'al frente',
+                definition: 'Hacia delante.',
+                examples: []
+            }
+        ]
+    };
+
+    renderWord(word);
+
+    expect($('.definitions li .plev').length).toBe(0);
+    expect($('.idiom-list li .plev').length).toBe(0);
+});
+
 test('colors definition based on gender', () => {
     const word = {
         mTitle: 'frente',

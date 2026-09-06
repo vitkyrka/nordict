@@ -27,6 +27,7 @@ class Word(
         var grammar: String = ""
         var geo: String = ""
         var gender: String = ""
+        var plev: String = ""
     }
 
     class Definition(val definition: String, @Transient val element: Element, val title: String? = null) {
@@ -35,6 +36,7 @@ class Word(
         var domain: String = ""
         var geo: String = ""
         var gender: String = ""
+        var plev: String = ""
     }
 
     fun getPage(chosenDefs: List<Definition>? = null, css: String? = null): String {

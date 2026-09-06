@@ -65,6 +65,8 @@ class EstParser {
                     definition.domain = domainEl?.attr("title") ?: ""
                     val geoEl = meaning.selectFirst(".geo")
                     definition.geo = geoEl?.attr("title") ?: ""
+                    val plevEl = meaning.selectFirst(".plev")
+                    definition.plev = plevEl?.attr("title") ?: ""
 
                     meaning.select(".ejemplo").forEach { example ->
                         definition.examples.add(example.text())
@@ -84,6 +86,8 @@ class EstParser {
                         idiom.gender = genderOf(gramEl?.attr("title"))
                         val geoEl = meaning.selectFirst(".geo")
                         idiom.geo = geoEl?.attr("title") ?: ""
+                        val plevEl = meaning.selectFirst(".plev")
+                        idiom.plev = plevEl?.attr("title") ?: ""
                         meaning.select(".ejemplo").forEach { example ->
                             idiom.examples.add(example.text())
                         }
