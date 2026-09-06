@@ -38,7 +38,9 @@ tools/                                      Standalone python scripts (crawl.py,
   fragments they keep in `Word.element`.
 - **`Word.kt`** — the model serialized to JSON. `Word.Definition` and
   `Word.Idiom` are nested classes; `element`/`lemma` fields are `@Transient`
-  (excluded from Gson output).
+  (excluded from Gson output). `Word.Synonym` carries the display `text`, an
+  `href` (the full source link target, e.g. a RAE DLE `?id=` deep-link), and a
+  `plev` marker (the DLE `abbr.sin_alert` title, e.g. "malsonante").
 - **`WordActivity.kt`** — fetches a word and, when `word.renderAsJson` is true,
   serializes the `Word` with Gson and injects it into
   `assets/word_template.html` via `loadWord(...)`. Otherwise it keeps the
@@ -46,8 +48,9 @@ tools/                                      Standalone python scripts (crawl.py,
 - **`assets/renderer.js`** — builds the DOM from the JSON word object
   (`renderWord(word)` -> `$('#content').html(...)`).
 - **`assets/word.js`** — turns words inside definitions/examples into
-  `/search/...` links (`createLinks`). Needs to keep working if selectors in
-  `renderer.js` change.
+  `/search/...` links (`createLinks`). Synonyms rendered as `<a>` anchors by
+  `renderer.js` are skipped (the regex already skips anchor content). Needs
+  to keep working if selectors in `renderer.js` change.
 - **`assets/renderer.css`** — styling for the JSON-rendered content
   (`span.grammar`/`domain`/`geo`, `ol.definitions`, `ul.idiom-list`, gender
   backgrounds, small-screen layout). Loaded by `word_template.html`.
@@ -131,6 +134,13 @@ parser just snapshots whole `<li>` fragments and the markers are embedded in
 the definition text. Tests: `DleParserTest.kt`, `DleIntegrationTest.kt`,
 fixtures `testdata/dle.{html,json,search.json}`.
 
+Synonyms in the DLE footer (`.c-word-list__items .sin`) are parsed into
+structured `Word.Synonym` objects: `text` is the display form, `href` is the
+full deep-link back to the RAE article (from the `data-id` attribute,
+`https://dle.rae.es/?id=<id>`), and `plev` is populated from
+`abbr.sin_alert` (NOT the parent `<span title="...">`), so only "malsonante"
+markers appear — "uso coloquial" / "usado en América" are dropped.
+
 ## Conventions / gotchas
 
 - All Kotlin source is in one package, `se.whitchurch.nordict`, in both
@@ -142,6 +152,9 @@ fixtures `testdata/dle.{html,json,search.json}`.
   `testdata/est.json`, and `renderer.js`/its tests.
 - The `definitions`/`idioms` lists in `Word` carry plain fields only; jsoup
   `Element`s are `@Transient` and never reach the renderer.
+- `renderer.js` accepts both plain strings and structured `{text, href, plev}`
+  objects for synonyms. DLE emits structured synonyms (with deep-link anchors);
+  EST emits plain strings (relying on `word.js` auto-linking).
 - Do not commit `local.properties`, `app/src/test/js/node_modules/`, or build
   output (`.gitignore` already covers `build/`, `.gradle/`, `local.properties`;
   `testdata/` is intentionally checked in).

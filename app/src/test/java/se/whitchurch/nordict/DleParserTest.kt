@@ -32,8 +32,14 @@ class DleParserTest {
         val geo: String = "",
         val plev: String = "",
         val register: String = "",
-        val synonyms: List<String> = emptyList(),
+        val synonyms: List<SynonymData> = emptyList(),
         val antonyms: List<String> = emptyList()
+    )
+
+    data class SynonymData(
+        val text: String,
+        val href: String = "",
+        val plev: String = ""
     )
 
     data class GlossData(
@@ -79,7 +85,7 @@ class DleParserTest {
                     geo = def.geo,
                     plev = def.plev,
                     register = def.register,
-                    synonyms = def.synonyms,
+                    synonyms = def.synonyms.map { SynonymData(it.text, it.href, it.plev) },
                     antonyms = def.antonyms
                 )
             },
@@ -127,7 +133,8 @@ class DleParserTest {
         assertThat(def1.grammar).isEqualTo("nombre femenino")
         assertThat(def1.gender).isEqualTo(Genders.FEMININE)
         assertThat(def1.glosses[0].definition).contains("Parte superior de la cara")
-        assertThat(def1.synonyms).containsExactly("testa", "testuz")
+        assertThat(def1.synonyms.map { it.text }).containsExactly("testa", "testuz")
+        assertThat(def1.synonyms[0].href).isEqualTo("https://dle.rae.es/?id=ZecEwPE")
 
         val def2 = word.definitions[1]
         assertThat(def2.glosses[0].examples).containsExactly("Frente serena.")
@@ -174,12 +181,12 @@ class DleParserTest {
         assertThat(def1.grammar).isEqualTo("verbo intransitivo")
         assertThat(def1.register).isEqualTo("malsonante")
         assertThat(def1.glosses[0].definition).contains("Evacuar el vientre")
-        assertThat(def1.synonyms).containsExactly("defecar", "evacuar", "deponer", "excretar")
+        assertThat(def1.synonyms.map { it.text }).containsExactly("defecar", "evacuar", "deponer", "excretar")
 
         val def2 = word.definitions[1]
         assertThat(def2.register).isEqualTo("malsonante coloquial")
         assertThat(def2.grammar).isEqualTo("verbo transitivo")
-        assertThat(def2.synonyms).containsExactly("estropear", "arruinar")
+        assertThat(def2.synonyms.map { it.text }).containsExactly("estropear", "arruinar")
 
         val idiom1 = word.idioms[0]
         assertThat(idiom1.idiom).isEqualTo("cagarla")
@@ -207,8 +214,19 @@ class DleParserTest {
         val def1 = word.definitions[0]
         assertThat(def1.grammar).isEqualTo("verbo intransitivo")
         assertThat(def1.glosses[0].definition).contains("Llegar al término de la vida")
-        assertThat(def1.synonyms).contains("fallecer")
-        assertThat(def1.synonyms).contains("apagarse")
+        assertThat(def1.synonyms.map { it.text }).contains("fallecer")
+        assertThat(def1.synonyms.map { it.text }).contains("apagarse")
+
+        // Verify structured synonym fields: malsonante marker on descoñetar
+        val descoSyn = def1.synonyms.find { it.text == "descoñetar" }
+        assertThat(descoSyn).isNotNull()
+        assertThat(descoSyn!!.href).isEqualTo("https://dle.rae.es/?id=CjYRP23")
+        assertThat(descoSyn.plev).isEqualTo("malsonante")
+
+        // Verify link-target href on piantarse
+        val piantaSyn = def1.synonyms.find { it.text == "piantarse" }
+        assertThat(piantaSyn).isNotNull()
+        assertThat(piantaSyn!!.href).isEqualTo("https://dle.rae.es/?id=SrurElO")
 
         writeAndAssert(words, "../testdata/dle/morir.json")
     }
@@ -231,7 +249,7 @@ class DleParserTest {
         val def1 = word.definitions[0]
         assertThat(def1.grammar).isEqualTo("adjetivo")
         assertThat(def1.glosses[0].definition).contains("Dicho de una persona o de una cosa")
-        assertThat(def1.synonyms).containsExactly("diferente", "distinto1")
+        assertThat(def1.synonyms.map { it.text }).containsExactly("diferente", "distinto1")
         assertThat(def1.antonyms).containsExactly("mismo")
 
         writeAndAssert(words, "../testdata/dle/otro.json")

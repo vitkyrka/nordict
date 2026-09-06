@@ -23,6 +23,14 @@ const renderGlosses = (glosses) => (glosses || []).map(gloss => `
     </div>
 `).join('');
 
+// Structured synonyms carry the source's link target (`id`, a RAE DLE
+// data-id) and optionally a DLE `abbr.sin_alert` marker (`plev`, e.g.
+// "malsonante"). Legacy dictionaries still emit plain strings.
+const renderSynonym = (s) => typeof s === 'string'
+    ? `<span class="synonym">${s}</span>`
+    : `<a class="synonym" href="${s.href}">${s.text}</a>` +
+      (s.plev ? ` <span class="synonym-plev">${s.plev}</span>` : '');
+
 const template = (word) => `
     <article>
         <header>
@@ -47,7 +55,7 @@ const template = (word) => `
                         ${renderGlosses(def.glosses)}
                         ${def.synonyms && def.synonyms.length > 0 ? `
                             <div class="synonyms">
-                                <span class="synonyms-label">→ </span>${def.synonyms.map(s => `<span class="synonym">${s}</span>`).join(', ')}
+                                <span class="synonyms-label">→ </span>${def.synonyms.map(renderSynonym).join(', ')}
                             </div>
                         ` : ''}
                         ${def.antonyms && def.antonyms.length > 0 ? `

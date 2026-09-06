@@ -75,7 +75,7 @@ class EstParserTest {
                     geo = def.geo,
                     plev = def.plev,
                     register = def.register,
-                    synonyms = def.synonyms
+                    synonyms = def.synonyms.map { it.text }
                 )
             },
             idioms = idioms.map { idiom ->
@@ -180,7 +180,7 @@ class EstParserTest {
         assertThat(def1.glosses[1].grammar).isEqualTo("")
         assertThat(def1.glosses[1].definition).isEqualTo("También prnl.")
         assertThat(def1.glosses[1].examples).containsExactly("Se ha muerto de un ataque al corazón.")
-        assertThat(def1.synonyms).containsExactly("expirar")
+        assertThat(def1.synonyms.map { it.text }).containsExactly("expirar")
         // Def 1 is non-pronominal on its primary gloss; the "También prnl."
         // secondary gloss grammar is empty, so neither gets a headword.
         assertThat(def1.glosses[0].headword).isEqualTo("")

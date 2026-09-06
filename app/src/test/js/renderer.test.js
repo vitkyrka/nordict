@@ -397,6 +397,37 @@ test('renders synonyms on definitions', () => {
     expect($('.synonyms .synonym').eq(1).text()).toBe('fallecer');
 });
 
+test('renders structured synonyms with href links and plev marker', () => {
+    const word = {
+        mTitle: 'morir',
+        definitions: [
+            {
+                synonyms: [
+                    { text: 'piantarse', href: 'https://dle.rae.es/?id=SrurElO', plev: '' },
+                    { text: 'descoñetar', href: 'https://dle.rae.es/?id=CjYRP23', plev: 'malsonante' }
+                ],
+                glosses: [
+                    { definition: 'Dejar de vivir.', grammar: 'verbo intransitivo', gender: '', examples: [] }
+                ]
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    const anchors = $('.synonyms a.synonym');
+    expect(anchors.length).toBe(2);
+
+    expect(anchors.eq(0).attr('href')).toBe('https://dle.rae.es/?id=SrurElO');
+    expect(anchors.eq(0).text()).toBe('piantarse');
+    expect(anchors.eq(0).next('.synonym-plev').length).toBe(0);
+
+    expect(anchors.eq(1).attr('href')).toBe('https://dle.rae.es/?id=CjYRP23');
+    expect(anchors.eq(1).text()).toBe('descoñetar');
+    expect(anchors.eq(1).next('.synonym-plev').text()).toBe('malsonante');
+});
+
 test('omits synonyms div when list is empty', () => {
     const word = {
         mTitle: 'frente',

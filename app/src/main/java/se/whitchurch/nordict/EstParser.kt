@@ -81,7 +81,7 @@ class EstParser {
                     applyHeadwords(definition.glosses, word)
 
                     meaning.select(".refS a.synon").forEach { synEl ->
-                        definition.synonyms.add(synEl.text())
+                        definition.synonyms.add(Word.Synonym(synEl.text()))
                     }
                     headword.definitions.add(definition)
                     meaning.remove()

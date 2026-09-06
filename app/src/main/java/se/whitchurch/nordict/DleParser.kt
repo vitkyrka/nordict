@@ -95,7 +95,7 @@ class DleParser {
                     val defItem = meaning.selectFirst(".c-definitions__item") ?: meaning
 
                     if (currentIdiom == null) {
-                        headword.definitions.add(parseDefinition(defItem, meaning))
+                        headword.definitions.add(parseDefinition(defItem, meaning, finalBaseUrl))
                         meaning.remove()
                     } else {
                         headword.idioms.add(parseIdiom(currentIdiom!!, defItem))
@@ -118,7 +118,7 @@ class DleParser {
         }
 
         // Parse a definition <li> element into a Word.Definition.
-        private fun parseDefinition(defItem: Element, meaning: Element): Word.Definition {
+        private fun parseDefinition(defItem: Element, meaning: Element, baseUrl: String): Word.Definition {
             val definition = Word.Definition(defItem.text(), meaning.clone())
 
             val mainDiv = defItem.children().firstOrNull { it.tagName() == "div" && !it.hasClass("c-definitions__item-footer") }
@@ -154,12 +154,22 @@ class DleParser {
                     if (isAntonym) {
                         definition.antonyms.add(synEl.text())
                     } else {
-                        definition.synonyms.add(synEl.text())
+                        definition.synonyms.add(parseSynonym(synEl, baseUrl))
                     }
                 }
             }
 
             return definition
+        }
+
+        private fun parseSynonym(synEl: Element, baseUrl: String): Word.Synonym {
+            val wrapper = synEl.parent()
+            // The malsonante marker lives on <abbr class="sin_alert" title="..."/>,
+            // not on the wrapper span's title attribute.
+            val plev = wrapper?.selectFirst("abbr.sin_alert")?.attr("title") ?: ""
+            val dataId = synEl.attr("data-id")
+            val href = if (dataId.isNotEmpty()) "${baseUrl}?id=$dataId" else ""
+            return Word.Synonym(synEl.text(), href, plev)
         }
 
         private fun parseIdiom(idiomName: String, defItem: Element): Word.Idiom {

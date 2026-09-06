@@ -51,6 +51,12 @@ class Word(
         var register: String = ""
     }
 
+    // One synonym (or antonym) in a definition footer. `href` carries the
+    // source's link target so the renderer can link to the original entry
+    // instead of relying on word.js auto-linking; `plev` is the DLE
+    // `abbr.sin_alert` marker (e.g. "malsonante").
+    class Synonym(val text: String, val href: String = "", val plev: String = "")
+
     class Definition(@Transient val definition: String, @Transient val element: Element, val title: String? = null) {
         val glosses: ArrayList<Gloss> = ArrayList()
 
@@ -61,7 +67,7 @@ class Word(
         var geo: String = ""
         var plev: String = ""
         var register: String = ""
-        val synonyms: ArrayList<String> = ArrayList()
+        val synonyms: ArrayList<Synonym> = ArrayList()
         val antonyms: ArrayList<String> = ArrayList()
     }
 

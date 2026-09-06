@@ -140,8 +140,17 @@ span.synonyms-label {
     color: var(--symbols-label-color);
 }
 
-span.synonym {
+span.synonym,
+a.synonym {
     font-style: italic;
+    text-decoration: none;
+    color: inherit;
+}
+
+span.synonym-plev {
+    color: var(--plev-color);
+    font-weight: bold;
+    font-size: 0.85em;
 }
 
 div.antonyms {
