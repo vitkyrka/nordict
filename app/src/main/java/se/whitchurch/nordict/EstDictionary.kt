@@ -7,8 +7,8 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONException
 
-class DleDictionary(client: OkHttpClient, private val baseUrl: String = "https://dle.rae.es") : Dictionary(client) {
-    override val tag: String = "DLE"
+class EstDictionary(client: OkHttpClient, private val baseUrl: String = "https://www.rae.es/diccionario-estudiante") : Dictionary(client) {
+    override val tag: String = "EST"
     override val flag: Int = R.drawable.flag_es
     override val lang: String = "es"
     override fun init() = Unit
@@ -42,7 +42,7 @@ class DleDictionary(client: OkHttpClient, private val baseUrl: String = "https:/
                 val item = items.getString(i).split("|").first()
                     .replace("<[^>]+?>".toRegex(), "")
 
-                val uri = Uri.parse("$baseUrl/${item}")
+                val uri = Uri.parse(baseUrl).buildUpon().appendPath(item).build()
                 results.add(SearchResult(item, uri))
             }
         } catch (_: JSONException) {
@@ -67,7 +67,7 @@ class DleDictionary(client: OkHttpClient, private val baseUrl: String = "https:/
         val newUri = builder.build()
         val page = fetch(newUri.toString())
 
-        val words = DleParser.parse(page, newUri, tag, baseUrl)
+        val words = EstParser.parse(page, newUri, tag, baseUrl)
         if (words.isEmpty()) return null
 
         val ref = uri.getQueryParameter(REFPARAM) ?: return words[0]
@@ -81,7 +81,7 @@ class DleDictionary(client: OkHttpClient, private val baseUrl: String = "https:/
     }
 
     companion object {
-        const val NAME = "DLE"
+        const val NAME = "EST"
         const val REFPARAM = "__ref"
     }
 }

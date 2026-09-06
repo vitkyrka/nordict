@@ -86,6 +86,9 @@ class Ordboken private constructor(context: Context, val client: OkHttpClient) {
         val dle = DleDictionary(this.client)
         dle.init()
 
+        val est = EstDictionary(this.client)
+        est.init()
+
         val colspan = CollinsSpanishEnglishDictionary(this.client)
         colspan.init()
 
@@ -104,7 +107,7 @@ class Ordboken private constructor(context: Context, val client: OkHttpClient) {
         val colfren = CollinsFrenchEnglishDictionary(this.client)
         colfren.init()
 
-        dictionaries = arrayOf(so, ddo, sdo, dle, colspan, lingpt, infopedia, wfr, rob, colfren)
+        dictionaries = arrayOf(so, ddo, sdo, dle, est, colspan, lingpt, infopedia, wfr, rob, colfren)
         flags = dictionaries.map { it.flag }.toTypedArray()
         dictMap = dictionaries.associateBy { it.tag }
 
