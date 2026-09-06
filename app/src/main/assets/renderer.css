@@ -148,9 +148,10 @@ a.synonym {
 }
 
 span.synonym-plev {
-    color: var(--plev-color);
-    font-weight: bold;
-    font-size: 0.85em;
+    font-size: 0.8em;
+    margin-left: 0.15em;
+    vertical-align: 0.05em;
+    cursor: help;
 }
 
 div.antonyms {

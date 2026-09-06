@@ -29,7 +29,7 @@ const renderGlosses = (glosses) => (glosses || []).map(gloss => `
 const renderSynonym = (s) => typeof s === 'string'
     ? `<span class="synonym">${s}</span>`
     : `<a class="synonym" href="${s.href}">${s.text}</a>` +
-      (s.plev ? ` <span class="synonym-plev">${s.plev}</span>` : '');
+      (s.plev ? `<span class="synonym-plev" title="${s.plev}">⚠️</span>` : '');
 
 const template = (word) => `
     <article>

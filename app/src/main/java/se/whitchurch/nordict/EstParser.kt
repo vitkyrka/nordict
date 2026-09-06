@@ -81,7 +81,9 @@ class EstParser {
                     applyHeadwords(definition.glosses, word)
 
                     meaning.select(".refS a.synon").forEach { synEl ->
-                        definition.synonyms.add(Word.Synonym(synEl.text()))
+                        val href = synEl.attr("href")
+                        val url = if (href.startsWith("http")) href else finalBaseUrl + href
+                        definition.synonyms.add(Word.Synonym(synEl.text(), url))
                     }
                     headword.definitions.add(definition)
                     meaning.remove()

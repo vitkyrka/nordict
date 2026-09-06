@@ -31,7 +31,13 @@ class EstParserTest {
         val geo: String = "",
         val plev: String = "",
         val register: String = "",
-        val synonyms: List<String> = emptyList()
+        val synonyms: List<SynonymData> = emptyList()
+    )
+
+    data class SynonymData(
+        val text: String,
+        val href: String,
+        val plev: String
     )
 
     data class GlossData(
@@ -75,7 +81,7 @@ class EstParserTest {
                     geo = def.geo,
                     plev = def.plev,
                     register = def.register,
-                    synonyms = def.synonyms.map { it.text }
+                    synonyms = def.synonyms.map { SynonymData(it.text, it.href, it.plev) }
                 )
             },
             idioms = idioms.map { idiom ->
@@ -180,7 +186,9 @@ class EstParserTest {
         assertThat(def1.glosses[1].grammar).isEqualTo("")
         assertThat(def1.glosses[1].definition).isEqualTo("También prnl.")
         assertThat(def1.glosses[1].examples).containsExactly("Se ha muerto de un ataque al corazón.")
-        assertThat(def1.synonyms.map { it.text }).containsExactly("expirar")
+        assertThat(def1.synonyms.map { SynonymData(it.text, it.href, it.plev) }).containsExactly(
+            SynonymData("expirar", "https://www.rae.es/diccionario-estudiante/expirar", "")
+        )
         // Def 1 is non-pronominal on its primary gloss; the "También prnl."
         // secondary gloss grammar is empty, so neither gets a headword.
         assertThat(def1.glosses[0].headword).isEqualTo("")

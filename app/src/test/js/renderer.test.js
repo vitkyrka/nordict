@@ -425,7 +425,8 @@ test('renders structured synonyms with href links and plev marker', () => {
 
     expect(anchors.eq(1).attr('href')).toBe('https://dle.rae.es/?id=CjYRP23');
     expect(anchors.eq(1).text()).toBe('descoñetar');
-    expect(anchors.eq(1).next('.synonym-plev').text()).toBe('malsonante');
+    expect(anchors.eq(1).next('.synonym-plev').text()).toBe('⚠️');
+    expect(anchors.eq(1).next('.synonym-plev').attr('title')).toBe('malsonante');
 });
 
 test('omits synonyms div when list is empty', () => {

@@ -153,8 +153,11 @@ markers appear — "uso coloquial" / "usado en América" are dropped.
 - The `definitions`/`idioms` lists in `Word` carry plain fields only; jsoup
   `Element`s are `@Transient` and never reach the renderer.
 - `renderer.js` accepts both plain strings and structured `{text, href, plev}`
-  objects for synonyms. DLE emits structured synonyms (with deep-link anchors);
-  EST emits plain strings (relying on `word.js` auto-linking).
+  objects for synonyms. DLE emits structured synonyms (deep-link `<a>` anchors
+  to `https://dle.rae.es/?id=<id>`); EST emits structured synonyms too — the
+  `href` comes from the `a.synon` anchor (resolved to an absolute
+  `https://www.rae.es/diccionario-estudiante/<word>` URL when the page uses a
+  relative href), so it doesn't rely on `word.js` auto-linking.
 - Do not commit `local.properties`, `app/src/test/js/node_modules/`, or build
   output (`.gitignore` already covers `build/`, `.gradle/`, `local.properties`;
   `testdata/` is intentionally checked in).
