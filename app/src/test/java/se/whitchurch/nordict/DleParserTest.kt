@@ -6,9 +6,11 @@ import com.google.gson.GsonBuilder
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 import java.io.File
 
 @RunWith(RobolectricTestRunner::class)
+@Config(sdk = [28])
 class DleParserTest {
 
     data class WordData(
@@ -64,10 +66,6 @@ class DleParserTest {
 
         val gson = GsonBuilder().setPrettyPrinting().create()
         val wordsData = words.map { it.toData() }
-        val json = gson.toJson(wordsData)
-
-        // For initial creation:
-        // File("../testdata/dle.json").writeText(json)
 
         val expectedJson = File("../testdata/dle.json").readText()
         val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
