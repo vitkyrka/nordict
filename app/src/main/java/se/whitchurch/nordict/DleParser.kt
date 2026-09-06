@@ -76,33 +76,45 @@ class DleParser {
 
                 headword.xrefs.add(ref.toString())
 
-                var title = headword.mTitle
+                var currentIdiom: String? = null
+                lemma.select("h3.k5, h3.k6, ol.c-definitions").forEach { child ->
+                    if (child.tagName() == "h3") {
+                        currentIdiom = child.text()
+                    } else if (child.tagName() == "ol") {
+                        child.select("> li").forEach { meaning ->
+                            val genderEl = meaning.selectFirst("abbr")
+                            if (genderEl != null) {
+                                val gender = genderEl.attr("title")
+                                if (gender == "nombre femenino" || gender == "nombre femenino plural") {
+                                    genderEl.addClass("feminine")
+                                    genderEl.addClass("rae")
+                                } else if (gender == "nombre masculino" || gender == "nombre masculino plural") {
+                                    genderEl.addClass("masculine")
+                                    genderEl.addClass("rae")
+                                }
+                            }
 
-                lemma.select("ol.c-definitions > li").forEach { meaning ->
-                    var definition: Word.Definition? = null
+                            if (currentIdiom == null) {
+                                val definition = Word.Definition(meaning.text(), meaning.clone())
 
-                    val genderEl = meaning.selectFirst("abbr")
-                    if (genderEl != null) {
-                        val gender = genderEl.attr("title")
-                        if (gender == "nombre femenino" || gender == "nombre femenino plural") {
-                            genderEl.addClass("feminine")
-                            genderEl.addClass("rae")
-                        } else if (gender == "nombre masculino" || gender == "nombre masculino plural") {
-                            genderEl.addClass("masculine")
-                            genderEl.addClass("rae")
+                                meaning.select(".h").forEach { example ->
+                                    definition.examples.add(example.text())
+                                }
+
+                                headword.definitions.add(definition)
+                                meaning.remove()
+                            } else {
+                                val idiom = Word.Idiom(currentIdiom!!, meaning.text())
+
+                                meaning.select(".h").forEach { example ->
+                                    idiom.examples.add(example.text())
+                                }
+
+                                headword.idioms.add(idiom)
+                            }
                         }
+                        currentIdiom = null
                     }
-
-                    //val tmp = Element("div")
-                    //tmp.appendChild(meaning)
-                    definition = Word.Definition(meaning.text(), meaning)
-
-                    meaning.select(".h").forEach { example ->
-                        definition.examples.add(example.text())
-                    }
-
-                    headword.definitions.add(definition)
-                    meaning.remove()
                 }
 
                 lemma.remove()

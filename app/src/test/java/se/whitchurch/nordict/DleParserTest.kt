@@ -64,6 +64,18 @@ class DleParserTest {
         val uri = Uri.parse("https://dle.rae.es/frente")
         val words = DleParser.parse(page, uri, "")
 
+        assertThat(words).hasSize(1)
+        val word = words[0]
+
+        // Assertions for idioms
+        val idiomCalzada = word.idioms.find { it.idiom.contains("frente calzada") }
+        assertThat(idiomCalzada).isNotNull()
+        assertThat(idiomCalzada?.definition).contains("frente que es poco espaciosa")
+
+        val lastIdiom = word.idioms.last()
+        assertThat(lastIdiom.idiom).isEqualTo("traerlo alguien escrito en la frente")
+        assertThat(lastIdiom.definition).contains("No acertar a disimular")
+
         val gson = GsonBuilder().setPrettyPrinting().create()
         val wordsData = words.map { it.toData() }
 

@@ -71,7 +71,7 @@ class Word(
                 if (parent == null) parent = doc.selectFirst("div.dolCatgramAceps")
                 // DLE
                 if (parent == null) parent = doc.selectFirst("ol.c-definitions")
-                parent.appendChild(el)
+                parent?.appendChild(el)
                 last = el
             }
         }
