@@ -129,7 +129,10 @@ marker: 4 definitions + 3 idioms). `testdata/est/muerte.{html,json}`
 (regression test: the idiom loop must select `div.acep` only — the
 `<a class="acep">` cross-reference anchors would otherwise produce ghost
 zero-gloss idiom duplicates; also covers relative `a.synon` hrefs resolving
-against the base URL).
+against the base URL). The `.sols` sub-entries on that page (`muerte natural`,
+`muerte violenta`) are parsed as separate headword `Word`s with their own
+`__ref` (resolvable via `EstDictionary.get` from both the search-result URL
+and the homograph link), not as trailing definitions of the parent lemma.
 
 ## DLE dictionary (RAE Diccionario de la lengua española)
 

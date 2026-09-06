@@ -71,6 +71,41 @@ class EstIntegrationTest {
     }
 
     @Test
+    fun testGetSubEntry() {
+        val html = File("../testdata/est/muerte.html").readText()
+
+        // Search-result URL for a .sols sub-entry resolves to that headword.
+        server.enqueue(MockResponse().setBody(html))
+        val uri = Uri.parse(server.url("/muerte%20natural").toString())
+        val word = dictionary.get(uri)
+
+        assertThat(word).isNotNull()
+        assertThat(word?.mTitle).isEqualTo("muerte natural")
+        assertThat(word?.definitions).hasSize(1)
+        assertThat(word?.idioms).isEmpty()
+
+        // Homograph/ref URL selects another sub-entry.
+        server.enqueue(MockResponse().setBody(html))
+        val refUri = Uri.parse(server.url("/muerte").toString()).buildUpon()
+            .appendQueryParameter("__ref", "3").build()
+        val word2 = dictionary.get(refUri)
+
+        assertThat(word2).isNotNull()
+        assertThat(word2?.mTitle).isEqualTo("muerte violenta")
+        assertThat(word2?.definitions).hasSize(1)
+
+        // A plain main-page URL still resolves to the parent headword.
+        server.enqueue(MockResponse().setBody(html))
+        val mainUri = Uri.parse(server.url("/muerte").toString())
+        val word3 = dictionary.get(mainUri)
+
+        assertThat(word3).isNotNull()
+        assertThat(word3?.mTitle).isEqualTo("muerte")
+        assertThat(word3?.definitions).hasSize(3)
+        assertThat(word3?.idioms).hasSize(7)
+    }
+
+    @Test
     fun testRegistration() {
         Ordboken.reset()
         val ordboken = Ordboken.getInstance(ApplicationProvider.getApplicationContext(), client)

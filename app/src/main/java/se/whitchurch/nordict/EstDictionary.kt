@@ -70,14 +70,24 @@ class EstDictionary(client: OkHttpClient, private val baseUrl: String = "https:/
         val words = EstParser.parse(page, newUri, tag, baseUrl)
         if (words.isEmpty()) return null
 
-        val ref = uri.getQueryParameter(REFPARAM) ?: return words[0]
-
-        val candidates = words.filter { ref in it.xrefs }
-        if (candidates.isEmpty()) {
-            return words[0]
+        val ref = uri.getQueryParameter(REFPARAM)
+        if (ref != null) {
+            val candidates = words.filter { ref in it.xrefs }
+            if (candidates.isEmpty()) {
+                return words[0]
+            }
+            return candidates[0]
         }
 
-        return candidates[0]
+        // Search can point straight at a .sols sub-entry ("muerte natural"),
+        // which is served from its parent lemma's page. Resolve the requested
+        // headword from the URL instead of always returning the first word.
+        val wanted = uri.lastPathSegment
+        if (wanted != null) {
+            words.firstOrNull { it.mSlug == wanted || it.mTitle == wanted }?.let { return it }
+        }
+
+        return words[0]
     }
 
     companion object {

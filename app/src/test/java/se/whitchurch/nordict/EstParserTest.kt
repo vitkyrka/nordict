@@ -276,15 +276,16 @@ class EstParserTest {
         val uri = Uri.parse("https://www.rae.es/diccionario-estudiante/muerte")
         val words = EstParser.parse(page, uri, "EST")
 
-        assertThat(words).hasSize(1)
+        assertThat(words).hasSize(3)
         val word = words[0]
 
         assertThat(word.mTitle).isEqualTo("muerte")
-        // 3 main definitions + the .sols sub-entries (muerte natural / violenta)
-        assertThat(word.definitions).hasSize(5)
+        // 3 main definitions; the .sols sub-entries are separate headwords
+        assertThat(word.definitions).hasSize(3)
         assertThat(word.idioms).hasSize(7)
         assertThat(word.conjugation).isEmpty()
         assertThat(word.participle).isEmpty()
+        assertThat(word.xrefs).containsExactly("1")
 
         // Definition 1: synonym from a relative <a class="synon" href="...">
         val def1 = word.definitions[0]
@@ -309,11 +310,25 @@ class EstParserTest {
             "la Muerte"
         ).inOrder()
 
-        // .sols sub-entries are kept as trailing definitions (as-is)
-        assertThat(word.definitions[3].glosses[0].definition)
+        // .sols sub-entries are parsed as separate headwords, each with its
+        // own __ref, not as trailing definitions of the parent lemma.
+        assertThat(words[1].mTitle).isEqualTo("muerte natural")
+        assertThat(words[1].uri.toString()).endsWith("?__ref=2")
+        assertThat(words[1].xrefs).containsExactly("2")
+        assertThat(words[1].definitions).hasSize(1)
+        assertThat(words[1].definitions[0].glosses[0].definition)
             .isEqualTo("Muerte (→ 1) producida por enfermedad y no por accidente o de forma violenta.")
-        assertThat(word.definitions[4].glosses[0].definition)
+        assertThat(words[1].definitions[0].glosses[0].examples)
+            .containsExactly("El forense certificó que había fallecido de muerte natural.")
+
+        assertThat(words[2].mTitle).isEqualTo("muerte violenta")
+        assertThat(words[2].uri.toString()).endsWith("?__ref=3")
+        assertThat(words[2].xrefs).containsExactly("3")
+        assertThat(words[2].definitions).hasSize(1)
+        assertThat(words[2].definitions[0].glosses[0].definition)
             .isEqualTo("Muerte (→ 1) que se produce de forma accidental o violenta.")
+        assertThat(words[2].definitions[0].glosses[0].examples)
+            .containsExactly("La policía no descarta una muerte violenta a manos de su novio.")
 
         val gson = GsonBuilder().setPrettyPrinting().create()
         val wordsData = words.map { it.toData() }

@@ -70,21 +70,12 @@ class EstParser {
 
                 // Definitions
                 lemma.select("div.acep").forEach { meaning ->
-                    // Skip idioms-section acep elements (they live inside .locs)
-                    if (meaning.parents().any { it.hasClass("locs") }) return@forEach
+                    // Skip aceps from the idiom (.locs) and sub-entry (.sols)
+                    // sections; both are handled separately below.
+                    if (meaning.parents().any { it.hasClass("locs") || it.hasClass("sols") }) return@forEach
 
-                    val primaryDef = meaning.selectFirst(".def")?.text() ?: meaning.text()
-                    val definition = Word.Definition(primaryDef, meaning.clone())
-                    val acep = parseAcep(meaning)
-                    definition.domain = meaning.selectFirst(".domain")?.attr("title") ?: ""
-                    fillTarget(definition, acep)
+                    val definition = parseDefinition(meaning, finalBaseUrl)
                     applyHeadwords(definition.glosses, word)
-
-                    meaning.select(".refS a.synon").forEach { synEl ->
-                        val href = synEl.attr("href")
-                        val url = if (href.startsWith("http")) href else finalBaseUrl + href
-                        definition.synonyms.add(Word.Synonym(synEl.text(), url))
-                    }
                     headword.definitions.add(definition)
                     meaning.remove()
                 }
@@ -93,16 +84,43 @@ class EstParser {
                 lemma.select(".locs .fc").forEach { fc ->
                     val idiomName = fc.selectFirst(".headword-fc")?.text() ?: ""
                     fc.select("div.acep").forEach { meaning ->
-                    val primaryDef = meaning.selectFirst(".def")?.text() ?: meaning.text()
-                    val idiom = Word.Idiom(idiomName, primaryDef)
-                    fillTarget(idiom, parseAcep(meaning))
-                    applyHeadwords(idiom.glosses, word)
-                    headword.idioms.add(idiom)
+                        val primaryDef = meaning.selectFirst(".def")?.text() ?: meaning.text()
+                        val idiom = Word.Idiom(idiomName, primaryDef)
+                        fillTarget(idiom, parseAcep(meaning))
+                        applyHeadwords(idiom.glosses, word)
+                        headword.idioms.add(idiom)
                     }
                 }
 
-                lemma.remove()
                 words.add(headword)
+
+                // Sub-entries: each .sols .fc is a distinct headword (e.g.
+                // "muerte natural", "muerte violenta"), with its own ref so a
+                // search result or homograph link can resolve straight to it.
+                lemma.select(".sols .fc").forEach { fc ->
+                    ref += 1
+
+                    val subTitle = fc.selectFirst(".headword-fc")?.text()?.trim() ?: ""
+                    if (subTitle.isEmpty()) return@forEach
+
+                    val subUri = uri.buildUpon()
+                        .appendQueryParameter("__ref", ref.toString()).build()
+                    val sub = Word(
+                        tag, subTitle, subTitle, subTitle, page, subUri,
+                        finalBaseUrl, doc, "", null, renderAsJson = true
+                    )
+                    sub.xrefs.add(ref.toString())
+
+                    fc.select("div.acep").forEach { meaning ->
+                        val definition = parseDefinition(meaning, finalBaseUrl)
+                        applyHeadwords(definition.glosses, subTitle)
+                        sub.definitions.add(definition)
+                    }
+
+                    words.add(sub)
+                }
+
+                lemma.remove()
             }
 
             if (words.size > 1) {
@@ -114,6 +132,21 @@ class EstParser {
             }
 
             return words
+        }
+
+        private fun parseDefinition(meaning: Element, finalBaseUrl: String): Word.Definition {
+            val primaryDef = meaning.selectFirst(".def")?.text() ?: meaning.text()
+            val definition = Word.Definition(primaryDef, meaning.clone())
+            val acep = parseAcep(meaning)
+            definition.domain = meaning.selectFirst(".domain")?.attr("title") ?: ""
+            fillTarget(definition, acep)
+
+            meaning.select(".refS a.synon").forEach { synEl ->
+                val href = synEl.attr("href")
+                val url = if (href.startsWith("http")) href else finalBaseUrl + href
+                definition.synonyms.add(Word.Synonym(synEl.text(), url))
+            }
+            return definition
         }
 
         private fun fillTarget(definition: Word.Definition, acep: Acep) {
