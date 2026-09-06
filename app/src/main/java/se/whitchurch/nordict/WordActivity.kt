@@ -33,6 +33,7 @@ import androidx.webkit.WebViewFeature
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
 import com.google.android.material.bottomappbar.BottomAppBar
+import com.google.gson.Gson
 import se.whitchurch.nordict.OrdbokenContract.FavoritesEntry
 import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
 import java.io.StringReader
@@ -268,6 +269,44 @@ class WordActivity : AppCompatActivity() {
     }
 
     private fun loadWebView(word: Word) {
+        if (word.renderAsJson) {
+            val gson = Gson()
+            val json = gson.toJson(word)
+            val html = """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                    <link rel='stylesheet' type='text/css' href='file:///android_asset/word.css'>
+                    <script src='file:///android_asset/jquery.min.js'></script>
+                    <script src='file:///android_asset/renderer.js'></script>
+                    <script src='file:///android_asset/word.js'></script>
+                    <script>
+                        const wordData = $json;
+                        $(document).ready(() => {
+                            renderWord(wordData);
+                            // word.js logic for divs might not be enough if we use other tags
+                            // so let's explicitly run it on the content
+                            if (typeof createLinks === 'function') {
+                                createLinks(document.getElementById('content'));
+                            }
+                        });
+                    </script>
+                </head>
+                <body>
+                    <div id="content"></div>
+                </body>
+                </html>
+            """.trimIndent()
+
+            mWebView!!.loadDataWithBaseURL(
+                word.baseUrl, html,
+                "text/html", "UTF-8", null
+            )
+            return
+        }
+
         val text = word.getPage()
         val footer = ("<script src='file:///android_asset/jquery.min.js'></script>"
                 + "<link rel='stylesheet' type='text/css' href='file:///android_asset/word.css'>"

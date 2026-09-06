@@ -8,9 +8,10 @@ class Word(
     val dict: String, val mTitle: String, val mSlug: String, val summary: String,
     val mText: String, internal val uri: Uri,
     internal val baseUrl: String,
-    val element: Element,
-    val header: String, val lemma: Element? = null,
-    val xrefs: ArrayList<String> = ArrayList<String>()
+    @Transient val element: Element,
+    val header: String, @Transient val lemma: Element? = null,
+    val xrefs: ArrayList<String> = ArrayList<String>(),
+    val renderAsJson: Boolean = false
 ) {
     var pos: Pos = Pos.UNKNOWN
     var gender: String = ""
@@ -25,8 +26,9 @@ class Word(
         val examples: ArrayList<String> = ArrayList()
     }
 
-    class Definition(val definition: String, val element: Element, val title: String? = null) {
+    class Definition(val definition: String, @Transient val element: Element, val title: String? = null) {
         val examples: ArrayList<String> = ArrayList()
+        var grammar: String = ""
     }
 
     fun getPage(chosenDefs: List<Definition>? = null, css: String? = null): String {

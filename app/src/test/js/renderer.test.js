@@ -1,3 +1,6 @@
+/**
+ * @jest-environment jsdom
+ */
 const { renderWord } = require('../../main/assets/renderer.js');
 const $ = require('jquery');
 

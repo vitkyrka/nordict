@@ -48,14 +48,18 @@ class EstParser {
                     finalBaseUrl,
                     doc,
                     "",
-                    lemma
+                    lemma,
+                    renderAsJson = true
                 )
 
                 headword.xrefs.add(ref.toString())
 
                 // Definitions
                 lemma.select("> div.acep").forEach { meaning ->
-                    val definition = Word.Definition(meaning.text(), meaning.clone())
+                    val defText = meaning.selectFirst(".def")?.text() ?: meaning.text()
+                    val definition = Word.Definition(defText, meaning.clone())
+                    definition.grammar = meaning.selectFirst(".gram")?.text() ?: ""
+
                     meaning.select(".ejemplo").forEach { example ->
                         definition.examples.add(example.text())
                     }
@@ -67,7 +71,8 @@ class EstParser {
                 lemma.select(".locs .fc").forEach { fc ->
                     val idiomName = fc.selectFirst(".headword-fc")?.text() ?: ""
                     fc.select(".acep").forEach { meaning ->
-                        val idiom = Word.Idiom(idiomName, meaning.text())
+                        val defText = meaning.selectFirst(".def")?.text() ?: meaning.text()
+                        val idiom = Word.Idiom(idiomName, defText)
                         meaning.select(".ejemplo").forEach { example ->
                             idiom.examples.add(example.text())
                         }

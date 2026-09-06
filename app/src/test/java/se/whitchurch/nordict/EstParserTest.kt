@@ -75,14 +75,8 @@ class EstParserTest {
 
         val gson = GsonBuilder().setPrettyPrinting().create()
         val wordsData = words.map { it.toData() }
-        val json = gson.toJson(wordsData)
 
-        val jsonFile = File("../testdata/est.json")
-        if (!jsonFile.exists()) {
-            jsonFile.writeText(json)
-        }
-
-        val expectedJson = jsonFile.readText()
+        val expectedJson = File("../testdata/est.json").readText()
         val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
 
         assertThat(wordsData).isEqualTo(expectedData)
