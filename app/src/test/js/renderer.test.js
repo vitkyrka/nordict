@@ -185,11 +185,11 @@ test('colors each gloss based on its gender', () => {
     renderWord(word);
 
     expect($('.definitions li .gloss').length).toBe(2);
-    expect($('.definitions li .gloss.feminine').length).toBe(1);
-    expect($('.definitions li .gloss.masculine').length).toBe(1);
-    expect($('.definitions li .gloss.feminine .definition').text()).toContain('Parte superior de la cara');
-    expect($('.definitions li .gloss.masculine .definition').text()).toContain('Zona de contacto');
-    expect($('.idiom-list li .gloss').hasClass('feminine')).toBe(false);
+    expect($('.definitions li .grammar.feminine').length).toBe(1);
+    expect($('.definitions li .grammar.masculine').length).toBe(1);
+    expect($('.grammar.feminine').closest('.gloss').find('.definition').text()).toContain('Parte superior de la cara');
+    expect($('.grammar.masculine').closest('.gloss').find('.definition').text()).toContain('Zona de contacto');
+    expect($('.idiom-list li .gloss .grammar').hasClass('feminine')).toBe(false);
 });
 
 test('exposes shared gender constants', () => {
@@ -530,6 +530,6 @@ test('renders idiom defP glosses with grammar and example attribution', () => {
 
     expect(glosses.eq(2).find('.definition').text()).toBe('También nombre masculino');
     expect(glosses.eq(2).find('.grammar').text()).toBe('nombre masculino');
-    expect(glosses.eq(2).hasClass('masculine')).toBe(true);
+    expect(glosses.eq(2).find('.grammar').hasClass('masculine')).toBe(true);
     expect(glosses.eq(2).find('.examples li').text()).toBe('Los mueras contra el general ahogaban los vítores de sus partidarios.');
 });
