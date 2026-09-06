@@ -212,10 +212,11 @@ class DleParser {
                 }
             }
 
-            // Build the definition text by cloning the div, removing the number
-            // and the classified markers, then taking the remaining text.
+            // Build the definition text by cloning the div, removing the number,
+            // example spans, and the classified markers, then taking the remaining text.
             val textDiv = mainDiv.clone()
             textDiv.select(".n_acep").remove()
+            textDiv.select("span.h").remove()
             textDiv.select("abbr").forEach { abbr ->
                 if (classifyMarker(abbr) != null) {
                     abbr.remove()
