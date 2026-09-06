@@ -1,6 +1,14 @@
+// Gender values carried in the Word JSON (`gender` field on Definition/Idiom).
+// Mirrors Genders.kt (app/src/main/java/se/whitchurch/nordict/Genders.kt).
+// Keep both in sync.
+const GENDERS = {
+    FEMININE: 'femenino',
+    MASCULINE: 'masculino'
+};
+
 const genderClass = (gender) =>
-    gender === 'femenino' ? 'feminine' :
-    gender === 'masculino' ? 'masculine' : '';
+    gender === GENDERS.FEMININE ? 'feminine' :
+    gender === GENDERS.MASCULINE ? 'masculine' : '';
 
 const template = (word) => `
     <article>
@@ -51,5 +59,5 @@ function renderWord(word) {
 
 // For Node.js testing
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { renderWord };
+    module.exports = { renderWord, GENDERS };
 }

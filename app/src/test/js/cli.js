@@ -32,7 +32,7 @@ const inlineStyle = (id, filename) => {
     html = html.replace(tag, () => `<style>${content}</style>`);
 };
 
-inlineStyle('main-css', 'word.css');
+inlineStyle('main-css', 'renderer.css');
 inlineScript('jq-js', 'jquery.min.js');
 inlineScript('renderer-js', 'renderer.js');
 inlineScript('word-js', 'word.js');

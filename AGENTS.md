@@ -48,8 +48,12 @@ tools/                                      Standalone python scripts (crawl.py,
 - **`assets/word.js`** — turns words inside definitions/examples into
   `/search/...` links (`createLinks`). Needs to keep working if selectors in
   `renderer.js` change.
-- **`assets/word.css`** — styling for both the JSON-rendered content and
-  dictionary-specific overrides.
+- **`assets/renderer.css`** — styling for the JSON-rendered content
+  (`span.grammar`/`domain`/`geo`, `ol.definitions`, `ul.idiom-list`, gender
+  backgrounds, small-screen layout). Loaded by `word_template.html`.
+- **`assets/word.css`** — styling/overrides for legacy dictionaries that render
+  original HTML from their sources (loaded in `WordActivity.loadWebView` on the
+  non-JSON path).
 
 ### The JSON rendering + testing pipeline (what most parser work touches)
 
@@ -61,7 +65,7 @@ tools/                                      Standalone python scripts (crawl.py,
    classes in the test must mirror any new `Word` fields (and their Gson field
    order).
 3. `renderer.js` renders that JSON in the app. Its output must match `word.js`
-   selectors and be styled by `word.css`.
+   selectors and be styled by `renderer.css`.
 4. `renderer.test.js` (Jest + jsdom) verifies the DOM produced by `renderWord`.
 
 ## Commands
@@ -114,7 +118,7 @@ for browser preview.
   `grammar`, `geo`, and `examples` too.
 
 Relevant files: `EstParser.kt`, `EstDictionary.kt`, `Word.kt`,
-`assets/renderer.js`, `assets/word.css`, `EstParserTest.kt`,
+`assets/renderer.js`, `assets/renderer.css`, `EstParserTest.kt`,
 `EstIntegrationTest.kt`, `testdata/est.{html,json,search.json}`.
 
 ## DLE dictionary (RAE Diccionario de la lengua española)

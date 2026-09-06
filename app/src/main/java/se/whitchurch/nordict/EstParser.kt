@@ -108,8 +108,8 @@ class EstParser {
 
         private fun genderOf(gramTitle: String?): String {
             return when (gramTitle) {
-                "nombre femenino", "nombre femenino plural" -> "femenino"
-                "nombre masculino", "nombre masculino plural" -> "masculino"
+                Genders.GRAMMAR_FEMININE, Genders.GRAMMAR_FEMININE_PLURAL -> Genders.FEMININE
+                Genders.GRAMMAR_MASCULINE, Genders.GRAMMAR_MASCULINE_PLURAL -> Genders.MASCULINE
                 else -> ""
             }
         }

@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-const { renderWord } = require('../../main/assets/renderer.js');
+const { renderWord, GENDERS } = require('../../main/assets/renderer.js');
 const $ = require('jquery');
 
 // Setup JSDOM
@@ -111,13 +111,13 @@ test('colors definition based on gender', () => {
         mTitle: 'frente',
         definitions: [
             {
-                gender: 'femenino',
+                gender: GENDERS.FEMININE,
                 grammar: 'nombre femenino',
                 definition: 'Parte superior de la cara.',
                 examples: []
             },
             {
-                gender: 'masculino',
+                gender: GENDERS.MASCULINE,
                 grammar: 'nombre masculino',
                 definition: 'Zona de contacto entre dos masas de aire.',
                 examples: []
@@ -142,4 +142,9 @@ test('colors definition based on gender', () => {
     expect($('.definitions li.masculine .definition').text()).toContain('Zona de contacto');
     expect($('.idiom-list li').hasClass('feminine')).toBe(false);
     expect($('.idiom-list li').hasClass('masculine')).toBe(false);
+});
+
+test('exposes shared gender constants', () => {
+    expect(GENDERS.FEMININE).toBe('femenino');
+    expect(GENDERS.MASCULINE).toBe('masculino');
 });

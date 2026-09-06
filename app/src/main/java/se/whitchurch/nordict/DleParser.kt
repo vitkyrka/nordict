@@ -87,10 +87,10 @@ class DleParser {
                             val genderEl = meaning.selectFirst("abbr")
                             if (genderEl != null) {
                                 val gender = genderEl.attr("title")
-                                if (gender == "nombre femenino" || gender == "nombre femenino plural") {
+                                if (gender == Genders.GRAMMAR_FEMININE || gender == Genders.GRAMMAR_FEMININE_PLURAL) {
                                     genderEl.addClass("feminine")
                                     genderEl.addClass("rae")
-                                } else if (gender == "nombre masculino" || gender == "nombre masculino plural") {
+                                } else if (gender == Genders.GRAMMAR_MASCULINE || gender == Genders.GRAMMAR_MASCULINE_PLURAL) {
                                     genderEl.addClass("masculine")
                                     genderEl.addClass("rae")
                                 }
