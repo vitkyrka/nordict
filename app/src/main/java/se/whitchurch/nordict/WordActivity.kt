@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.database.sqlite.SQLiteDatabase
-import android.graphics.Color
 import android.graphics.Typeface
 import android.media.AudioAttributes
 import android.media.AudioManager
@@ -179,7 +178,6 @@ class WordActivity : AppCompatActivity() {
 
             override fun onPageFinished(view: WebView, url: String) {
                 if (!mPageFinished) {
-                    webView.setBackgroundColor(Color.GREEN)
                     webView.visibility = View.VISIBLE
                     mStatusLayout!!.visibility = View.INVISIBLE
 
