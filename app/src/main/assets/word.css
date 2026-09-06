@@ -247,3 +247,13 @@ ul.examples li:before {
     content: "• ";
     padding-right: 0.5em;
 }
+
+ol.definitions li.feminine,
+ul.idiom-list li.feminine {
+    background: #fee;
+}
+
+ol.definitions li.masculine,
+ul.idiom-list li.masculine {
+    background: #eef;
+}

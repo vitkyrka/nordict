@@ -26,6 +26,7 @@ class Word(
         val examples: ArrayList<String> = ArrayList()
         var grammar: String = ""
         var geo: String = ""
+        var gender: String = ""
     }
 
     class Definition(val definition: String, @Transient val element: Element, val title: String? = null) {
@@ -33,6 +34,7 @@ class Word(
         var grammar: String = ""
         var domain: String = ""
         var geo: String = ""
+        var gender: String = ""
     }
 
     fun getPage(chosenDefs: List<Definition>? = null, css: String? = null): String {

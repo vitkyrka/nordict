@@ -1,10 +1,14 @@
+const genderClass = (gender) =>
+    gender === 'femenino' ? 'feminine' :
+    gender === 'masculino' ? 'masculine' : '';
+
 const template = (word) => `
     <article>
         <header><h1>${word.mTitle}</h1></header>
         ${word.definitions && word.definitions.length > 0 ? `
             <ol class="definitions">
                 ${word.definitions.map(def => `
-                    <li>
+                    <li class="${genderClass(def.gender)}">
                         ${def.grammar ? `<span class="grammar">${def.grammar}</span> ` : ''}
                         ${def.domain ? `<span class="domain">${def.domain}</span> ` : ''}
                         ${def.geo ? `<span class="geo">${def.geo}</span> ` : ''}
@@ -23,7 +27,7 @@ const template = (word) => `
                 <h3>Locuciones</h3>
                 <ul class="idiom-list">
                     ${word.idioms.map(idiom => `
-                        <li>
+                        <li class="${genderClass(idiom.gender)}">
                             <b class="idiom-name">${idiom.idiom}</b>:
                             ${idiom.grammar ? `<span class="grammar">${idiom.grammar}</span> ` : ''}
                             ${idiom.geo ? `<span class="geo">${idiom.geo}</span> ` : ''}

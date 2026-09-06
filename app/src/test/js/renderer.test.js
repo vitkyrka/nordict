@@ -105,3 +105,41 @@ test('omits domain and geo elements when absent', () => {
     expect($('.definitions li .domain').length).toBe(0);
     expect($('.definitions li .geo').length).toBe(0);
 });
+
+test('colors definition based on gender', () => {
+    const word = {
+        mTitle: 'frente',
+        definitions: [
+            {
+                gender: 'femenino',
+                grammar: 'nombre femenino',
+                definition: 'Parte superior de la cara.',
+                examples: []
+            },
+            {
+                gender: 'masculino',
+                grammar: 'nombre masculino',
+                definition: 'Zona de contacto entre dos masas de aire.',
+                examples: []
+            }
+        ],
+        idioms: [
+            {
+                gender: '',
+                idiom: 'al frente',
+                definition: 'Hacia delante.',
+                examples: []
+            }
+        ]
+    };
+
+    renderWord(word);
+
+    expect($('.definitions li').length).toBe(2);
+    expect($('.definitions li.feminine').length).toBe(1);
+    expect($('.definitions li.masculine').length).toBe(1);
+    expect($('.definitions li.feminine .definition').text()).toContain('Parte superior de la cara');
+    expect($('.definitions li.masculine .definition').text()).toContain('Zona de contacto');
+    expect($('.idiom-list li').hasClass('feminine')).toBe(false);
+    expect($('.idiom-list li').hasClass('masculine')).toBe(false);
+});

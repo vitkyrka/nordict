@@ -58,7 +58,9 @@ class EstParser {
                 lemma.select("> div.acep").forEach { meaning ->
                     val defText = meaning.selectFirst(".def")?.text() ?: meaning.text()
                     val definition = Word.Definition(defText, meaning.clone())
-                    definition.grammar = meaning.selectFirst(".gram")?.text() ?: ""
+                    val gramEl = meaning.selectFirst(".gram")
+                    definition.grammar = gramEl?.text() ?: ""
+                    definition.gender = genderOf(gramEl?.attr("title"))
                     val domainEl = meaning.selectFirst(".domain")
                     definition.domain = domainEl?.attr("title") ?: ""
                     val geoEl = meaning.selectFirst(".geo")
@@ -77,7 +79,9 @@ class EstParser {
                     fc.select(".acep").forEach { meaning ->
                         val defText = meaning.selectFirst(".def")?.text() ?: meaning.text()
                         val idiom = Word.Idiom(idiomName, defText)
-                        idiom.grammar = meaning.selectFirst(".gram")?.text() ?: ""
+                        val gramEl = meaning.selectFirst(".gram")
+                        idiom.grammar = gramEl?.text() ?: ""
+                        idiom.gender = genderOf(gramEl?.attr("title"))
                         val geoEl = meaning.selectFirst(".geo")
                         idiom.geo = geoEl?.attr("title") ?: ""
                         meaning.select(".ejemplo").forEach { example ->
@@ -100,6 +104,14 @@ class EstParser {
             }
 
             return words
+        }
+
+        private fun genderOf(gramTitle: String?): String {
+            return when (gramTitle) {
+                "nombre femenino", "nombre femenino plural" -> "femenino"
+                "nombre masculino", "nombre masculino plural" -> "masculino"
+                else -> ""
+            }
         }
     }
 }
