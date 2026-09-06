@@ -3,9 +3,40 @@
  * Legacy dictionaries that render original source HTML use word.css
  * instead; keep the two files independent. */
 
+:root {
+    color-scheme: light dark;
+    --bg-color: #ffffff;
+    --text-color: #1a1a1a;
+    --grammar-color: #a52a2a;
+    --domain-color: #0066cc;
+    --geo-color: #2e8b57;
+    --plev-color: #c00;
+    --muted-color: #555;
+    --feminine-bg: #fee;
+    --masculine-bg: #eef;
+    --symbols-label-color: #336;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-color: #121212;
+        --text-color: #e6e6e6;
+        --grammar-color: #e08f8f;
+        --domain-color: #6aa9e8;
+        --geo-color: #6fbf8f;
+        --plev-color: #ff6b6b;
+        --muted-color: #b0b0b0;
+        --feminine-bg: #3d2a2a;
+        --masculine-bg: #2a2a3d;
+        --symbols-label-color: #9b9bd0;
+    }
+}
+
 #content {
     font-family: sans-serif;
     font-size: 1em;
+    color: var(--text-color);
+    background-color: var(--bg-color);
 }
 
 a.normalx {
@@ -15,42 +46,42 @@ a.normalx {
 }
 
 span.grammar {
-    color: #a52a2a;
+    color: var(--grammar-color);
     font-weight: bold;
     font-style: italic;
 }
 
 span.register {
-    color: #808080;
+    color: var(--muted-color);
     font-style: italic;
 }
 
 span.domain {
-    color: #0066cc;
+    color: var(--domain-color);
     font-weight: bold;
     font-style: italic;
     text-transform: capitalize;
 }
 
 span.geo {
-    color: #2e8b57;
+    color: var(--geo-color);
     font-weight: bold;
     font-style: italic;
     text-transform: capitalize;
 }
 
 span.plev {
-    color: #c00;
+    color: var(--plev-color);
     font-weight: bold;
     font-style: italic;
 }
 
 div.gloss.feminine {
-    background: #fee;
+    background: var(--feminine-bg);
 }
 
 div.gloss.masculine {
-    background: #eef;
+    background: var(--masculine-bg);
 }
 
 div.gloss .examples {
@@ -60,7 +91,7 @@ div.gloss .examples {
 ul.examples {
     list-style-type: none;
     padding-left: 1em;
-    color: #555;
+    color: var(--muted-color);
 }
 
 ul.examples li:before {
@@ -71,7 +102,7 @@ ul.examples li:before {
 /* Morphology line (conjugation / participle) */
 
 div.morphology {
-    color: #555;
+    color: var(--muted-color);
     font-size: 0.9em;
     margin-bottom: 0.3em;
 }
@@ -88,14 +119,14 @@ div.morphology span.participle b {
 
 div.synonyms {
     font-size: 0.9em;
-    color: #555;
+    color: var(--muted-color);
     margin-top: 0.2em;
     padding-left: 1em;
 }
 
 span.synonyms-label {
     font-weight: bold;
-    color: #336;
+    color: var(--symbols-label-color);
 }
 
 span.synonym {
