@@ -270,6 +270,62 @@ class EstParserTest {
     }
 
     @Test
+    fun testParseEstMuerte() {
+        val htmlFile = File("../testdata/est/muerte.html")
+        val page = htmlFile.readText()
+        val uri = Uri.parse("https://www.rae.es/diccionario-estudiante/muerte")
+        val words = EstParser.parse(page, uri, "EST")
+
+        assertThat(words).hasSize(1)
+        val word = words[0]
+
+        assertThat(word.mTitle).isEqualTo("muerte")
+        // 3 main definitions + the .sols sub-entries (muerte natural / violenta)
+        assertThat(word.definitions).hasSize(5)
+        assertThat(word.idioms).hasSize(7)
+        assertThat(word.conjugation).isEmpty()
+        assertThat(word.participle).isEmpty()
+
+        // Definition 1: synonym from a relative <a class="synon" href="...">
+        val def1 = word.definitions[0]
+        assertThat(def1.glosses[0].definition).isEqualTo(
+            "Término de la vida de una persona o de otro ser vivo."
+        )
+        assertThat(def1.synonyms.map { SynonymData(it.text, it.href, it.plev) }).containsExactly(
+            SynonymData("defunción", "https://www.rae.es/diccionario-estudiante/defunción", "")
+        )
+
+        // Regression: every idiom must be a real acep, not the <a class="acep">
+        // cross-reference anchors in the definition text (which produced ghost,
+        // zero-gloss duplicates). "la Muerte" must appear exactly once.
+        assertThat(word.idioms.map { it.glosses.size }).containsExactly(1, 3, 2, 1, 1, 2, 1)
+        assertThat(word.idioms.map { it.idiom }).containsExactly(
+            "a la muerte",
+            "a muerte",
+            "a muerte",
+            "dar muerte (a alguien)",
+            "de mala muerte",
+            "de muerte",
+            "la Muerte"
+        ).inOrder()
+
+        // .sols sub-entries are kept as trailing definitions (as-is)
+        assertThat(word.definitions[3].glosses[0].definition)
+            .isEqualTo("Muerte (→ 1) producida por enfermedad y no por accidente o de forma violenta.")
+        assertThat(word.definitions[4].glosses[0].definition)
+            .isEqualTo("Muerte (→ 1) que se produce de forma accidental o violenta.")
+
+        val gson = GsonBuilder().setPrettyPrinting().create()
+        val wordsData = words.map { it.toData() }
+        File("../testdata/est/muerte.json").writeText(gson.toJson(wordsData))
+
+        val expectedJson = File("../testdata/est/muerte.json").readText()
+        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
+
+        assertThat(wordsData).isEqualTo(expectedData)
+    }
+
+    @Test
     fun testParseEstOtro() {
         val htmlFile = File("../testdata/est/otro.html")
         val page = htmlFile.readText()

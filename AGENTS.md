@@ -125,7 +125,11 @@ Relevant files: `EstParser.kt`, `EstDictionary.kt`, `Word.kt`,
 `assets/renderer.js`, `assets/renderer.css`, `EstParserTest.kt`,
 `EstIntegrationTest.kt`, `testdata/est.{html,json,search.json}`,
 `testdata/est/cagar.{html,json}` (golden test for the `plev` "malsonante"
-marker: 4 definitions + 3 idioms).
+marker: 4 definitions + 3 idioms). `testdata/est/muerte.{html,json}`
+(regression test: the idiom loop must select `div.acep` only — the
+`<a class="acep">` cross-reference anchors would otherwise produce ghost
+zero-gloss idiom duplicates; also covers relative `a.synon` hrefs resolving
+against the base URL).
 
 ## DLE dictionary (RAE Diccionario de la lengua española)
 

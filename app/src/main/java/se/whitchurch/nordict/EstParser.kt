@@ -92,7 +92,7 @@ class EstParser {
                 // Idioms
                 lemma.select(".locs .fc").forEach { fc ->
                     val idiomName = fc.selectFirst(".headword-fc")?.text() ?: ""
-                    fc.select(".acep").forEach { meaning ->
+                    fc.select("div.acep").forEach { meaning ->
                     val primaryDef = meaning.selectFirst(".def")?.text() ?: meaning.text()
                     val idiom = Word.Idiom(idiomName, primaryDef)
                     fillTarget(idiom, parseAcep(meaning))
