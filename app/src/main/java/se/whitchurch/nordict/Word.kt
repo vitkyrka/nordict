@@ -15,6 +15,8 @@ class Word(
 ) {
     var pos: Pos = Pos.UNKNOWN
     var gender: String = ""
+    var conjugation: String = ""
+    var participle: String = ""
     val mHomographs: ArrayList<SearchResult>
     val mHasAudio: Boolean
     val idioms: ArrayList<Idiom> = ArrayList()
@@ -28,6 +30,8 @@ class Word(
         var geo: String = ""
         var gender: String = ""
         var plev: String = ""
+        var register: String = ""
+        var note: String = ""
     }
 
     class Definition(val definition: String, @Transient val element: Element, val title: String? = null) {
@@ -37,6 +41,9 @@ class Word(
         var geo: String = ""
         var gender: String = ""
         var plev: String = ""
+        var register: String = ""
+        var note: String = ""
+        val synonyms: ArrayList<String> = ArrayList()
     }
 
     fun getPage(chosenDefs: List<Definition>? = null, css: String? = null): String {

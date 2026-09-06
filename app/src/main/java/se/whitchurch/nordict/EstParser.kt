@@ -52,10 +52,26 @@ class EstParser {
                     renderAsJson = true
                 )
 
+                // Capture conjugation and participle info from div.par
+                val parDiv = lemma.selectFirst("div.paracep div.par")
+                if (parDiv != null) {
+                    val verboModelo = parDiv.selectFirst("span.verboModelo")
+                    if (verboModelo != null) {
+                        headword.conjugation = verboModelo.text()
+                    }
+                    val participio = parDiv.selectFirst("span[class*=participio]")
+                    if (participio != null) {
+                        headword.participle = participio.text()
+                    }
+                }
+
                 headword.xrefs.add(ref.toString())
 
                 // Definitions
-                lemma.select("> div.acep").forEach { meaning ->
+                lemma.select("div.acep").forEach { meaning ->
+                    // Skip idioms-section acep elements (they live inside .locs)
+                    if (meaning.parents().any { it.hasClass("locs") }) return@forEach
+
                     val defText = meaning.selectFirst(".def")?.text() ?: meaning.text()
                     val definition = Word.Definition(defText, meaning.clone())
                     val gramEl = meaning.selectFirst(".gram")
@@ -67,9 +83,16 @@ class EstParser {
                     definition.geo = geoEl?.attr("title") ?: ""
                     val plevEl = meaning.selectFirst(".plev")
                     definition.plev = plevEl?.attr("title") ?: ""
+                    val registerEl = meaning.selectFirst(".register")
+                    definition.register = registerEl?.attr("title") ?: ""
+                    val noteEl = meaning.selectFirst(".defP")
+                    definition.note = noteEl?.text() ?: ""
 
                     meaning.select(".ejemplo").forEach { example ->
                         definition.examples.add(example.text())
+                    }
+                    meaning.select(".refS a.synon").forEach { synEl ->
+                        definition.synonyms.add(synEl.text())
                     }
                     headword.definitions.add(definition)
                     meaning.remove()
@@ -88,6 +111,10 @@ class EstParser {
                         idiom.geo = geoEl?.attr("title") ?: ""
                         val plevEl = meaning.selectFirst(".plev")
                         idiom.plev = plevEl?.attr("title") ?: ""
+                        val registerEl = meaning.selectFirst(".register")
+                        idiom.register = registerEl?.attr("title") ?: ""
+                        val noteEl = meaning.selectFirst(".defP")
+                        idiom.note = noteEl?.text() ?: ""
                         meaning.select(".ejemplo").forEach { example ->
                             idiom.examples.add(example.text())
                         }

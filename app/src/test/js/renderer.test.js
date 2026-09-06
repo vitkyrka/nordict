@@ -201,3 +201,168 @@ test('exposes shared gender constants', () => {
     expect(GENDERS.FEMININE).toBe('femenino');
     expect(GENDERS.MASCULINE).toBe('masculino');
 });
+
+test('renders conjugation and participle in header', () => {
+    const word = {
+        mTitle: 'morir',
+        conjugation: 'dormir',
+        participle: 'muerto',
+        definitions: [
+            {
+                grammar: 'verbo intransitivo',
+                definition: 'Dejar de vivir.',
+                examples: ['Ha muerto en un accidente.']
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('h1').text()).toBe('morir');
+    expect($('.morphology .conjugation').text()).toContain('dormir');
+    expect($('.morphology .participle').text()).toContain('muerto');
+});
+
+test('omits morphology line when no conjugation or participle', () => {
+    const word = {
+        mTitle: 'frente',
+        definitions: [
+            {
+                grammar: 'nombre femenino',
+                definition: 'Parte superior de la cara.',
+                examples: []
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('.morphology').length).toBe(0);
+});
+
+test('renders register marker on definitions', () => {
+    const word = {
+        mTitle: 'morir',
+        definitions: [
+            {
+                grammar: 'verbo intransitivo pronominal',
+                register: 'coloquial',
+                definition: 'Sentir intensamente algo.',
+                examples: []
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('.definitions li .register').text()).toBe('coloquial');
+});
+
+test('renders register marker on idioms', () => {
+    const word = {
+        mTitle: 'morir',
+        definitions: [],
+        idioms: [
+            {
+                idiom: 'muera',
+                grammar: 'expresión',
+                register: 'coloquial',
+                definition: 'Expresa rechazo.',
+                examples: []
+            }
+        ]
+    };
+
+    renderWord(word);
+
+    expect($('.idiom-list li .register').text()).toBe('coloquial');
+});
+
+test('renders synonyms on definitions', () => {
+    const word = {
+        mTitle: 'morir',
+        definitions: [
+            {
+                grammar: 'verbo intransitivo',
+                definition: 'Dejar de vivir.',
+                examples: [],
+                synonyms: ['expirar', 'fallecer']
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('.synonyms .synonym').length).toBe(2);
+    expect($('.synonyms .synonym').eq(0).text()).toBe('expirar');
+    expect($('.synonyms .synonym').eq(1).text()).toBe('fallecer');
+});
+
+test('omits synonyms div when list is empty', () => {
+    const word = {
+        mTitle: 'frente',
+        definitions: [
+            {
+                grammar: 'nombre femenino',
+                definition: 'Parte superior de la cara.',
+                examples: [],
+                synonyms: []
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('.synonyms').length).toBe(0);
+});
+
+test('renders note on definitions and idioms', () => {
+    const word = {
+        mTitle: 'morir',
+        definitions: [
+            {
+                grammar: 'verbo intransitivo',
+                definition: 'Dejar de vivir.',
+                note: 'También prnl.',
+                examples: []
+            }
+        ],
+        idioms: [
+            {
+                idiom: 'muera',
+                grammar: 'expresión',
+                definition: 'Expresa rechazo.',
+                note: 'Se usa espec. como grito.',
+                examples: []
+            }
+        ]
+    };
+
+    renderWord(word);
+
+    expect($('.definitions li .note').text()).toBe('También prnl.');
+    expect($('.idiom-list li .note').text()).toBe('Se usa espec. como grito.');
+});
+
+test('omits note element when absent', () => {
+    const word = {
+        mTitle: 'frente',
+        definitions: [
+            {
+                grammar: 'nombre femenino',
+                definition: 'Parte superior de la cara.',
+                examples: []
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('.definitions li .note').length).toBe(0);
+});
