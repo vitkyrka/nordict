@@ -17,6 +17,7 @@ class Word(
     var gender: String = ""
     var conjugation: String = ""
     var participle: String = ""
+    var etymology: String = ""
     val mHomographs: ArrayList<SearchResult>
     val mHasAudio: Boolean
     val idioms: ArrayList<Idiom> = ArrayList()
@@ -44,6 +45,7 @@ class Word(
         @Transient val examples: ArrayList<String> = ArrayList()
         @Transient var grammar: String = ""
         @Transient var gender: String = ""
+        var domain: String = ""
         var geo: String = ""
         var plev: String = ""
         var register: String = ""
@@ -60,6 +62,7 @@ class Word(
         var plev: String = ""
         var register: String = ""
         val synonyms: ArrayList<String> = ArrayList()
+        val antonyms: ArrayList<String> = ArrayList()
     }
 
     fun getPage(chosenDefs: List<Definition>? = null, css: String? = null): String {

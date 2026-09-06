@@ -119,6 +119,13 @@ div.morphology span.participle b {
     font-weight: bold;
 }
 
+div.etymology {
+    color: var(--muted-color);
+    font-size: 0.9em;
+    margin-bottom: 0.3em;
+    font-style: italic;
+}
+
 /* Synonyms */
 
 div.synonyms {
@@ -134,6 +141,22 @@ span.synonyms-label {
 }
 
 span.synonym {
+    font-style: italic;
+}
+
+div.antonyms {
+    font-size: 0.9em;
+    color: var(--muted-color);
+    margin-top: 0.2em;
+    padding-left: 1em;
+}
+
+span.antonyms-label {
+    font-weight: bold;
+    color: var(--symbols-label-color);
+}
+
+span.antonym {
     font-style: italic;
 }
 

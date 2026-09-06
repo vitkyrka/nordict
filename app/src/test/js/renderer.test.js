@@ -237,6 +237,106 @@ test('omits morphology line when no conjugation or participle', () => {
     expect($('.morphology').length).toBe(0);
 });
 
+test('renders etymology in header', () => {
+    const word = {
+        mTitle: 'frente',
+        etymology: 'Del antiguo fruente, y este del latín frons, frontis.',
+        definitions: [
+            {
+                glosses: [
+                    { definition: 'Parte superior de la cara.', grammar: 'nombre femenino', gender: '', examples: [] }
+                ]
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('h1').text()).toBe('frente');
+    expect($('.etymology').text()).toContain('Del antiguo fruente');
+});
+
+test('omits etymology element when absent', () => {
+    const word = {
+        mTitle: 'frente',
+        definitions: [
+            {
+                glosses: [
+                    { definition: 'Parte superior de la cara.', grammar: 'nombre femenino', gender: '', examples: [] }
+                ]
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('.etymology').length).toBe(0);
+});
+
+test('renders antonyms on definitions', () => {
+    const word = {
+        mTitle: 'frente',
+        definitions: [
+            {
+                synonyms: ['fachada'],
+                antonyms: ['trasera', 'espalda'],
+                glosses: [
+                    { definition: 'Fachada o parte primera.', grammar: 'nombre masculino o femenino', gender: '', examples: [] }
+                ]
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('.antonyms .antonym').length).toBe(2);
+    expect($('.antonyms .antonym').eq(0).text()).toBe('trasera');
+    expect($('.antonyms .antonym').eq(1).text()).toBe('espalda');
+});
+
+test('omits antonyms div when list is empty', () => {
+    const word = {
+        mTitle: 'frente',
+        definitions: [
+            {
+                synonyms: ['fachada'],
+                antonyms: [],
+                glosses: [
+                    { definition: 'Fachada o parte primera.', grammar: 'nombre masculino o femenino', gender: '', examples: [] }
+                ]
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('.antonyms').length).toBe(0);
+});
+
+test('renders domain on idioms', () => {
+    const word = {
+        mTitle: 'frente',
+        definitions: [],
+        idioms: [
+            {
+                idiom: 'frente de batalla',
+                domain: 'Milicia',
+                glosses: [
+                    { definition: 'Extensión que ocupa una porción de tropa.', grammar: 'locución nominal', gender: '', examples: [] }
+                ]
+            }
+        ]
+    };
+
+    renderWord(word);
+
+    expect($('.idiom-list li .domain').text()).toBe('Milicia');
+});
+
 test('renders register marker on definitions', () => {
     const word = {
         mTitle: 'morir',

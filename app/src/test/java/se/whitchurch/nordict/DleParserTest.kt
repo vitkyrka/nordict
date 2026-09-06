@@ -14,74 +14,226 @@ import java.io.File
 class DleParserTest {
 
     data class WordData(
-        val title: String,
-        val slug: String,
+        val mTitle: String,
+        val mSlug: String,
         val summary: String,
         val uri: String,
         val definitions: List<DefinitionData>,
         val idioms: List<IdiomData>,
-        val xrefs: List<String>
+        val xrefs: List<String>,
+        val conjugation: String = "",
+        val participle: String = "",
+        val etymology: String = ""
     )
 
     data class DefinitionData(
+        val glosses: List<GlossData>,
+        val domain: String = "",
+        val geo: String = "",
+        val plev: String = "",
+        val register: String = "",
+        val synonyms: List<String> = emptyList(),
+        val antonyms: List<String> = emptyList()
+    )
+
+    data class GlossData(
         val definition: String,
+        val headword: String,
+        val grammar: String,
+        val gender: String,
         val examples: List<String>
     )
 
     data class IdiomData(
         val idiom: String,
-        val definition: String,
-        val examples: List<String>
+        val glosses: List<GlossData>,
+        val domain: String = "",
+        val geo: String = "",
+        val plev: String = "",
+        val register: String = ""
     )
+
+    private fun Word.Gloss.toData(): GlossData {
+        return GlossData(
+            definition = definition,
+            headword = headword,
+            grammar = grammar,
+            gender = gender,
+            examples = examples
+        )
+    }
 
     private fun Word.toData(): WordData {
         return WordData(
-            title = mTitle,
-            slug = mSlug,
+            mTitle = mTitle,
+            mSlug = mSlug,
             summary = summary,
             uri = uri.toString(),
+            conjugation = conjugation,
+            participle = participle,
+            etymology = etymology,
             definitions = definitions.map { def ->
                 DefinitionData(
-                    definition = def.definition,
-                    examples = def.examples
+                    glosses = def.glosses.map { it.toData() },
+                    domain = def.domain,
+                    geo = def.geo,
+                    plev = def.plev,
+                    register = def.register,
+                    synonyms = def.synonyms,
+                    antonyms = def.antonyms
                 )
             },
             idioms = idioms.map { idiom ->
                 IdiomData(
                     idiom = idiom.idiom,
-                    definition = idiom.definition,
-                    examples = idiom.examples
+                    glosses = idiom.glosses.map { it.toData() },
+                    domain = idiom.domain,
+                    geo = idiom.geo,
+                    plev = idiom.plev,
+                    register = idiom.register
                 )
             },
             xrefs = xrefs
         )
     }
 
+    private fun writeAndAssert(words: List<Word>, jsonPath: String) {
+        val gson = GsonBuilder().setPrettyPrinting().create()
+        val wordsData = words.map { it.toData() }
+        File(jsonPath).writeText(gson.toJson(wordsData))
+
+        val expectedJson = File(jsonPath).readText()
+        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
+
+        assertThat(wordsData).isEqualTo(expectedData)
+    }
+
     @Test
-    fun testParseDle() {
-        val htmlFile = File("../testdata/dle.html")
+    fun testParseDleFrente() {
+        val htmlFile = File("../testdata/dle/frente.html")
         val page = htmlFile.readText()
         val uri = Uri.parse("https://dle.rae.es/frente")
-        val words = DleParser.parse(page, uri, "")
+        val words = DleParser.parse(page, uri, "DLE")
 
         assertThat(words).hasSize(1)
         val word = words[0]
 
-        // Assertions for idioms
-        val idiomCalzada = word.idioms.find { it.idiom.contains("frente calzada") }
-        assertThat(idiomCalzada).isNotNull()
-        assertThat(idiomCalzada?.definition).contains("frente que es poco espaciosa")
+        assertThat(word.mTitle).isEqualTo("frente")
+        assertThat(word.definitions).hasSize(14)
+        assertThat(word.idioms).hasSize(25)
+        assertThat(word.etymology).contains("Del antiguo fruente")
+
+        val def1 = word.definitions[0]
+        assertThat(def1.grammar).isEqualTo("nombre femenino")
+        assertThat(def1.gender).isEqualTo(Genders.FEMININE)
+        assertThat(def1.glosses[0].definition).contains("Parte superior de la cara")
+        assertThat(def1.synonyms).containsExactly("testa", "testuz")
+
+        val def2 = word.definitions[1]
+        assertThat(def2.glosses[0].examples).containsExactly("Frente serena.")
+
+        val def6 = word.definitions[5]
+        assertThat(def6.domain).isEqualTo("Meteorología")
+
+        val def8 = word.definitions[7]
+        assertThat(def8.antonyms).containsExactly("retaguardia")
+        assertThat(def8.glosses[0].examples).containsExactly("El escuadrón tenía diez hombres de frente.")
+
+        // First idiom
+        val idiom1 = word.idioms[0]
+        assertThat(idiom1.idiom).isEqualTo("frente calzada")
+        assertThat(idiom1.glosses[0].grammar).isEqualTo("nombre femenino")
+
+        val idiomBatalla = word.idioms.find { it.idiom.contains("frente de batalla") }
+        assertThat(idiomBatalla).isNotNull()
+        assertThat(idiomBatalla?.domain).isEqualTo("Milicia")
 
         val lastIdiom = word.idioms.last()
         assertThat(lastIdiom.idiom).isEqualTo("traerlo alguien escrito en la frente")
-        assertThat(lastIdiom.definition).contains("No acertar a disimular")
+        assertThat(lastIdiom.glosses[0].definition).contains("No acertar a disimular")
 
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        val wordsData = words.map { it.toData() }
+        writeAndAssert(words, "../testdata/dle/frente.json")
+    }
 
-        val expectedJson = File("../testdata/dle.json").readText()
-        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
+    @Test
+    fun testParseDleCagar() {
+        val htmlFile = File("../testdata/dle/cagar.html")
+        val page = htmlFile.readText()
+        val uri = Uri.parse("https://dle.rae.es/cagar")
+        val words = DleParser.parse(page, uri, "DLE")
 
-        assertThat(wordsData).isEqualTo(expectedData)
+        assertThat(words).hasSize(1)
+        val word = words[0]
+
+        assertThat(word.mTitle).isEqualTo("cagar")
+        assertThat(word.definitions).hasSize(3)
+        assertThat(word.idioms).hasSize(4)
+        assertThat(word.etymology).contains("cacāre")
+
+        val def1 = word.definitions[0]
+        assertThat(def1.grammar).isEqualTo("verbo intransitivo")
+        assertThat(def1.register).isEqualTo("malsonante")
+        assertThat(def1.glosses[0].definition).contains("Evacuar el vientre")
+        assertThat(def1.synonyms).containsExactly("defecar", "evacuar", "deponer", "excretar")
+
+        val def2 = word.definitions[1]
+        assertThat(def2.register).isEqualTo("malsonante coloquial")
+        assertThat(def2.grammar).isEqualTo("verbo transitivo")
+        assertThat(def2.synonyms).containsExactly("estropear", "arruinar")
+
+        val idiom1 = word.idioms[0]
+        assertThat(idiom1.idiom).isEqualTo("cagarla")
+
+        writeAndAssert(words, "../testdata/dle/cagar.json")
+    }
+
+    @Test
+    fun testParseDleMorir() {
+        val htmlFile = File("../testdata/dle/morir.html")
+        val page = htmlFile.readText()
+        val uri = Uri.parse("https://dle.rae.es/morir")
+        val words = DleParser.parse(page, uri, "DLE")
+
+        assertThat(words).hasSize(1)
+        val word = words[0]
+
+        assertThat(word.mTitle).isEqualTo("morir")
+        assertThat(word.definitions).hasSize(8)
+        assertThat(word.idioms).hasSize(3)
+        assertThat(word.conjugation).isEqualTo("dormir")
+        assertThat(word.participle).isEqualTo("muerto")
+        assertThat(word.etymology).contains("morī")
+
+        val def1 = word.definitions[0]
+        assertThat(def1.grammar).isEqualTo("verbo intransitivo")
+        assertThat(def1.glosses[0].definition).contains("Llegar al término de la vida")
+        assertThat(def1.synonyms).contains("fallecer")
+        assertThat(def1.synonyms).contains("apagarse")
+
+        writeAndAssert(words, "../testdata/dle/morir.json")
+    }
+
+    @Test
+    fun testParseDleOtro() {
+        val htmlFile = File("../testdata/dle/otro.html")
+        val page = htmlFile.readText()
+        val uri = Uri.parse("https://dle.rae.es/otro")
+        val words = DleParser.parse(page, uri, "DLE")
+
+        assertThat(words).hasSize(1)
+        val word = words[0]
+
+        assertThat(word.mTitle).isEqualTo("otro, tra")
+        assertThat(word.definitions).hasSize(7)
+        assertThat(word.idioms).hasSize(7)
+        assertThat(word.etymology).contains("alter")
+
+        val def1 = word.definitions[0]
+        assertThat(def1.grammar).isEqualTo("adjetivo")
+        assertThat(def1.glosses[0].definition).contains("Dicho de una persona o de una cosa")
+        assertThat(def1.synonyms).containsExactly("diferente", "distinto1")
+        assertThat(def1.antonyms).containsExactly("mismo")
+
+        writeAndAssert(words, "../testdata/dle/otro.json")
     }
 }

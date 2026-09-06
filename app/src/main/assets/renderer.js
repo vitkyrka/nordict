@@ -34,6 +34,7 @@ const template = (word) => `
                     ${word.participle ? `<span class="participle">part. <b>${word.participle}</b></span>` : ''}
                 </div>
             ` : ''}
+            ${word.etymology ? `<div class="etymology">${word.etymology}</div>` : ''}
         </header>
         ${word.definitions && word.definitions.length > 0 ? `
             <ol class="definitions">
@@ -49,6 +50,11 @@ const template = (word) => `
                                 <span class="synonyms-label">→ </span>${def.synonyms.map(s => `<span class="synonym">${s}</span>`).join(', ')}
                             </div>
                         ` : ''}
+                        ${def.antonyms && def.antonyms.length > 0 ? `
+                            <div class="antonyms">
+                                <span class="antonyms-label">↛ </span>${def.antonyms.map(a => `<span class="antonym">${a}</span>`).join(', ')}
+                            </div>
+                        ` : ''}
                     </li>
                 `).join('')}
             </ol>
@@ -61,6 +67,7 @@ const template = (word) => `
                         <li>
                             <b class="idiom-name">${idiom.idiom}</b>:
                             ${idiom.register ? `<span class="register">${idiom.register}</span> ` : ''}
+                            ${idiom.domain ? `<span class="domain">${idiom.domain}</span> ` : ''}
                             ${idiom.geo ? `<span class="geo">${idiom.geo}</span> ` : ''}
                             ${idiom.plev ? `<span class="plev">${idiom.plev}</span> ` : ''}
                             ${renderGlosses(idiom.glosses)}
