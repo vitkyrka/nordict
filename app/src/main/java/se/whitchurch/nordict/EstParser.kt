@@ -78,6 +78,7 @@ class EstParser {
                     val acep = parseAcep(meaning)
                     definition.domain = meaning.selectFirst(".domain")?.attr("title") ?: ""
                     fillTarget(definition, acep)
+                    applyHeadwords(definition.glosses, word)
 
                     meaning.select(".refS a.synon").forEach { synEl ->
                         definition.synonyms.add(synEl.text())
@@ -90,10 +91,11 @@ class EstParser {
                 lemma.select(".locs .fc").forEach { fc ->
                     val idiomName = fc.selectFirst(".headword-fc")?.text() ?: ""
                     fc.select(".acep").forEach { meaning ->
-                        val primaryDef = meaning.selectFirst(".def")?.text() ?: meaning.text()
-                        val idiom = Word.Idiom(idiomName, primaryDef)
-                        fillTarget(idiom, parseAcep(meaning))
-                        headword.idioms.add(idiom)
+                    val primaryDef = meaning.selectFirst(".def")?.text() ?: meaning.text()
+                    val idiom = Word.Idiom(idiomName, primaryDef)
+                    fillTarget(idiom, parseAcep(meaning))
+                    applyHeadwords(idiom.glosses, word)
+                    headword.idioms.add(idiom)
                     }
                 }
 
@@ -178,11 +180,29 @@ class EstParser {
             return Acep(glosses, geo, plev, register)
         }
 
+        // For pronominal-verb glosses, set the gloss's dictionary headword to
+        // the pronominal form of the verb (e.g. "cagar" -> "cagarse"). The
+        // headword is left empty when the infinitive already ends in "se".
+        private fun applyHeadwords(glosses: ArrayList<Word.Gloss>, headword: String) {
+            for (gloss in glosses) {
+                if (gloss.grammar.contains("pronominal") && !headword.endsWith("se")) {
+                    gloss.headword = "$headword" + "se"
+                }
+            }
+        }
+
         // A .defP markable carries a grammatical qualifier in one of its
         // (expanded) <abbr> titles, e.g. <abbr title="nombre masculino">m.</abbr>
         // in "Tb. m.". Distinguish those from discourse markers like
         // "También"/"Frecuentemente"/"especialmente".
         private fun defPGrammar(defP: Element): String {
+            // Only extract grammar from defPs whose first child is an element
+            // (e.g. "Tb. nombre masculino").  Usage notes like "Se usa
+            // precedido de artículo" have leading text nodes and should not
+            // contribute grammar — the <abbr> there refers to a different
+            // word, not a label for this gloss.
+            if (defP.childNode(0) !is Element) return ""
+
             for (el in defP.select("abbr")) {
                 val title = el.attr("title")
                 if (title.isNotEmpty() && title in GRAMMAR_TITLES) {

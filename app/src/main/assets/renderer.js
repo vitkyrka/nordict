@@ -12,6 +12,7 @@ const genderClass = (gender) =>
 
 const renderGlosses = (glosses) => (glosses || []).map(gloss => `
     <div class="gloss ${genderClass(gloss.gender)}">
+        ${gloss.headword ? `<span class="headword">${gloss.headword}</span> ` : ''}
         ${gloss.grammar ? `<span class="grammar">${gloss.grammar}</span> ` : ''}
         <span class="definition">${gloss.definition}</span>
         ${gloss.examples && gloss.examples.length > 0 ? `

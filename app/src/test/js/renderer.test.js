@@ -345,6 +345,30 @@ test('renders each gloss with its grammar and own examples', () => {
     expect(glosses.eq(1).find('.examples li').text()).toBe('Se ha muerto de un ataque al corazón.');
 });
 
+test('renders headword on a pronominal gloss', () => {
+    const word = {
+        mTitle: 'cagar',
+        definitions: [
+            {
+                glosses: [
+                    { definition: 'Evacuar el vientre.', grammar: 'verbo intransitivo', gender: '', examples: [] },
+                    { definition: 'Acobardarse o sentir miedo.', headword: 'cagarse', grammar: 'verbo intransitivo pronominal', gender: '', examples: [] }
+                ]
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    const glosses = $('.definitions li .gloss');
+    expect(glosses.length).toBe(2);
+
+    expect(glosses.eq(0).find('.headword').length).toBe(0);
+    expect(glosses.eq(1).find('.headword').text()).toBe('cagarse');
+    expect(glosses.eq(1).find('.definition').text()).toBe('Acobardarse o sentir miedo.');
+});
+
 test('renders idiom defP glosses with grammar and example attribution', () => {
     const word = {
         mTitle: 'morir',

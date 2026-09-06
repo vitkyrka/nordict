@@ -29,6 +29,7 @@ class Word(
     // (e.g. "También prnl."), each owning its own grammar/gender/examples.
     class Gloss {
         var definition: String = ""
+        var headword: String = ""
         var grammar: String = ""
         var gender: String = ""
         val examples: ArrayList<String> = ArrayList()

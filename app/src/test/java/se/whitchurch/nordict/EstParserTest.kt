@@ -36,6 +36,7 @@ class EstParserTest {
 
     data class GlossData(
         val definition: String,
+        val headword: String,
         val grammar: String,
         val gender: String,
         val examples: List<String>
@@ -52,6 +53,7 @@ class EstParserTest {
     private fun Word.Gloss.toData(): GlossData {
         return GlossData(
             definition = definition,
+            headword = headword,
             grammar = grammar,
             gender = gender,
             examples = examples
@@ -137,6 +139,12 @@ class EstParserTest {
         assertThat(word.definitions[0].grammar).isEqualTo("verbo intransitivo")
         assertThat(word.idioms[0].grammar).isEqualTo("locución verbal")
 
+        // Defs 3 and 4 are pronominal; their glosses carry "cagarse" as headword
+        assertThat(word.definitions[0].glosses[0].headword).isEqualTo("")
+        assertThat(word.definitions[1].glosses[0].headword).isEqualTo("")
+        assertThat(word.definitions[2].glosses[0].headword).isEqualTo("cagarse")
+        assertThat(word.definitions[3].glosses[0].headword).isEqualTo("cagarse")
+
         val gson = GsonBuilder().setPrettyPrinting().create()
         val wordsData = words.map { it.toData() }
         File("../testdata/est/cagar.json").writeText(gson.toJson(wordsData))
@@ -173,6 +181,10 @@ class EstParserTest {
         assertThat(def1.glosses[1].definition).isEqualTo("También prnl.")
         assertThat(def1.glosses[1].examples).containsExactly("Se ha muerto de un ataque al corazón.")
         assertThat(def1.synonyms).containsExactly("expirar")
+        // Def 1 is non-pronominal on its primary gloss; the "También prnl."
+        // secondary gloss grammar is empty, so neither gets a headword.
+        assertThat(def1.glosses[0].headword).isEqualTo("")
+        assertThat(def1.glosses[1].headword).isEqualTo("")
 
         // Definition 2: Llegar algo a su fin. — secundary gloss "También prnl."
         val def2 = word.definitions[1]
@@ -187,6 +199,7 @@ class EstParserTest {
         // Definition 3: Sentir intensamente algo. (coloquial)
         assertThat(word.definitions[2].glosses).hasSize(1)
         assertThat(word.definitions[2].glosses[0].grammar).isEqualTo("verbo intransitivo pronominal")
+        assertThat(word.definitions[2].glosses[0].headword).isEqualTo("morirse")
         assertThat(word.definitions[2].register).isEqualTo("coloquial")
         assertThat(word.definitions[2].glosses[0].definition).isEqualTo("Sentir intensamente algo.")
         assertThat(word.definitions[2].glosses[0].examples).containsExactly(
@@ -243,6 +256,56 @@ class EstParserTest {
         File("../testdata/est/morir.json").writeText(gson.toJson(wordsData))
 
         val expectedJson = File("../testdata/est/morir.json").readText()
+        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
+
+        assertThat(wordsData).isEqualTo(expectedData)
+    }
+
+    @Test
+    fun testParseEstOtro() {
+        val htmlFile = File("../testdata/est/otro.html")
+        val page = htmlFile.readText()
+        val uri = Uri.parse("https://www.rae.es/diccionario-estudiante/otro")
+        val words = EstParser.parse(page, uri, "EST")
+
+        assertThat(words).hasSize(1)
+        val word = words[0]
+
+        assertThat(word.mTitle).isEqualTo("otro, tra")
+        assertThat(word.definitions).hasSize(6)
+        assertThat(word.idioms).hasSize(2)
+
+        // Def 1: Distinto de la persona o cosa mencionadas...
+        val def1 = word.definitions[0]
+        assertThat(def1.glosses).hasSize(3)
+        assertThat(def1.glosses[0].grammar).isEqualTo("adjetivo")
+        assertThat(def1.glosses[0].definition).isEqualTo("Distinto de la persona o cosa mencionadas o que puede identificar el oyente.")
+        // Second gloss is a usage note, not grammar
+        assertThat(def1.glosses[1].definition).contains("Se usa antepuesto al nombre")
+        assertThat(def1.glosses[1].grammar).isEqualTo("")
+        // Third gloss "Tb. sustantivado" — no grammar
+        assertThat(def1.glosses[2].definition).isEqualTo("También sustantivado.")
+        assertThat(def1.glosses[2].grammar).isEqualTo("")
+
+        // Def 3: Siguiente — second gloss is a usage note, not "artículo"
+        val def3 = word.definitions[2]
+        assertThat(def3.glosses[0].grammar).isEqualTo("adjetivo")
+        assertThat(def3.glosses[0].definition).isEqualTo("Siguiente.")
+        assertThat(def3.glosses).hasSize(2)
+        assertThat(def3.glosses[1].definition).isEqualTo("Se usa precedido de artículo")
+        assertThat(def3.glosses[1].grammar).isEqualTo("")
+
+        // Def 4: Seguido de un nombre que expresa tiempo — usage note, not "artículo"
+        val def4 = word.definitions[3]
+        assertThat(def4.glosses).hasSize(2)
+        assertThat(def4.glosses[1].definition).contains("Se usa precedido de artículo")
+        assertThat(def4.glosses[1].grammar).isEqualTo("")
+
+        val gson = GsonBuilder().setPrettyPrinting().create()
+        val wordsData = words.map { it.toData() }
+        File("../testdata/est/otro.json").writeText(gson.toJson(wordsData))
+
+        val expectedJson = File("../testdata/est/otro.json").readText()
         val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
 
         assertThat(wordsData).isEqualTo(expectedData)

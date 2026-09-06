@@ -51,6 +51,10 @@ span.grammar {
     font-style: italic;
 }
 
+span.headword {
+    font-weight: bold;
+}
+
 span.register {
     color: var(--muted-color);
     font-style: italic;
