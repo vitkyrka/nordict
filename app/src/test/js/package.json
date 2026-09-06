@@ -1,0 +1,13 @@
+{
+  "name": "nordict-js-tests",
+  "version": "1.0.0",
+  "description": "JS rendering tests",
+  "scripts": {
+    "test": "jest"
+  },
+  "devDependencies": {
+    "jest": "^29.0.0",
+    "jest-environment-jsdom": "^29.0.0",
+    "jquery": "^3.6.0"
+  }
+}
