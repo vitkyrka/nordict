@@ -11,9 +11,9 @@ const genderClass = (gender) =>
     gender === GENDERS.MASCULINE ? 'masculine' : '';
 
 const renderGlosses = (glosses) => (glosses || []).map(gloss => `
-    <div class="gloss ${genderClass(gloss.gender)}">
+    <div class="gloss">
         ${gloss.headword ? `<span class="headword">${gloss.headword}</span> ` : ''}
-        ${gloss.grammar ? `<span class="grammar">${gloss.grammar}</span> ` : ''}
+        ${gloss.grammar ? `<span class="grammar ${genderClass(gloss.gender)}">${gloss.grammar}</span> ` : ''}
         <span class="definition">${gloss.definition}</span>
         ${gloss.examples && gloss.examples.length > 0 ? `
             <ul class="examples">

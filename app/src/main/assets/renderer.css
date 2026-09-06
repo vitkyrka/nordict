@@ -80,11 +80,11 @@ span.plev {
     font-style: italic;
 }
 
-div.gloss.feminine {
+span.grammar.feminine {
     background: var(--feminine-bg);
 }
 
-div.gloss.masculine {
+span.grammar.masculine {
     background: var(--masculine-bg);
 }
 
