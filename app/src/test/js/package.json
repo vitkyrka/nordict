@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "JS rendering tests",
   "scripts": {
-    "test": "jest"
+    "test": "jest",
+    "render": "node cli.js"
   },
   "devDependencies": {
     "jest": "^29.0.0",

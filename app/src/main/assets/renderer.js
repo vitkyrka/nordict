@@ -1,57 +1,44 @@
+const template = (word) => `
+    <article>
+        <header><h1>${word.mTitle}</h1></header>
+        ${word.definitions && word.definitions.length > 0 ? `
+            <ol class="definitions">
+                ${word.definitions.map(def => `
+                    <li>
+                        ${def.grammar ? `<span class="grammar">${def.grammar}</span> ` : ''}
+                        <span class="definition">${def.definition}</span>
+                        ${def.examples && def.examples.length > 0 ? `
+                            <ul class="examples">
+                                ${def.examples.map(ex => `<li>${ex}</li>`).join('')}
+                            </ul>
+                        ` : ''}
+                    </li>
+                `).join('')}
+            </ol>
+        ` : ''}
+        ${word.idioms && word.idioms.length > 0 ? `
+            <section class="idioms">
+                <h3>Locuciones</h3>
+                <ul class="idiom-list">
+                    ${word.idioms.map(idiom => `
+                        <li>
+                            <b class="idiom-name">${idiom.idiom}</b>:
+                            <span class="idiom-definition">${idiom.definition}</span>
+                            ${idiom.examples && idiom.examples.length > 0 ? `
+                                <ul class="examples">
+                                    ${idiom.examples.map(ex => `<li>${ex}</li>`).join('')}
+                                </ul>
+                            ` : ''}
+                        </li>
+                    `).join('')}
+                </ul>
+            </section>
+        ` : ''}
+    </article>
+`;
+
 function renderWord(word) {
-    const $content = $('#content');
-    $content.empty();
-
-    const $article = $('<article>');
-    const $header = $('<header>');
-    $header.append($('<h1>').text(word.mTitle));
-    $article.append($header);
-
-    if (word.definitions && word.definitions.length > 0) {
-        const $defList = $('<ol class="definitions">');
-        word.definitions.forEach(def => {
-            const $li = $('<li>');
-            if (def.grammar) {
-                $li.append($('<span class="grammar">').text(def.grammar + ' '));
-            }
-            $li.append($('<span class="definition">').text(def.definition));
-
-            if (def.examples && def.examples.length > 0) {
-                const $exList = $('<ul class="examples">');
-                def.examples.forEach(ex => {
-                    $exList.append($('<li>').text(ex));
-                });
-                $li.append($exList);
-            }
-            $defList.append($li);
-        });
-        $article.append($defList);
-    }
-
-    if (word.idioms && word.idioms.length > 0) {
-        const $idiomSection = $('<section class="idioms">');
-        $idiomSection.append($('<h3>').text('Locuciones'));
-        const $idiomList = $('<ul class="idiom-list">');
-        word.idioms.forEach(idiom => {
-            const $li = $('<li>');
-            $li.append($('<b class="idiom-name">').text(idiom.idiom));
-            $li.append(': ');
-            $li.append($('<span class="idiom-definition">').text(idiom.definition));
-
-            if (idiom.examples && idiom.examples.length > 0) {
-                const $exList = $('<ul class="examples">');
-                idiom.examples.forEach(ex => {
-                    $exList.append($('<li>').text(ex));
-                });
-                $li.append($exList);
-            }
-            $idiomList.append($li);
-        });
-        $idiomSection.append($idiomList);
-        $article.append($idiomSection);
-    }
-
-    $content.append($article);
+    $('#content').html(template(word));
 }
 
 // For Node.js testing

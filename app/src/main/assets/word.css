@@ -216,3 +216,20 @@ div.feminine {
 header.f {
     color: #000;
 }
+
+span.grammar {
+    color: #a52a2a;
+    font-weight: bold;
+    font-style: italic;
+}
+
+ul.examples {
+    list-style-type: none;
+    padding-left: 1em;
+    color: #555;
+}
+
+ul.examples li:before {
+    content: "• ";
+    padding-right: 0.5em;
+}

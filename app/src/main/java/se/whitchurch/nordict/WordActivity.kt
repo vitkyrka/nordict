@@ -272,36 +272,16 @@ class WordActivity : AppCompatActivity() {
         if (word.renderAsJson) {
             val gson = Gson()
             val json = gson.toJson(word)
-            val html = """
-                <!DOCTYPE html>
-                <html>
-                <head>
-                    <meta charset="UTF-8">
-                    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                    <link rel='stylesheet' type='text/css' href='file:///android_asset/word.css'>
-                    <script src='file:///android_asset/jquery.min.js'></script>
-                    <script src='file:///android_asset/renderer.js'></script>
-                    <script src='file:///android_asset/word.js'></script>
-                    <script>
-                        const wordData = $json;
-                        $(document).ready(() => {
-                            renderWord(wordData);
-                            // word.js logic for divs might not be enough if we use other tags
-                            // so let's explicitly run it on the content
-                            if (typeof createLinks === 'function') {
-                                createLinks(document.getElementById('content'));
-                            }
-                        });
-                    </script>
-                </head>
-                <body>
-                    <div id="content"></div>
+            val template = assets.open("word_template.html").bufferedReader().use { it.readText() }
+            val html = template.replace("</body>", """
+                <script>
+                    loadWord($json);
+                </script>
                 </body>
-                </html>
-            """.trimIndent()
+            """.trimIndent())
 
             mWebView!!.loadDataWithBaseURL(
-                word.baseUrl, html,
+                "file:///android_asset/", html,
                 "text/html", "UTF-8", null
             )
             return

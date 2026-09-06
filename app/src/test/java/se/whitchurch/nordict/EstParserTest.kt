@@ -14,8 +14,8 @@ import java.io.File
 class EstParserTest {
 
     data class WordData(
-        val title: String,
-        val slug: String,
+        val mTitle: String,
+        val mSlug: String,
         val summary: String,
         val uri: String,
         val definitions: List<DefinitionData>,
@@ -37,8 +37,8 @@ class EstParserTest {
 
     private fun Word.toData(): WordData {
         return WordData(
-            title = mTitle,
-            slug = mSlug,
+            mTitle = mTitle,
+            mSlug = mSlug,
             summary = summary,
             uri = uri.toString(),
             definitions = definitions.map { def ->
@@ -75,6 +75,7 @@ class EstParserTest {
 
         val gson = GsonBuilder().setPrettyPrinting().create()
         val wordsData = words.map { it.toData() }
+        File("../testdata/est.json").writeText(gson.toJson(wordsData))
 
         val expectedJson = File("../testdata/est.json").readText()
         val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
