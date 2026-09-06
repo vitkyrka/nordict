@@ -2,6 +2,7 @@ package se.whitchurch.nordict
 
 import android.net.Uri
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 
 class EstParser {
     companion object {
@@ -72,25 +73,12 @@ class EstParser {
                     // Skip idioms-section acep elements (they live inside .locs)
                     if (meaning.parents().any { it.hasClass("locs") }) return@forEach
 
-                    val defText = meaning.selectFirst(".def")?.text() ?: meaning.text()
-                    val definition = Word.Definition(defText, meaning.clone())
-                    val gramEl = meaning.selectFirst(".gram")
-                    definition.grammar = gramEl?.text() ?: ""
-                    definition.gender = genderOf(gramEl?.attr("title"))
-                    val domainEl = meaning.selectFirst(".domain")
-                    definition.domain = domainEl?.attr("title") ?: ""
-                    val geoEl = meaning.selectFirst(".geo")
-                    definition.geo = geoEl?.attr("title") ?: ""
-                    val plevEl = meaning.selectFirst(".plev")
-                    definition.plev = plevEl?.attr("title") ?: ""
-                    val registerEl = meaning.selectFirst(".register")
-                    definition.register = registerEl?.attr("title") ?: ""
-                    val noteEl = meaning.selectFirst(".defP")
-                    definition.note = noteEl?.text() ?: ""
+                    val primaryDef = meaning.selectFirst(".def")?.text() ?: meaning.text()
+                    val definition = Word.Definition(primaryDef, meaning.clone())
+                    val acep = parseAcep(meaning)
+                    definition.domain = meaning.selectFirst(".domain")?.attr("title") ?: ""
+                    fillTarget(definition, acep)
 
-                    meaning.select(".ejemplo").forEach { example ->
-                        definition.examples.add(example.text())
-                    }
                     meaning.select(".refS a.synon").forEach { synEl ->
                         definition.synonyms.add(synEl.text())
                     }
@@ -102,22 +90,9 @@ class EstParser {
                 lemma.select(".locs .fc").forEach { fc ->
                     val idiomName = fc.selectFirst(".headword-fc")?.text() ?: ""
                     fc.select(".acep").forEach { meaning ->
-                        val defText = meaning.selectFirst(".def")?.text() ?: meaning.text()
-                        val idiom = Word.Idiom(idiomName, defText)
-                        val gramEl = meaning.selectFirst(".gram")
-                        idiom.grammar = gramEl?.text() ?: ""
-                        idiom.gender = genderOf(gramEl?.attr("title"))
-                        val geoEl = meaning.selectFirst(".geo")
-                        idiom.geo = geoEl?.attr("title") ?: ""
-                        val plevEl = meaning.selectFirst(".plev")
-                        idiom.plev = plevEl?.attr("title") ?: ""
-                        val registerEl = meaning.selectFirst(".register")
-                        idiom.register = registerEl?.attr("title") ?: ""
-                        val noteEl = meaning.selectFirst(".defP")
-                        idiom.note = noteEl?.text() ?: ""
-                        meaning.select(".ejemplo").forEach { example ->
-                            idiom.examples.add(example.text())
-                        }
+                        val primaryDef = meaning.selectFirst(".def")?.text() ?: meaning.text()
+                        val idiom = Word.Idiom(idiomName, primaryDef)
+                        fillTarget(idiom, parseAcep(meaning))
                         headword.idioms.add(idiom)
                     }
                 }
@@ -136,6 +111,100 @@ class EstParser {
 
             return words
         }
+
+        private fun fillTarget(definition: Word.Definition, acep: Acep) {
+            definition.glosses.addAll(acep.glosses)
+            definition.geo = acep.geo
+            definition.plev = acep.plev
+            definition.register = acep.register
+            val primary = acep.glosses.firstOrNull()
+            if (primary != null) {
+                definition.examples.addAll(primary.examples)
+                definition.grammar = primary.grammar
+                definition.gender = primary.gender
+            }
+        }
+
+        private fun fillTarget(idiom: Word.Idiom, acep: Acep) {
+            idiom.glosses.addAll(acep.glosses)
+            idiom.geo = acep.geo
+            idiom.plev = acep.plev
+            idiom.register = acep.register
+            val primary = acep.glosses.firstOrNull()
+            if (primary != null) {
+                idiom.examples.addAll(primary.examples)
+                idiom.grammar = primary.grammar
+                idiom.gender = primary.gender
+            }
+        }
+
+        // Split the acep children into glosses at .def /.defP boundaries.
+        // The primary .def (with the acep-level .gram) starts gloss 1; each
+        // .defP starts a following gloss; examples belong to the most recent
+        // gloss. Acep-level markers (geo/plev/register) are child attributes.
+        private data class Acep(
+            val glosses: ArrayList<Word.Gloss>,
+            val geo: String,
+            val plev: String,
+            val register: String
+        )
+
+        private fun parseAcep(meaning: Element): Acep {
+            val glosses = ArrayList<Word.Gloss>()
+            val gramEl = meaning.selectFirst(".gram")
+            var gloss: Word.Gloss? = null
+            for (child in meaning.children()) {
+                when {
+                    child.hasClass("def") -> {
+                        gloss = Word.Gloss()
+                        gloss.definition = child.text()
+                        gloss.grammar = gramEl?.text() ?: ""
+                        gloss.gender = genderOf(gramEl?.attr("title"))
+                        glosses.add(gloss)
+                    }
+                    child.hasClass("defP") -> {
+                        gloss = Word.Gloss()
+                        gloss.definition = child.text()
+                        gloss.grammar = defPGrammar(child)
+                        gloss.gender = genderOf(gloss.grammar)
+                        glosses.add(gloss)
+                    }
+                    child.hasClass("ejemplo") -> gloss?.examples?.add(child.text())
+                }
+            }
+            val geo = meaning.selectFirst(".geo")?.attr("title") ?: ""
+            val plev = meaning.selectFirst(".plev")?.attr("title") ?: ""
+            val register = meaning.selectFirst(".register")?.attr("title") ?: ""
+            return Acep(glosses, geo, plev, register)
+        }
+
+        // A .defP markable carries a grammatical qualifier in one of its
+        // (expanded) <abbr> titles, e.g. <abbr title="nombre masculino">m.</abbr>
+        // in "Tb. m.". Distinguish those from discourse markers like
+        // "También"/"Frecuentemente"/"especialmente".
+        private fun defPGrammar(defP: Element): String {
+            for (el in defP.select("abbr")) {
+                val title = el.attr("title")
+                if (title.isNotEmpty() && title in GRAMMAR_TITLES) {
+                    return title
+                }
+            }
+            return ""
+        }
+
+        private val GRAMMAR_TITLES = setOf(
+            Genders.GRAMMAR_MASCULINE, Genders.GRAMMAR_MASCULINE_PLURAL,
+            Genders.GRAMMAR_FEMININE, Genders.GRAMMAR_FEMININE_PLURAL,
+            "adjetivo", "adjetivo invariable", "adverbio", "artículo",
+            "conjunción", "expresión", "interjección", "numeral", "participio",
+            "preposición", "pronombre", "pronombre átono", "pronombre personal",
+            "verbo intransitivo", "verbo intransitivo pronominal", "verbo transitivo",
+            "verbo transitivo pronominal", "verbo pronominal", "verbo impersonal",
+            "verbo copulativo", "verbo auxiliar",
+            "locución", "locución adjetiva", "locución adverbial", "locución conjuntiva",
+            "locución interjectiva", "locución nominal", "locución preposicional",
+            "locución prepositiva", "locución pronominal", "locución verbal"
+        )
 
         private fun genderOf(gramTitle: String?): String {
             return when (gramTitle) {

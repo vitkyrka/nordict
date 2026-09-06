@@ -45,8 +45,16 @@ span.plev {
     font-style: italic;
 }
 
-span.note {
-    color: #555;
+div.gloss.feminine {
+    background: #fee;
+}
+
+div.gloss.masculine {
+    background: #eef;
+}
+
+div.gloss .examples {
+    margin: 0;
 }
 
 ul.examples {
@@ -58,16 +66,6 @@ ul.examples {
 ul.examples li:before {
     content: "\2022 ";
     padding-right: 0.5em;
-}
-
-ol.definitions li.feminine,
-ul.idiom-list li.feminine {
-    background: #fee;
-}
-
-ol.definitions li.masculine,
-ul.idiom-list li.masculine {
-    background: #eef;
 }
 
 /* Morphology line (conjugation / participle) */

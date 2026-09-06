@@ -24,25 +24,40 @@ class Word(
     val audio: ArrayList<String> = ArrayList()
     val images: ArrayList<String> = ArrayList()
 
-    class Idiom(val idiom: String, val definition: String) {
-        val examples: ArrayList<String> = ArrayList()
+    // One numbered gloss (definition or idiom acep). Most aceps carry
+    // a single gloss; secondary glosses come from RAE `.defP` markers
+    // (e.g. "También prnl."), each owning its own grammar/gender/examples.
+    class Gloss {
+        var definition: String = ""
         var grammar: String = ""
-        var geo: String = ""
         var gender: String = ""
-        var plev: String = ""
-        var register: String = ""
-        var note: String = ""
+        val examples: ArrayList<String> = ArrayList()
     }
 
-    class Definition(val definition: String, @Transient val element: Element, val title: String? = null) {
-        val examples: ArrayList<String> = ArrayList()
-        var grammar: String = ""
-        var domain: String = ""
+    class Idiom(val idiom: String, @Transient val definition: String) {
+        val glosses: ArrayList<Gloss> = ArrayList()
+
+        // Flattened view of the primary gloss, kept for legacy in-memory
+        // consumers (CardActivity, non-JSON dictionaries). Excluded from
+        // the Word JSON; the renderer reads `glosses`.
+        @Transient val examples: ArrayList<String> = ArrayList()
+        @Transient var grammar: String = ""
+        @Transient var gender: String = ""
         var geo: String = ""
-        var gender: String = ""
         var plev: String = ""
         var register: String = ""
-        var note: String = ""
+    }
+
+    class Definition(@Transient val definition: String, @Transient val element: Element, val title: String? = null) {
+        val glosses: ArrayList<Gloss> = ArrayList()
+
+        @Transient val examples: ArrayList<String> = ArrayList()
+        @Transient var grammar: String = ""
+        @Transient var gender: String = ""
+        var domain: String = ""
+        var geo: String = ""
+        var plev: String = ""
+        var register: String = ""
         val synonyms: ArrayList<String> = ArrayList()
     }
 
