@@ -223,6 +223,13 @@ span.grammar {
     font-style: italic;
 }
 
+span.domain {
+    color: #0066cc;
+    font-weight: bold;
+    font-style: italic;
+    text-transform: capitalize;
+}
+
 ul.examples {
     list-style-type: none;
     padding-left: 1em;

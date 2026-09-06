@@ -59,6 +59,8 @@ class EstParser {
                     val defText = meaning.selectFirst(".def")?.text() ?: meaning.text()
                     val definition = Word.Definition(defText, meaning.clone())
                     definition.grammar = meaning.selectFirst(".gram")?.text() ?: ""
+                    val domainEl = meaning.selectFirst(".domain")
+                    definition.domain = domainEl?.attr("title") ?: ""
 
                     meaning.select(".ejemplo").forEach { example ->
                         definition.examples.add(example.text())

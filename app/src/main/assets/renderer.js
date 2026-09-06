@@ -6,6 +6,7 @@ const template = (word) => `
                 ${word.definitions.map(def => `
                     <li>
                         ${def.grammar ? `<span class="grammar">${def.grammar}</span> ` : ''}
+                        ${def.domain ? `<span class="domain">${def.domain}</span> ` : ''}
                         <span class="definition">${def.definition}</span>
                         ${def.examples && def.examples.length > 0 ? `
                             <ul class="examples">

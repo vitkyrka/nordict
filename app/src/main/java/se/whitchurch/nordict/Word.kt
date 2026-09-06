@@ -29,6 +29,7 @@ class Word(
     class Definition(val definition: String, @Transient val element: Element, val title: String? = null) {
         val examples: ArrayList<String> = ArrayList()
         var grammar: String = ""
+        var domain: String = ""
     }
 
     fun getPage(chosenDefs: List<Definition>? = null, css: String? = null): String {

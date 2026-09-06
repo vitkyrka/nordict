@@ -26,7 +26,8 @@ class EstParserTest {
     data class DefinitionData(
         val definition: String,
         val examples: List<String>,
-        val grammar: String
+        val grammar: String,
+        val domain: String
     )
 
     data class IdiomData(
@@ -45,7 +46,8 @@ class EstParserTest {
                 DefinitionData(
                     definition = def.definition,
                     examples = def.examples,
-                    grammar = def.grammar
+                    grammar = def.grammar,
+                    domain = def.domain
                 )
             },
             idioms = idioms.map { idiom ->
