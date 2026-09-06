@@ -1,0 +1,59 @@
+/* Styles for dictionaries rendered from JSON by renderer.js
+ * (e.g. EST). The template (word_template.html) loads this stylesheet.
+ * Legacy dictionaries that render original source HTML use word.css
+ * instead; keep the two files independent. */
+
+span.grammar {
+    color: #a52a2a;
+    font-weight: bold;
+    font-style: italic;
+}
+
+span.domain {
+    color: #0066cc;
+    font-weight: bold;
+    font-style: italic;
+    text-transform: capitalize;
+}
+
+span.geo {
+    color: #2e8b57;
+    font-weight: bold;
+    font-style: italic;
+    text-transform: capitalize;
+}
+
+ul.examples {
+    list-style-type: none;
+    padding-left: 1em;
+    color: #555;
+}
+
+ul.examples li:before {
+    content: "• ";
+    padding-right: 0.5em;
+}
+
+ol.definitions li.feminine,
+ul.idiom-list li.feminine {
+    background: #fee;
+}
+
+ol.definitions li.masculine,
+ul.idiom-list li.masculine {
+    background: #eef;
+}
+
+/* Compact layout for small screens */
+
+@media (max-width: 480px) {
+    #content header h1 {
+        margin-top: 0.3em;
+    }
+
+    ol.definitions,
+    ul.idiom-list {
+        padding-left: 0;
+        list-style-position: inside;
+    }
+}
