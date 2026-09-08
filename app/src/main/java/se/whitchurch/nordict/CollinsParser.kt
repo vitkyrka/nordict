@@ -33,25 +33,54 @@ class CollinsParser {
             val mainLabel = if (dictCode == "french-english") MAIN_LABEL_FR else MAIN_LABEL_ES
             val easyLabel = if (dictCode == "french-english") EASY_LABEL_FR else EASY_LABEL_ES
 
-            // Materialize headword metadata first so __ref URIs can be assigned
-            // after the default (main-first) ordering is known.
-            data class Head(val title: String, val isMain: Boolean, val label: String, val ref: String, val block: Element)
+            // A single renderable unit: one headword. The main (benedict)
+            // dictionary may carry several homographs (POS groups) under one
+            // `div.cB`; each such hom becomes its own headword, just as the
+            // easy-learning dictionary spreads its headwords across separate
+            // `div.cB` blocks. `content` is the element whose `div.hom`
+            // children (and any roaming idioms/phrases) get parsed.
+            data class Head(
+                val title: String,
+                val isMain: Boolean,
+                val label: String,
+                val ref: String,
+                val block: Element,
+                val content: Element,
+                val singleHom: Element? = null
+            )
 
             var ref = 0
             val heads = ArrayList<Head>()
             doc.select("div.cB.cB-def").forEach { block ->
-                ref += 1
+                val isMain = block.hasClass("benedict")
+                val isEasy = block.hasClass("easy")
+                if (!isMain && !isEasy) return@forEach
 
                 val title = block.selectFirst("h2.h2_entry .orth")?.text()?.trim()
                     ?: return@forEach
-                val isMain = block.hasClass("benedict")
-                if (!isMain && !block.hasClass("easy")) return@forEach
-                if (block.selectFirst("div.content.definitions") == null) return@forEach
+                val content = block.selectFirst("div.content.definitions")
+                    ?: return@forEach
+                val label = if (isMain) mainLabel else easyLabel
 
-                heads.add(Head(title, isMain, if (isMain) mainLabel else easyLabel, ref.toString(), block))
+                if (isMain) {
+                    // Each POS-group hom is a distinct headword.
+                    val homs = content.children().filter { it.tagName() == "div" && it.hasClass("hom") }
+                    if (homs.isEmpty()) {
+                        ref += 1
+                        heads.add(Head(title, true, label, ref.toString(), block, content))
+                    } else {
+                        for (hom in homs) {
+                            ref += 1
+                            heads.add(Head(title, true, label, ref.toString(), block, content, hom))
+                        }
+                    }
+                } else {
+                    ref += 1
+                    heads.add(Head(title, false, label, ref.toString(), block, content))
+                }
             }
 
-            // Default (no-__ref) view shows the main dictionary headword first;
+            // Default (no-__ref) view shows the main dictionary headwords first;
             // easy-learning headwords follow. Order within each group is the
             // document order.
             heads.sortBy { if (it.isMain) 0 else 1 }
@@ -78,7 +107,11 @@ class CollinsParser {
                     headword.audio.add(audio.attr("data-src-mp3"))
                 }
 
-                parseDefinitions(head.block, headword)
+                if (head.singleHom != null) {
+                    headword.definitions.add(parseHom(head.singleHom))
+                } else {
+                    parseContent(head.content, headword)
+                }
                 words.add(headword)
             }
 
@@ -94,8 +127,7 @@ class CollinsParser {
 
         private const val REFPARAM = CollinsDictionary.REFPARAM
 
-        private fun parseDefinitions(block: Element, headword: Word) {
-            val content = block.selectFirst("div.content.definitions") ?: return
+        private fun parseContent(content: Element, headword: Word) {
             var currentDef: Word.Definition? = null
 
             content.children().forEach { child ->
@@ -119,9 +151,15 @@ class CollinsParser {
             definition.grammar = pos
             definition.gender = genderOf(pos)
 
-            // Idioms and phrases nested at any depth inside the hom are hoisted
-            // to the definition (the user-facing grouping), then pruned so they
-            // don't also appear inline inside a sense's rich HTML.
+            hom.children().forEach { child ->
+                if (child.tagName() == "div" && child.hasClass("sense")) {
+                    definition.glosses.add(parseSense(child))
+                }
+            }
+
+            // Idioms and phrases living directly on the hom (roaming, outside any
+            // sense) are hoisted to the POS-group definition. Those nested inside
+            // a specific sense stay on that gloss, rendered inline under it.
             hom.select("div.re.type-idm").forEach { re ->
                 definition.idioms.add(parsePhrase(re))
                 re.remove()
@@ -129,12 +167,6 @@ class CollinsParser {
             hom.select("div.re.type-phr").forEach { re ->
                 definition.phrases.add(parsePhrase(re))
                 re.remove()
-            }
-
-            hom.children().forEach { child ->
-                if (child.tagName() == "div" && child.hasClass("sense")) {
-                    definition.glosses.add(parseSense(child))
-                }
             }
 
             return definition
@@ -151,6 +183,17 @@ class CollinsParser {
                     gloss.examples.add(cleanHtml(child.html()))
                     child.remove()
                 }
+            }
+
+            // Idioms and phrases nested inside this sense stay attached to the
+            // gloss, then are pruned so they don't also appear in the rich HTML.
+            sense.select("div.re.type-idm").forEach { re ->
+                gloss.idioms.add(parsePhrase(re))
+                re.remove()
+            }
+            sense.select("div.re.type-phr").forEach { re ->
+                gloss.phrases.add(parsePhrase(re))
+                re.remove()
             }
 
             // Definition HTML = the sense's remaining children: sensenum,

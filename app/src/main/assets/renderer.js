@@ -20,6 +20,8 @@ const renderGlosses = (glosses) => (glosses || []).map(gloss => `
                 ${gloss.examples.map(ex => `<li>${ex}</li>`).join('')}
             </ul>
         ` : ''}
+        ${renderCollinsIdioms(gloss.idioms)}
+        ${renderCollinsPhrases(gloss.phrases)}
     </div>
 `).join('');
 

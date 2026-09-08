@@ -10,7 +10,7 @@ if (!jsonPath) {
 }
 
 const data = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
-const word = Array.isArray(data) ? data[0] : data;
+const words = Array.isArray(data) && data.length > 0 ? data : [data];
 
 const assetsDir = path.join(__dirname, '../../main/assets');
 const templatePath = path.join(assetsDir, 'word_template.html');
@@ -37,16 +37,35 @@ inlineScript('jq-js', 'jquery.min.js');
 inlineScript('renderer-js', 'renderer.js');
 inlineScript('word-js', 'word.js');
 
+// Load one headword; for multiple headwords append one template article each.
+// (renderer.js exposes `template()` as a top-level const in the inline script.)
+const json = JSON.stringify(words).replace(/<\/script>/g, '<\\/script>');
+const loadScript = words.length === 1 ? `
+    loadWord(words[0]);
+` : `
+    $(document).ready(() => {
+        const content = document.getElementById('content');
+        words.forEach((word, i) => {
+            if (i > 0) {
+                content.insertAdjacentHTML('beforeend', '<hr class="cli-word-sep">');
+            }
+            content.insertAdjacentHTML('beforeend', template(word));
+        });
+        createLinks(content);
+    });
+`;
+
 html = html.replace('</body>', () => `
     <script>
-        loadWord(${JSON.stringify(word).replace(/<\/script>/g, '<\\/script>')});
+        const words = ${json};
+        ${loadScript}
     </script>
     </body>
 `);
 
 if (outPath) {
     fs.writeFileSync(path.resolve(outPath), html);
-    console.log(`Successfully rendered to ${outPath}`);
+    console.log(`Successfully rendered ${words.length} headword${words.length === 1 ? '' : 's'} to ${outPath}`);
 } else {
     process.stdout.write(html);
 }

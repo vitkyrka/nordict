@@ -36,6 +36,12 @@ class Word(
         var grammar: String = ""
         var gender: String = ""
         val examples: ArrayList<String> = ArrayList()
+
+        // Collins idioms and phrases nested inside this sense (gloss).
+        // The renderer shows these inline under the specific definition
+        // they belong to, instead of at the end of the POS group.
+        val idioms: ArrayList<Phrase> = ArrayList()
+        val phrases: ArrayList<Phrase> = ArrayList()
     }
 
     class Idiom(val idiom: String, @Transient val definition: String) {

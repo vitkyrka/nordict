@@ -263,6 +263,31 @@ span.quote {
     font-style: italic;
 }
 
+/* English target-language text in Collins bilingual entries. The source
+ * language (es/fr) appears in bare span.quote cells; the English
+ * translation is wrapped in .cit.type-translation carrying lang="en-gb".
+ * Give the translation a distinct accent so source and target read
+ * differently. */
+span.cit.type-translation,
+span[lang="en-gb"] {
+    color: var(--domain-color);
+    font-weight: 500;
+}
+
+span.cit.type-translation .quote,
+span[lang="en-gb"] .quote {
+    font-style: italic;
+    color: inherit;
+    font-weight: inherit;
+}
+
+/* Alternate-translation separator (⧫) rendered by Collins between
+ * co-translations of one example/phrase. */
+span.bluebold {
+    font-weight: bold;
+    color: var(--text-color);
+}
+
 div.cit {
     /* Block-level translation cells from Collins */
 }

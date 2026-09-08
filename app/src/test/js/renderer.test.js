@@ -620,3 +620,47 @@ test('renders phrase examples', () => {
     expect($('.def-phrases li').first().text()).toContain('Ejemplo 1');
     expect($('.def-phrases li').first().text()).toContain('Ejemplo 2');
 });
+
+test('distinguishes English translation cells from source quotes', () => {
+    const word = {
+        mTitle: 'frente',
+        dictionary: 'Collins Spanish-English',
+        definitions: [
+            {
+                pos: 'noun',
+                glosses: [
+                    {
+                        definition: '<span class="sensenum bluebold">1.&nbsp;</span><span lang="en-gb" class="cit type-translation"><span class="quote">forehead</span></span>',
+                        examples: ['<span class="quote">un ejército con su capitán al frente</span> <span lang="en-gb" class="cit type-translation"><span class="quote">an army led by its captain</span></span>']
+                    }
+                ],
+                idioms: [],
+                phrases: [
+                    {
+                        headword: 'al frente de',
+                        translation: '<span lang="en-gb" class="cit type-translation"><span class="quote">at the head of</span></span>',
+                        examples: ['<span class="quote">espero seguir al frente del festival</span> <span lang="en-gb" class="cit type-translation"><span class="quote">I hope to continue as director of the festival</span></span>']
+                    }
+                ]
+            }
+        ]
+    };
+
+    renderWord(word);
+
+    // The definition has English translation cells marked with lang + cit.type-translation
+    expect($('.definition span.cit.type-translation').length).toBe(1);
+    expect($('.definition span.cit.type-translation').attr('lang')).toBe('en-gb');
+
+    // The bare source quote has NO lang/cit wrapper
+    const glossEx = $('.gloss .examples li:first');
+    expect(glossEx.find('span.cit.type-translation').length).toBe(1);
+    expect(glossEx.find('span.quote').length).toBe(2);
+
+    // Phrase example similarly keeps source (bare quote) + translation (cit cell)
+    const phraseEx = $('.def-phrases ul.def-examples li:first');
+    expect(phraseEx.find('span.quote').length).toBe(2);
+    expect(phraseEx.find('span[lang="en-gb"]').length).toBe(1);
+    expect(phraseEx.find('span:not([lang]) .quote').length).toBe(0);
+    expect(phraseEx.find('span[lang="en-gb"] .quote').length).toBe(1);
+});

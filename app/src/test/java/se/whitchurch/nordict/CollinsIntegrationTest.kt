@@ -62,10 +62,13 @@ class CollinsIntegrationTest {
         assertThat(word).isNotNull()
         assertThat(word?.mTitle).isEqualTo("morir")
         assertThat(word?.dictionary).isEqualTo("Collins Spanish-English")
-        assertThat(word?.definitions).hasSize(2)
+        assertThat(word?.definitions).hasSize(1)
         assertThat(word?.definitions?.get(0)?.pos).isEqualTo("intransitive verb")
-        assertThat(word?.definitions?.get(0)?.idioms).hasSize(2)
-        assertThat(word?.definitions?.get(0)?.phrases).hasSize(5)
+        assertThat(word?.definitions?.get(0)?.idioms).isEmpty()
+        assertThat(word?.definitions?.get(0)?.phrases).isEmpty()
+        assertThat(word?.definitions?.get(0)?.glosses).hasSize(2)
+        assertThat(word?.definitions?.get(0)?.glosses?.get(0)?.idioms).hasSize(1)
+        assertThat(word?.definitions?.get(0)?.glosses?.get(0)?.phrases).hasSize(5)
         assertThat(word?.audio).hasSize(2)
     }
 
