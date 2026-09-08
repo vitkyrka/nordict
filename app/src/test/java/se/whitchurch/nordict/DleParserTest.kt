@@ -2,7 +2,6 @@ package se.whitchurch.nordict
 
 import android.net.Uri
 import com.google.common.truth.Truth.assertThat
-import com.google.gson.GsonBuilder
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -103,15 +102,8 @@ class DleParserTest {
         )
     }
 
-    private fun writeAndAssert(words: List<Word>, jsonPath: String) {
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        val wordsData = words.map { it.toData() }
-        File(jsonPath).writeText(gson.toJson(wordsData))
-
-        val expectedJson = File(jsonPath).readText()
-        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
-
-        assertThat(wordsData).isEqualTo(expectedData)
+    private fun assertGolden(words: List<Word>, jsonPath: String) {
+        Goldens.assertGolden(words.map { it.toData() }, jsonPath, Array<WordData>::class.java)
     }
 
     @Test
@@ -159,7 +151,7 @@ class DleParserTest {
         assertThat(lastIdiom.idiom).isEqualTo("traerlo alguien escrito en la frente")
         assertThat(lastIdiom.glosses[0].definition).contains("No acertar a disimular")
 
-        writeAndAssert(words, "../testdata/dle/frente.json")
+        assertGolden(words, "../testdata/dle/frente.json")
     }
 
     @Test
@@ -191,7 +183,7 @@ class DleParserTest {
         val idiom1 = word.idioms[0]
         assertThat(idiom1.idiom).isEqualTo("cagarla")
 
-        writeAndAssert(words, "../testdata/dle/cagar.json")
+        assertGolden(words, "../testdata/dle/cagar.json")
     }
 
     @Test
@@ -228,7 +220,7 @@ class DleParserTest {
         assertThat(piantaSyn).isNotNull()
         assertThat(piantaSyn!!.href).isEqualTo("https://dle.rae.es/?id=SrurElO")
 
-        writeAndAssert(words, "../testdata/dle/morir.json")
+        assertGolden(words, "../testdata/dle/morir.json")
     }
 
     @Test
@@ -252,6 +244,6 @@ class DleParserTest {
         assertThat(def1.synonyms.map { it.text }).containsExactly("diferente", "distinto1")
         assertThat(def1.antonyms).containsExactly("mismo")
 
-        writeAndAssert(words, "../testdata/dle/otro.json")
+        assertGolden(words, "../testdata/dle/otro.json")
     }
 }

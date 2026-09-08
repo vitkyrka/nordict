@@ -2,7 +2,6 @@ package se.whitchurch.nordict
 
 import android.net.Uri
 import com.google.common.truth.Truth.assertThat
-import com.google.gson.GsonBuilder
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -97,6 +96,10 @@ class EstParserTest {
         )
     }
 
+    private fun assertGolden(words: List<Word>, jsonPath: String) {
+        Goldens.assertGolden(words.map { it.toData() }, jsonPath, Array<WordData>::class.java)
+    }
+
     @Test
     fun testParseEst() {
         val htmlFile = File("../testdata/est.html")
@@ -111,14 +114,7 @@ class EstParserTest {
         assertThat(word.definitions).hasSize(6)
         assertThat(word.idioms).hasSize(14)
 
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        val wordsData = words.map { it.toData() }
-        File("../testdata/est.json").writeText(gson.toJson(wordsData))
-
-        val expectedJson = File("../testdata/est.json").readText()
-        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
-
-        assertThat(wordsData).isEqualTo(expectedData)
+        assertGolden(words, "../testdata/est.json")
     }
 
     @Test
@@ -151,14 +147,7 @@ class EstParserTest {
         assertThat(word.definitions[2].glosses[0].headword).isEqualTo("cagarse")
         assertThat(word.definitions[3].glosses[0].headword).isEqualTo("cagarse")
 
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        val wordsData = words.map { it.toData() }
-        File("../testdata/est/cagar.json").writeText(gson.toJson(wordsData))
-
-        val expectedJson = File("../testdata/est/cagar.json").readText()
-        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
-
-        assertThat(wordsData).isEqualTo(expectedData)
+        assertGolden(words, "../testdata/est/cagar.json")
     }
 
     @Test
@@ -259,14 +248,7 @@ class EstParserTest {
         assertThat(muera.glosses[2].gender).isEqualTo(Genders.MASCULINE)
         assertThat(muera.glosses[2].examples).containsExactly("Los mueras contra el general ahogaban los vítores de sus partidarios.")
 
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        val wordsData = words.map { it.toData() }
-        File("../testdata/est/morir.json").writeText(gson.toJson(wordsData))
-
-        val expectedJson = File("../testdata/est/morir.json").readText()
-        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
-
-        assertThat(wordsData).isEqualTo(expectedData)
+        assertGolden(words, "../testdata/est/morir.json")
     }
 
     @Test
@@ -330,14 +312,7 @@ class EstParserTest {
         assertThat(words[2].definitions[0].glosses[0].examples)
             .containsExactly("La policía no descarta una muerte violenta a manos de su novio.")
 
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        val wordsData = words.map { it.toData() }
-        File("../testdata/est/muerte.json").writeText(gson.toJson(wordsData))
-
-        val expectedJson = File("../testdata/est/muerte.json").readText()
-        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
-
-        assertThat(wordsData).isEqualTo(expectedData)
+        assertGolden(words, "../testdata/est/muerte.json")
     }
 
     @Test
@@ -380,13 +355,6 @@ class EstParserTest {
         assertThat(def4.glosses[1].definition).contains("Se usa precedido de artículo")
         assertThat(def4.glosses[1].grammar).isEqualTo("")
 
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        val wordsData = words.map { it.toData() }
-        File("../testdata/est/otro.json").writeText(gson.toJson(wordsData))
-
-        val expectedJson = File("../testdata/est/otro.json").readText()
-        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
-
-        assertThat(wordsData).isEqualTo(expectedData)
+        assertGolden(words, "../testdata/est/otro.json")
     }
 }

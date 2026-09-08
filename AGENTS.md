@@ -22,7 +22,7 @@ app/src/main/assets/                        WebView assets (HTML/JS/CSS/jquery)
 app/src/test/java/se/whitchurch/nordict/   Robolectric unit + MockWebServer tests
 app/src/test/js/                            Jest tests + CLI for the JS renderer
 app/src/androidTest/java/...                Instrumented tests (WordTest.kt)
-testdata/                                   Golden fixtures (.html/.json) for parser tests
+testdata/                                   Golden fixtures (.html/.json) for parser tests (separate git repo; gitignored here)
 tools/                                      Standalone python scripts (crawl.py, parse.py, ...)
 ```
 
@@ -85,6 +85,20 @@ tools/                                      Standalone python scripts (crawl.py,
 Parser tests read fixtures relatively as `../testdata/<name>.json` (they run in
 `app/` working dir). Integration tests spin up a MockWebServer serving
 `testdata/<tag>-search.json` / `testdata/<tag>.html`.
+
+The parser tests (`CollinsParserTest`, `EstParserTest`, `DleParserTest`) use a
+true golden pattern via the shared `Goldens.assertGolden(...)` helper
+(`Goldens.kt`): the parsed output is asserted against the committed JSON
+fixture (`testdata/colspan/`, `testdata/est/`, `testdata/dle/`) and is never
+rewritten in normal runs. When parser behavior changes intentionally,
+regenerate the fixtures with
+
+```sh
+UPDATE_GOLDEN=1 ./gradlew testDebugUnitTest --tests 'se.whitchurch.nordict.CollinsParserTest'
+```
+
+(or any parser test class), then review the git diff; keep the test's semantic
+assertions in sync.
 
 ### JS renderer tests
 
@@ -166,5 +180,6 @@ markers appear — "uso coloquial" / "usado en América" are dropped.
   `https://www.rae.es/diccionario-estudiante/<word>` URL when the page uses a
   relative href), so it doesn't rely on `word.js` auto-linking.
 - Do not commit `local.properties`, `app/src/test/js/node_modules/`, or build
-  output (`.gitignore` already covers `build/`, `.gradle/`, `local.properties`;
-  `testdata/` is intentionally checked in).
+  output (`.gitignore` already covers `build/`, `.gradle/`, `local.properties`,
+  `testdata/`). `testdata/` lives in a separate git repo to avoid distributing
+  original dictionary pages with the app code.

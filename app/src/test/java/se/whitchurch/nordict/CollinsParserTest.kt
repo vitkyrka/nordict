@@ -2,7 +2,6 @@ package se.whitchurch.nordict
 
 import android.net.Uri
 import com.google.common.truth.Truth.assertThat
-import com.google.gson.GsonBuilder
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -107,20 +106,11 @@ class CollinsParserTest {
         }
     )
 
-    private fun assertGolden(name: String) {
-        val htmlFile = File("../testdata/colspan/$name.html")
-        val page = htmlFile.readText()
-        val uri = Uri.parse("https://www.collinsdictionary.com/dictionary/spanish-english/$name")
-        val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
-
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        val wordsData = words.map { it.toData() }
-        File("../testdata/colspan/$name.json").writeText(gson.toJson(wordsData))
-
-        val expectedJson = File("../testdata/colspan/$name.json").readText()
-        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
-
-        assertThat(wordsData).isEqualTo(expectedData)
+    // Golden-file comparison: asserts the parsed output equals the committed
+    // testdata/colspan/<name>.json fixture and never rewrites it in normal runs
+    // (see Goldens.kt for the UPDATE_GOLDEN=1 regen workflow).
+    private fun assertGolden(words: List<Word>, name: String) {
+        Goldens.assertGolden(words.map { it.toData() }, "../testdata/colspan/$name.json", Array<WordData>::class.java)
     }
 
     @Test
@@ -188,14 +178,7 @@ class CollinsParserTest {
         assertThat(words[3].dictionary).isEqualTo("Collins Easy Learning")
         assertThat(words[3].uri.toString()).contains("__ref=2")
 
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        val wordsData = words.map { it.toData() }
-        File("../testdata/colspan/frente.json").writeText(gson.toJson(wordsData))
-
-        val expectedJson = File("../testdata/colspan/frente.json").readText()
-        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
-
-        assertThat(wordsData).isEqualTo(expectedData)
+        assertGolden(words, "frente")
     }
 
     @Test
@@ -233,14 +216,7 @@ class CollinsParserTest {
         assertThat(reflex.definitions[0].pos).isEqualTo("reflexive verb")
         assertThat(reflex.definitions[0].glosses).hasSize(1)
 
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        val wordsData = words.map { it.toData() }
-        File("../testdata/colspan/cagar.json").writeText(gson.toJson(wordsData))
-
-        val expectedJson = File("../testdata/colspan/cagar.json").readText()
-        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
-
-        assertThat(wordsData).isEqualTo(expectedData)
+        assertGolden(words, "cagar")
     }
 
     @Test
@@ -280,14 +256,7 @@ class CollinsParserTest {
         assertThat(words[2].definitions).hasSize(1)
         assertThat(words[2].definitions[0].pos).isEqualTo("verb")
 
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        val wordsData = words.map { it.toData() }
-        File("../testdata/colspan/morir.json").writeText(gson.toJson(wordsData))
-
-        val expectedJson = File("../testdata/colspan/morir.json").readText()
-        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
-
-        assertThat(wordsData).isEqualTo(expectedData)
+        assertGolden(words, "morir")
     }
 
     @Test
@@ -321,14 +290,7 @@ class CollinsParserTest {
         assertThat(easy.dictionary).isEqualTo("Collins Easy Learning")
         assertThat(easy.definitions[0].phrases).hasSize(2)
 
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        val wordsData = words.map { it.toData() }
-        File("../testdata/colspan/muerte.json").writeText(gson.toJson(wordsData))
-
-        val expectedJson = File("../testdata/colspan/muerte.json").readText()
-        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
-
-        assertThat(wordsData).isEqualTo(expectedData)
+        assertGolden(words, "muerte")
     }
 
     @Test
@@ -373,13 +335,6 @@ class CollinsParserTest {
         assertThat(words[2].definitions[0].phrases).hasSize(6)
         assertThat(words[2].definitions[0].glosses[0].phrases).hasSize(2)
 
-        val gson = GsonBuilder().setPrettyPrinting().create()
-        val wordsData = words.map { it.toData() }
-        File("../testdata/colspan/otro.json").writeText(gson.toJson(wordsData))
-
-        val expectedJson = File("../testdata/colspan/otro.json").readText()
-        val expectedData = gson.fromJson(expectedJson, Array<WordData>::class.java).toList()
-
-        assertThat(wordsData).isEqualTo(expectedData)
+        assertGolden(words, "otro")
     }
 }
