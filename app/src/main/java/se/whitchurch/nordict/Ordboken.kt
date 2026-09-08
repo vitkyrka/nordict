@@ -173,6 +173,7 @@ class Ordboken private constructor(context: Context, val client: OkHttpClient) {
             langGroup.addView(RadioButton(activity).apply {
                 this.setCompoundDrawablesWithIntrinsicBounds(languageFlags[lang]!!, 0, 0, 0)
                 this.tag = lang
+                this.contentDescription = lang
             })
         }
         langGroup.check(langGroup.getChildAt(langIndex).id)
@@ -214,6 +215,7 @@ class Ordboken private constructor(context: Context, val client: OkHttpClient) {
             currentIndex = index
             currentDictionary = dictionaries[index]
             currentFlag = flags[index]
+            saveDictIndex(currentDictionary.lang, index)
             activity.findViewById<ImageView>(R.id.dictFlag)?.setImageResource(flags[index])
         }
     }
@@ -222,25 +224,29 @@ class Ordboken private constructor(context: Context, val client: OkHttpClient) {
         group.clearCheck()
         group.removeAllViews()
 
-        for (index in dictionaries.indices) {
-            if (dictionaries[index].lang != lang) {
-                continue
-            }
+        val indices = dictionaries.indices.filter { dictionaries[it].lang == lang }
+        var desiredIndex = if (lang == currentDictionary.lang) currentIndex else storedDictIndex(lang)
+        if (desiredIndex !in indices) {
+            desiredIndex = indices.firstOrNull() ?: return
+        }
 
+        for (index in indices) {
             val button = RadioButton(activity).apply {
                 this.setCompoundDrawablesWithIntrinsicBounds(flags[index], 0, 0, 0)
                 this.text = "\u00A0" + dictionaries[index].tag
                 this.tag = index
             }
             group.addView(button)
-            if (index == currentIndex) {
+            if (index == desiredIndex) {
                 group.check(button.id)
             }
         }
+    }
 
-        if (group.checkedRadioButtonId == View.NO_ID && group.childCount > 0) {
-            group.check(group.getChildAt(0).id)
-        }
+    private fun storedDictIndex(lang: String): Int = mPrefs.getInt("dictIndex_$lang", -1)
+
+    private fun saveDictIndex(lang: String, index: Int) {
+        mPrefs.edit().putInt("dictIndex_$lang", index).apply()
     }
 
     fun initSearchView(

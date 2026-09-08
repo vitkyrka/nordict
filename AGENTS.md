@@ -32,7 +32,15 @@ tools/                                      Standalone python scripts (crawl.py,
   `search(query)`, `get(uri)`). Concrete impls are named `<Name>Dictionary.kt`
   (e.g. `EstDictionary`, `DleDictionary`, `DdoDictionary`).
 - **`Ordboken.kt`** — dictionary registry (`dictMap` keyed by `tag`) and the
-  app entry point for lookups.
+  app entry point for lookups. Also builds the action bar's two-row navigation
+  in `onResume`: a language row (`langRadio`) with one flag-only button per
+  language, and a dictionary row (`dictRadio`, ids `radioScroll`/`dictRadio`)
+  showing only the selected language's dictionaries with full tags
+  (e.g. `DLE`). Language buttons carry `tag`/`contentDescription` = lang code;
+  dict buttons carry `tag` = global index into `dictionaries`. Each dictionary's
+  last selection is remembered per language in prefs under `dictIndex_<lang>`
+  (falls back to the first dict of a language); `currentIndex` remains the
+  global index.
 - **`<Name>Parser.kt`** — companion-object parsers that take a raw HTML page,
   `Uri`, and dict `tag`, and return `List<Word>`. They use Jsoup and clone the
   fragments they keep in `Word.element`.
@@ -116,7 +124,45 @@ for browser preview.
 
 ```sh
 ./gradlew connectedAndroidTest
+./gradlew connectedAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=se.whitchurch.nordict.NavigationTest   # one class
 ```
+
+`NavigationTest` (Espresso) launches `MainActivity`, clears the app prefs and
+`Ordboken` singleton, and exercises the two-row language/dictionary nav
+(per-language selection memory, restore on recreate). Requires a connected
+device/emulator. The androidTest androidx.test dependencies are pinned to
+versions that work on current Android (espresso 3.6.1 / runner 1.6.2 etc.);
+older ones crash with a `PendingIntent` FLAG_IMMUTABLE error on Android 12+.
+
+### Deploying and verifying on a device
+
+```sh
+./gradlew assembleDebug                              # build debug APK
+# APK ends up in: app/build/outputs/apk/debug/app-debug.apk
+adb devices                                          # find the connected device serial
+adb -s <serial> install -r app/build/outputs/apk/debug/app-debug.apk
+adb -s <serial> shell monkey -p se.whitchurch.nordict -c android.intent.category.LAUNCHER 1   # launch
+```
+
+Package / launch activity is `se.whitchurch.nordict` / `.MainActivity`. A
+physical phone typically shows up over adb-over-TLS
+(e.g. `adb-RFCY10MKMMD-...._adb-tls-connect._tcp` series).
+
+To inspect the running UI without eyes on the device, the `android` CLI works
+best when the serial is a TLS one (the plain `uiautomator dump` can silently
+fail while a WebView is on screen):
+
+```sh
+android --sdk=$ANDROID_HOME layout --device <serial>   # interactive UI tree as JSON (text/bounds/state)
+android --sdk=$ANDROID_HOME screen capture -o /tmp/out.png  # screenshot (visual, if the model can read images)
+```
+
+When interacting via raw taps, read the element bounds/centers from the layout
+dump and tap with `adb shell input tap X Y`; re-dump after each action to
+confirm state changes. Beware that `adb shell input text` appends to whatever
+is already in a focused field — use the SearchView's "Clear query" (X) button
+instead of trying to delete characters, or select-all (`input keyevent --meta
+CTRL_ON 29`) + delete.
 
 ## EST dictionary (RAE Diccionario del estudiante)
 
