@@ -163,15 +163,19 @@ class Ordboken private constructor(context: Context, val client: OkHttpClient) {
         val dictGroup = activity.findViewById<RadioGroup>(R.id.dictRadio)
         val dictScroll = activity.findViewById<HorizontalScrollView>(R.id.radioScroll)
 
-        var langIndex = 0
         val currentLang = dictionaries[currentIndex].lang
+        var langIndex = 0
         langGroup.removeAllViews()
         for ((index, lang) in languages.withIndex()) {
             if (lang == currentLang) {
                 langIndex = index
             }
+            val image = languageFlags[lang]!!
             langGroup.addView(RadioButton(activity).apply {
-                this.setCompoundDrawablesWithIntrinsicBounds(languageFlags[lang]!!, 0, 0, 0)
+                this.setBackgroundResource(R.drawable.toggle_button_background)
+                this.setButtonDrawable(null)
+                this.setCompoundDrawablesWithIntrinsicBounds(image, 0, 0, 0)
+                this.setPadding(dp(activity, 8), dp(activity, 8), dp(activity, 8), dp(activity, 8))
                 this.tag = lang
                 this.contentDescription = lang
             })
@@ -231,17 +235,22 @@ class Ordboken private constructor(context: Context, val client: OkHttpClient) {
         }
 
         for (index in indices) {
-            val button = RadioButton(activity).apply {
-                this.setCompoundDrawablesWithIntrinsicBounds(flags[index], 0, 0, 0)
-                this.text = "\u00A0" + dictionaries[index].tag
+            group.addView(RadioButton(activity).apply {
+                this.setBackgroundResource(R.drawable.toggle_button_background)
+                this.setButtonDrawable(null)
+                this.text = dictionaries[index].tag
+                this.setPadding(dp(activity, 8), dp(activity, 6), dp(activity, 8), dp(activity, 6))
                 this.tag = index
-            }
-            group.addView(button)
+            })
+            val button = group.getChildAt(group.childCount - 1) as RadioButton
             if (index == desiredIndex) {
                 group.check(button.id)
             }
         }
     }
+
+    private fun dp(activity: AppCompatActivity, value: Int): Int =
+        (value * activity.resources.displayMetrics.density).toInt()
 
     private fun storedDictIndex(lang: String): Int = mPrefs.getInt("dictIndex_$lang", -1)
 

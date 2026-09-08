@@ -25,7 +25,7 @@ class NavigationTest {
         return ActivityScenario.launch(MainActivity::class.java)
     }
 
-    private fun dictButton(name: String) = onView(withText("\u00A0" + name))
+    private fun dictButton(name: String) = onView(withText(name))
 
     private fun checkDictButton(name: String) {
         dictButton(name).check(matches(isChecked()))
