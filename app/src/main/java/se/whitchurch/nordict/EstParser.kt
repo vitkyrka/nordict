@@ -52,6 +52,7 @@ class EstParser {
                     lemma,
                     renderAsJson = true
                 )
+                headword.rawHeadword = Word.raeSearchKey(word)
 
                 // Capture conjugation and participle info from div.par
                 val parDiv = lemma.selectFirst("div.paracep div.par")
@@ -109,6 +110,7 @@ class EstParser {
                         tag, subTitle, subTitle, subTitle, page, subUri,
                         finalBaseUrl, doc, "", null, renderAsJson = true
                     )
+                    sub.rawHeadword = subTitle
                     sub.xrefs.add(ref.toString())
 
                     fc.select("div.acep").forEach { meaning ->

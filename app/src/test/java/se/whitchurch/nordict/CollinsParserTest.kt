@@ -21,7 +21,8 @@ class CollinsParserTest {
         val xrefs: List<String> = emptyList(),
         val audio: List<String> = emptyList(),
         val definitions: List<DefinitionData> = emptyList(),
-        val idioms: List<IdiomData> = emptyList()
+        val idioms: List<IdiomData> = emptyList(),
+        val rawHeadword: String = ""
     )
 
     data class DefinitionData(
@@ -103,7 +104,8 @@ class CollinsParserTest {
                 plev = idiom.plev,
                 register = idiom.register
             )
-        }
+        },
+        rawHeadword = rawHeadword
     )
 
     // Golden-file comparison: asserts the parsed output equals the committed
@@ -170,11 +172,13 @@ class CollinsParserTest {
 
         // Easy-learning headwords follow (no audio).
         assertThat(words[2].mTitle).isEqualTo("la frente")
+        assertThat(words[2].rawHeadword).isEqualTo("frente")
         assertThat(words[2].dictionary).isEqualTo("Collins Easy Learning")
         assertThat(words[2].audio).isEmpty()
         assertThat(words[2].uri.toString()).contains("__ref=1")
 
         assertThat(words[3].mTitle).isEqualTo("el frente")
+        assertThat(words[3].rawHeadword).isEqualTo("frente")
         assertThat(words[3].dictionary).isEqualTo("Collins Easy Learning")
         assertThat(words[3].uri.toString()).contains("__ref=2")
 
@@ -287,6 +291,7 @@ class CollinsParserTest {
         // Easy-learning entry: the two roaming phrases stay at definition level.
         val easy = words[1]
         assertThat(easy.mTitle).isEqualTo("la muerte")
+        assertThat(easy.rawHeadword).isEqualTo("muerte")
         assertThat(easy.dictionary).isEqualTo("Collins Easy Learning")
         assertThat(easy.definitions[0].phrases).hasSize(2)
 

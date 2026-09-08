@@ -22,7 +22,8 @@ class DleParserTest {
         val xrefs: List<String>,
         val conjugation: String = "",
         val participle: String = "",
-        val etymology: String = ""
+        val etymology: String = "",
+        val rawHeadword: String = ""
     )
 
     data class DefinitionData(
@@ -77,6 +78,7 @@ class DleParserTest {
             conjugation = conjugation,
             participle = participle,
             etymology = etymology,
+            rawHeadword = rawHeadword,
             definitions = definitions.map { def ->
                 DefinitionData(
                     glosses = def.glosses.map { it.toData() },
@@ -234,6 +236,7 @@ class DleParserTest {
         val word = words[0]
 
         assertThat(word.mTitle).isEqualTo("otro, tra")
+        assertThat(word.rawHeadword).isEqualTo("otro")
         assertThat(word.definitions).hasSize(7)
         assertThat(word.idioms).hasSize(7)
         assertThat(word.etymology).contains("alter")

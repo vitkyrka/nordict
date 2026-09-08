@@ -346,7 +346,7 @@ class WordActivity : AppCompatActivity() {
         if (newDict.lang != wordDict.lang) return
 
         loadResource.increment()
-        SwitchDictTask().execute(word.mTitle)
+        SwitchDictTask().execute(word.searchHeadword)
     }
 
     private inner class SwitchDictTask : AsyncTask<String, Void, SearchResult>() {

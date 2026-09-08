@@ -55,6 +55,7 @@ class DleParser {
                     lemma,
                     renderAsJson = true
                 )
+                headword.rawHeadword = Word.raeSearchKey(word)
 
                 // Etymology: div.n2.c-text-intro (e.g. "Del lat. cacāre.")
                 val etymEl = lemma.selectFirst("div.n2.c-text-intro")

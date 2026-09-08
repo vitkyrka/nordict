@@ -106,6 +106,7 @@ class CollinsParser {
                     xrefs = arrayListOf(head.ref),
                     renderAsJson = true
                 )
+                headword.rawHeadword = rawHeadword(head.title)
                 headword.dictionary = head.label
 
                 head.block.select("div.mini_h2 a.hwd_sound[data-src-mp3]").forEach { audio ->
@@ -131,6 +132,22 @@ class CollinsParser {
         }
 
         private const val REFPARAM = CollinsDictionary.REFPARAM
+
+        // Spanish determiners shown in Collins Easy Learning headwords ("la
+        // frente") that the RAE dictionaries do not key on.
+        private val ARTICLES = listOf("el ", "la ", "los ", "las ")
+
+        // The bare headword form used when searching other dictionaries: strip a
+        // leading article ("la frente" -> "frente"). Main-dictionary entries keep
+        // their title unchanged (no article prefix to strip).
+        private fun rawHeadword(title: String): String {
+            for (article in ARTICLES) {
+                if (title.startsWith(article)) {
+                    return title.removePrefix(article).trim()
+                }
+            }
+            return title
+        }
 
         private fun parseContent(content: Element, headword: Word) {
             var currentDef: Word.Definition? = null

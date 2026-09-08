@@ -20,6 +20,16 @@ class Word(
     var participle: String = ""
     var etymology: String = ""
 
+    // The searchable headword, which may differ from the displayed `mTitle`
+    // (e.g. DLE/EST show "otro, tra" but other dictionaries need "otro";
+    // Collins Easy Learning shows "la frente" but DLE/EST need "frente").
+    // Populated by the JSON dictionaries (DLE, EST, COLSPAN); empty elsewhere.
+    var rawHeadword: String = ""
+
+    // What to pass to the search box / cross-dictionary lookup for this entry.
+    val searchHeadword: String
+        get() = rawHeadword.takeIf { it.isNotBlank() } ?: mTitle
+
     val mHomographs: ArrayList<SearchResult>
     val mHasAudio: Boolean
     val idioms: ArrayList<Idiom> = ArrayList()
@@ -157,5 +167,13 @@ class Word(
 
     fun addHomograph(homograph: SearchResult) {
         mHomographs.add(homograph)
+    }
+
+    companion object {
+        // RAE (DLE/EST) headword titles abbreviate gendered/apocopated forms as
+        // "base, ending" (e.g. "otro, tra", "macabro, bra"). The part before the
+        // comma is the searchable key the autocomplete API and other dictionaries
+        // expect (e.g. Collins keys "otro", "macabro").
+        fun raeSearchKey(title: String): String = title.substringBefore(',').trim()
     }
 }

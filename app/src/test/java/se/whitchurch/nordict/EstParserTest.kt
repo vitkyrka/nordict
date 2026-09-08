@@ -21,7 +21,8 @@ class EstParserTest {
         val idioms: List<IdiomData>,
         val xrefs: List<String>,
         val conjugation: String = "",
-        val participle: String = ""
+        val participle: String = "",
+        val rawHeadword: String = ""
     )
 
     data class DefinitionData(
@@ -73,6 +74,7 @@ class EstParserTest {
             uri = uri.toString(),
             conjugation = conjugation,
             participle = participle,
+            rawHeadword = rawHeadword,
             definitions = definitions.map { def ->
                 DefinitionData(
                     glosses = def.glosses.map { it.toData() },
@@ -326,6 +328,7 @@ class EstParserTest {
         val word = words[0]
 
         assertThat(word.mTitle).isEqualTo("otro, tra")
+        assertThat(word.rawHeadword).isEqualTo("otro")
         assertThat(word.definitions).hasSize(6)
         assertThat(word.idioms).hasSize(2)
 
