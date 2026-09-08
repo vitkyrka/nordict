@@ -42,6 +42,8 @@ class Ordboken private constructor(context: Context, val client: OkHttpClient) {
     private var dictionaries: Array<Dictionary>
     lateinit var dictMap: Map<String, Dictionary>
     private var flags: Array<Int>
+    private var languages: Array<String> = emptyArray()
+    private var languageFlags: Map<String, Int> = emptyMap()
     private val mCache: LruCache<Uri, Word> = LruCache(25)
     private val mSearchResultCache: LruCache<Pair<String, Int>, List<SearchResult>> = LruCache(25)
 
@@ -111,6 +113,17 @@ class Ordboken private constructor(context: Context, val client: OkHttpClient) {
         flags = dictionaries.map { it.flag }.toTypedArray()
         dictMap = dictionaries.associateBy { it.tag }
 
+        val languageList = ArrayList<String>()
+        val languageFlagMap = HashMap<String, Int>()
+        for (dict in dictionaries) {
+            if (dict.lang !in languageList) {
+                languageList.add(dict.lang)
+                languageFlagMap[dict.lang] = dict.flag
+            }
+        }
+        languages = languageList.toTypedArray()
+        languageFlags = languageFlagMap
+
         currentIndex = mPrefs.getInt("currentIndex", 0)
         currentDictionary = dictionaries[currentIndex]
         currentFlag = flags[currentIndex]
@@ -146,40 +159,87 @@ class Ordboken private constructor(context: Context, val client: OkHttpClient) {
     fun onResume(activity: AppCompatActivity) {
         currentIndex = mPrefs.getInt("currentIndex", 0)
 
-        val group = activity.findViewById<RadioGroup>(R.id.dictRadio)
-        group.removeAllViews()
+        val langGroup = activity.findViewById<RadioGroup>(R.id.langRadio)
+        val dictGroup = activity.findViewById<RadioGroup>(R.id.dictRadio)
+        val dictScroll = activity.findViewById<HorizontalScrollView>(R.id.radioScroll)
 
-        var prevFlag = 0
-        for ((index, it) in flags.withIndex()) {
-            group.addView(RadioButton(activity).apply {
-                if (it == prevFlag) {
-                    this.text = "\u00A0" + dictionaries[index].tag[0]
-                }
-                this.setCompoundDrawablesWithIntrinsicBounds(it, 0, 0, 0)
+        var langIndex = 0
+        val currentLang = dictionaries[currentIndex].lang
+        langGroup.removeAllViews()
+        for ((index, lang) in languages.withIndex()) {
+            if (lang == currentLang) {
+                langIndex = index
+            }
+            langGroup.addView(RadioButton(activity).apply {
+                this.setCompoundDrawablesWithIntrinsicBounds(languageFlags[lang]!!, 0, 0, 0)
+                this.tag = lang
             })
-
-            prevFlag = it
         }
+        langGroup.check(langGroup.getChildAt(langIndex).id)
 
-        group.check(group.getChildAt(currentIndex).id)
+        buildDictionaryRow(activity, dictGroup, currentLang)
 
-        val radioScroll = activity.findViewById<HorizontalScrollView>(R.id.radioScroll)
-        radioScroll.post(Runnable {
-            val view = group.getChildAt(currentIndex)
-            radioScroll.scrollTo((view.left + view.right - radioScroll.width) / 2, 0)
-        })
+        langGroup.jumpDrawablesToCurrentState()
+        dictGroup.jumpDrawablesToCurrentState()
 
         activity.findViewById<ImageView>(R.id.dictFlag)?.setImageResource(flags[currentIndex])
 
-        group.jumpDrawablesToCurrentState()
-        group.setOnCheckedChangeListener { group, checkedId ->
-            val button = group.findViewById<RadioButton>(checkedId)
-            val index = group.indexOfChild(button)
+        dictScroll.post(Runnable {
+            val checked = dictGroup.findViewById<RadioButton>(dictGroup.checkedRadioButtonId)
+            if (checked != null) {
+                dictScroll.scrollTo((checked.left + checked.right - dictScroll.width) / 2, 0)
+            }
+        })
 
+        langGroup.setOnCheckedChangeListener { _, checkedId ->
+            if (checkedId == View.NO_ID) {
+                return@setOnCheckedChangeListener
+            }
+            val lang = langGroup.findViewById<RadioButton>(checkedId).tag as String
+            buildDictionaryRow(activity, dictGroup, lang)
+            dictScroll.post(Runnable {
+                val checked = dictGroup.findViewById<RadioButton>(dictGroup.checkedRadioButtonId)
+                if (checked != null) {
+                    dictScroll.smoothScrollTo((checked.left + checked.right - dictScroll.width) / 2, 0)
+                }
+            })
+        }
+
+        dictGroup.setOnCheckedChangeListener { _, checkedId ->
+            val button = dictGroup.findViewById<RadioButton>(checkedId)
+            if (button == null) {
+                return@setOnCheckedChangeListener
+            }
+            val index = button.tag as Int
             currentIndex = index
             currentDictionary = dictionaries[index]
             currentFlag = flags[index]
             activity.findViewById<ImageView>(R.id.dictFlag)?.setImageResource(flags[index])
+        }
+    }
+
+    private fun buildDictionaryRow(activity: AppCompatActivity, group: RadioGroup, lang: String) {
+        group.clearCheck()
+        group.removeAllViews()
+
+        for (index in dictionaries.indices) {
+            if (dictionaries[index].lang != lang) {
+                continue
+            }
+
+            val button = RadioButton(activity).apply {
+                this.setCompoundDrawablesWithIntrinsicBounds(flags[index], 0, 0, 0)
+                this.text = "\u00A0" + dictionaries[index].tag
+                this.tag = index
+            }
+            group.addView(button)
+            if (index == currentIndex) {
+                group.check(button.id)
+            }
+        }
+
+        if (group.checkedRadioButtonId == View.NO_ID && group.childCount > 0) {
+            group.check(group.getChildAt(0).id)
         }
     }
 
