@@ -7,6 +7,7 @@ import android.os.Looper
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import androidx.appcompat.widget.SearchView
+import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
@@ -141,6 +142,46 @@ class SwitchDictionaryTest {
             }
 
             assertThat(shadowOf(activity!!).nextStartedActivity).isNull()
+        }
+    }
+
+    @Test
+    fun switchingDictThenComingBackDoesNotSwitchAgain() {
+        estServer.enqueue(MockResponse().setBody(File("../testdata/est/cagar.html").readText()))
+        colspanServer.enqueue(MockResponse().setBody(
+            """[{"title":"cagar"},{"title":"cagarse"}]"""
+        ))
+        colspanServer.enqueue(MockResponse().setBody(
+            """[{"title":"cagar"},{"title":"cagarse"}]"""
+        ))
+
+        launchEstWord("/cagar").use { scenario ->
+            var activity: WordActivity? = null
+            scenario.onActivity { activity = it }
+
+            await { Ordboken.getInstance(context).currentWord?.mTitle == "cagar" }
+
+            scenario.onActivity { tapDictButton(it, "COLSPAN") }
+
+            // The switch navigates to the exact COLSPAN match...
+            await {
+                val intent = shadowOf(activity!!).peekNextStartedActivity()
+                intent?.data?.toString() == colspanServer.url("/dictionary/spanish-english/cagar").toString()
+            }
+            assertThat(shadowOf(activity!!).nextStartedActivity).isNotNull()
+
+            // ...and coming back (back button) must just restore this entry
+            // instead of re-running the switch and jumping away again.
+            scenario.moveToState(Lifecycle.State.STARTED)
+            scenario.moveToState(Lifecycle.State.RESUMED)
+
+            repeat(20) {
+                shadowOf(Looper.getMainLooper()).idle()
+                Thread.sleep(50)
+            }
+
+            assertThat(shadowOf(activity!!).nextStartedActivity).isNull()
+            assertThat(shadowOf(activity!!).peekNextStartedActivity()).isNull()
         }
     }
 }

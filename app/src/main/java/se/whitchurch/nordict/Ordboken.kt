@@ -151,6 +151,13 @@ class Ordboken private constructor(
         val dictGroup = activity.findViewById<RadioGroup>(R.id.dictRadio)
         val dictScroll = activity.findViewById<HorizontalScrollView>(R.id.radioScroll)
 
+        // Drop listeners attached by an earlier onResume before we rebuild the
+        // rows: the programmatic group.check() below would otherwise fire them
+        // (e.g. re-running a dictionary switch when the user simply comes back
+        // to this entry with the back button). They are re-attached below.
+        langGroup.setOnCheckedChangeListener(null)
+        dictGroup.setOnCheckedChangeListener(null)
+
         val currentLang = dictionaries[currentIndex].lang
         var langIndex = 0
         langGroup.removeAllViews()
