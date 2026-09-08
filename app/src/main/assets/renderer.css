@@ -181,3 +181,98 @@ ul.idiom-list {
     padding-left: 0;
     list-style-position: inside;
 }
+
+/* span.definition renders rich HTML (bilingual Collins); display:contents
+ * lets block children like div.sense and div.cit render properly. */
+span.definition {
+    display: contents;
+}
+
+/* ---- Bilingual dictionaries (Collins) ---- */
+
+ol.definitions.bilingual {
+    list-style-type: none;
+}
+
+span.pos {
+    color: var(--grammar-color);
+    font-weight: bold;
+    font-style: italic;
+}
+
+/* Dictionary sub-heading (e.g. "Collins Spanish-English") */
+div.dictionary-label {
+    color: var(--muted-color);
+    font-size: 0.85em;
+    margin-bottom: -0.2em;
+    margin-top: 0.6em;
+}
+
+/* Per-definition idiom and phrase blocks */
+ul.def-idioms,
+ul.def-phrases {
+    margin: 0.3em 0 0 0;
+    padding-left: 1em;
+}
+
+ul.def-idioms li,
+ul.def-phrases li {
+    margin: 0.15em 0;
+    font-size: 0.95em;
+}
+
+span.idiom-marker {
+    color: var(--symbols-label-color);
+}
+
+b.idiom-headword,
+b.phrase-headword {
+    font-style: italic;
+}
+
+ul.def-examples {
+    list-style-type: none;
+    padding-left: 1em;
+    color: var(--muted-color);
+    font-size: 0.9em;
+    margin: 0.1em 0 0 0;
+}
+
+ul.def-examples li:before {
+    content: "\2022 ";
+    padding-right: 0.5em;
+}
+
+/* ---- Collins source HTML classes (rendered verbatim) ---- */
+
+.lbl {
+    color: var(--muted-color);
+    font-style: italic;
+}
+
+.punctuation {
+    /* inline punctuation marks that don't need special styling */
+}
+
+a.ref {
+    color: var(--domain-color);
+    text-decoration: none;
+}
+
+span.quote {
+    font-style: italic;
+}
+
+div.cit {
+    /* Block-level translation cells from Collins */
+}
+
+.sensenum.bluebold {
+    font-weight: bold;
+    color: var(--domain-color);
+}
+
+.gramGrp.colloc {
+    color: var(--muted-color);
+    font-style: italic;
+}

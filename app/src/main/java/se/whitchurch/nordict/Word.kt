@@ -13,11 +13,13 @@ class Word(
     val xrefs: ArrayList<String> = ArrayList<String>(),
     val renderAsJson: Boolean = false
 ) {
+    var dictionary: String = ""
     var pos: Pos = Pos.UNKNOWN
     var gender: String = ""
     var conjugation: String = ""
     var participle: String = ""
     var etymology: String = ""
+
     val mHomographs: ArrayList<SearchResult>
     val mHasAudio: Boolean
     val idioms: ArrayList<Idiom> = ArrayList()
@@ -57,8 +59,20 @@ class Word(
     // `abbr.sin_alert` marker (e.g. "malsonante").
     class Synonym(val text: String, val href: String = "", val plev: String = "")
 
+    // A Collins idiom or phrase attached to a definition. `headword` and
+    // `translation` are rich-HTML strings; `examples` holds HTML examples.
+    class Phrase(val headword: String, val translation: String = "") {
+        val examples: ArrayList<String> = ArrayList()
+    }
+
     class Definition(@Transient val definition: String, @Transient val element: Element, val title: String? = null) {
         val glosses: ArrayList<Gloss> = ArrayList()
+
+        // Collins part-of-speech group label (e.g. "feminine noun",
+        // "transitive verb"). Serialized as `pos`.
+        var pos: String = ""
+        val idioms: ArrayList<Phrase> = ArrayList()
+        val phrases: ArrayList<Phrase> = ArrayList()
 
         @Transient val examples: ArrayList<String> = ArrayList()
         @Transient var grammar: String = ""

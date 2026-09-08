@@ -31,9 +31,44 @@ const renderSynonym = (s) => typeof s === 'string'
     : `<a class="synonym" href="${s.href}">${s.text}</a>` +
       (s.plev ? `<span class="synonym-plev" title="${s.plev}">⚠️</span>` : '');
 
+// Collins per-definition idioms and phrases (bilingual dictionaries).
+const renderCollinsIdioms = (idioms) => (idioms || []).length === 0 ? '' : `
+    <ul class="def-idioms">
+        ${(idioms || []).map(idiom => `
+            <li>
+                <span class="idiom-marker">▪</span>
+                <b class="idiom-headword">${idiom.headword}</b>
+                ${idiom.translation ? `: ${idiom.translation}` : ''}
+                ${idiom.examples && idiom.examples.length > 0 ? `
+                    <ul class="def-examples">
+                        ${idiom.examples.map(ex => `<li>${ex}</li>`).join('')}
+                    </ul>
+                ` : ''}
+            </li>
+        `).join('')}
+    </ul>
+`;
+
+const renderCollinsPhrases = (phrases) => (phrases || []).length === 0 ? '' : `
+    <ul class="def-phrases">
+        ${(phrases || []).map(phrase => `
+            <li>
+                <b class="phrase-headword">${phrase.headword}</b>
+                ${phrase.translation ? ` ${phrase.translation}` : ''}
+                ${phrase.examples && phrase.examples.length > 0 ? `
+                    <ul class="def-examples">
+                        ${phrase.examples.map(ex => `<li>${ex}</li>`).join('')}
+                    </ul>
+                ` : ''}
+            </li>
+        `).join('')}
+    </ul>
+`;
+
 const template = (word) => `
     <article>
         <header>
+            ${word.dictionary ? `<div class="dictionary-label">${word.dictionary}</div>` : ''}
             <h1>${word.mTitle}</h1>
             ${word.conjugation || word.participle ? `
                 <div class="morphology">
@@ -45,9 +80,10 @@ const template = (word) => `
             ${word.etymology ? `<div class="etymology">${word.etymology}</div>` : ''}
         </header>
         ${word.definitions && word.definitions.length > 0 ? `
-            <ol class="definitions">
+            <ol class="definitions${word.dictionary ? ' bilingual' : ''}">
                 ${word.definitions.map(def => `
                     <li>
+                        ${def.pos ? `<span class="pos">${def.pos}</span> ` : ''}
                         ${def.register ? `<span class="register">${def.register}</span> ` : ''}
                         ${def.domain ? `<span class="domain">${def.domain}</span> ` : ''}
                         ${def.geo ? `<span class="geo">${def.geo}</span> ` : ''}
@@ -63,6 +99,8 @@ const template = (word) => `
                                 <span class="antonyms-label">↛ </span>${def.antonyms.map(a => `<span class="antonym">${a}</span>`).join(', ')}
                             </div>
                         ` : ''}
+                        ${renderCollinsIdioms(def.idioms)}
+                        ${renderCollinsPhrases(def.phrases)}
                     </li>
                 `).join('')}
             </ol>

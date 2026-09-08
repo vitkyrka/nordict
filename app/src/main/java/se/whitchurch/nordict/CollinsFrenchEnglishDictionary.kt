@@ -2,7 +2,10 @@ package se.whitchurch.nordict
 
 import okhttp3.OkHttpClient
 
-class CollinsFrenchEnglishDictionary(client: OkHttpClient) : CollinsDictionary(client) {
+class CollinsFrenchEnglishDictionary(
+    client: OkHttpClient,
+    baseUrl: String = "https://www.collinsdictionary.com"
+) : CollinsDictionary(client, baseUrl) {
     override val dictCode: String = "french-english"
     override val tag: String = "COLFREN"
     override val lang: String = "fr"

@@ -533,3 +533,90 @@ test('renders idiom defP glosses with grammar and example attribution', () => {
     expect(glosses.eq(2).find('.grammar').hasClass('masculine')).toBe(true);
     expect(glosses.eq(2).find('.examples li').text()).toBe('Los mueras contra el general ahogaban los vítores de sus partidarios.');
 });
+test('renders dictionary label for bilingual word', () => {
+    const word = {
+        mTitle: 'frente',
+        dictionary: 'Collins Spanish-English',
+        definitions: [
+            {
+                pos: 'feminine noun',
+                grammar: 'feminine noun',
+                glosses: [
+                    { definition: '<span lang="en-gb" class="cit type-translation"><span class="quote">forehead</span></span>', examples: [] }
+                ],
+                idioms: [{ headword: 'frente a frente', translation: '<span class="quote">face to face</span>', examples: [] }],
+                phrases: [{ headword: 'al frente', translation: '<span class="quote">at the front</span>', examples: [] }]
+            }
+        ]
+    };
+
+    renderWord(word);
+
+    expect($('.dictionary-label').text()).toBe('Collins Spanish-English');
+    expect($('.definitions').hasClass('bilingual')).toBe(true);
+    const li = $('.definitions li').first();
+    expect(li.find('.pos').text()).toBe('feminine noun');
+    expect(li.find('.def-idioms li').length).toBe(1);
+    expect(li.find('.def-idioms .idiom-headword').text()).toBe('frente a frente');
+    expect(li.find('.def-idioms').find('.quote').text()).toBe('face to face');
+    expect(li.find('.def-phrases li').length).toBe(1);
+    expect(li.find('.def-phrases .phrase-headword').text()).toBe('al frente');
+    expect(li.find('.gloss .definition').text()).toContain('forehead');
+});
+
+test('omits dictionary label and pos when absent', () => {
+    const word = {
+        mTitle: 'frente',
+        definitions: [
+            { glosses: [{ definition: 'face', examples: [] }] }
+        ]
+    };
+
+    renderWord(word);
+
+    expect($('.dictionary-label').length).toBe(0);
+    expect($('.definitions').hasClass('bilingual')).toBe(false);
+    expect($('.pos').length).toBe(0);
+});
+
+test('omits per-definition idioms and phrases when empty', () => {
+    const word = {
+        mTitle: 'frente',
+        dictionary: 'Collins Spanish-English',
+        definitions: [
+            { pos: 'noun', glosses: [{ definition: 'face', examples: [] }], idioms: [], phrases: [] }
+        ]
+    };
+
+    renderWord(word);
+
+    expect($('.def-idioms').length).toBe(0);
+    expect($('.def-phrases').length).toBe(0);
+});
+
+test('renders phrase examples', () => {
+    const word = {
+        mTitle: 'frente',
+        dictionary: 'Collins Spanish-English',
+        definitions: [
+            {
+                pos: 'noun',
+                glosses: [{ definition: '<span>front</span>', examples: [] }],
+                idioms: [],
+                phrases: [
+                    { headword: 'al frente de', translation: '<span class="quote">at the head of</span>', examples: ['<span>Ejemplo 1</span>', '<span>Ejemplo 2</span>'] }
+                ]
+            }
+        ]
+    };
+
+    renderWord(word);
+
+    const phrases = $('.def-phrases');
+    expect($('.def-phrases .phrase-headword').length).toBe(1);
+    expect($('.def-phrases .phrase-headword').text()).toBe('al frente de');
+    // examples render inside translation rich HTML; verify translation coerced
+    expect($('.def-phrases li').first().text()).toContain('at the head of');
+    expect($('.def-phrases li').first().text()).toContain('Ejemplo 1');
+    expect($('.def-phrases li').first().text()).toContain('Ejemplo 2');
+});
