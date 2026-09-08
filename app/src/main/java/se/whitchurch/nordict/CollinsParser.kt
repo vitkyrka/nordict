@@ -52,7 +52,12 @@ class CollinsParser {
             var ref = 0
             val heads = ArrayList<Head>()
             doc.select("div.cB.cB-def").forEach { block ->
-                val isMain = block.hasClass("benedict")
+                // `data-xrentry` marks a main-dictionary entry embedded in a
+                // cross-reference stub page (e.g. the full "ley" entry inside
+                // "ley de la gravedad"). Unlike a plain `benedict` block it
+                // carries neither the benedict nor the easy marker, but it is
+                // still a first-class main headword.
+                val isMain = block.hasClass("benedict") || block.hasAttr("data-xrentry")
                 val isEasy = block.hasClass("easy")
                 if (!isMain && !isEasy) return@forEach
 
@@ -155,6 +160,15 @@ class CollinsParser {
                 if (child.tagName() == "div" && child.hasClass("sense")) {
                     definition.glosses.add(parseSense(child))
                 }
+            }
+
+            // A cross-reference stub (e.g. "ley de la gravedad" -> "law of
+            // gravity") collapses the hom and its single sense into one element,
+            // `<div class="hom sense">`, holding the translation directly rather
+            // than nesting `<div class="sense">` children. Treat the hom itself
+            // as the sense when it carries the `sense` class.
+            if (definition.glosses.isEmpty() && hom.hasClass("sense")) {
+                definition.glosses.add(parseSense(hom))
             }
 
             // Idioms and phrases living directly on the hom (roaming, outside any

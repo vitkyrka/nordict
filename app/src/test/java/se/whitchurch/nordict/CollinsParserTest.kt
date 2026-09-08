@@ -337,4 +337,38 @@ class CollinsParserTest {
 
         assertGolden(words, "otro")
     }
+
+    @Test
+    fun testParseLeyDeLaGravedad() {
+        val htmlFile = File("../testdata/colspan/ley+de+la+gravedad.html")
+        val page = htmlFile.readText()
+        val uri = Uri.parse("https://www.collinsdictionary.com/dictionary/spanish-english/ley-de-la-gravedad")
+        val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
+
+        assertThat(words).hasSize(2)
+
+        // Cross-reference stub: the <div class="hom sense"> collapses the hom
+        // and its single sense, so the translation is captured rather than lost.
+        val stub = words[0]
+        assertThat(stub.mTitle).isEqualTo("ley de la gravedad")
+        assertThat(stub.dictionary).isEqualTo("Collins Spanish-English")
+        assertThat(stub.uri.toString()).doesNotContain("__ref")
+        assertThat(stub.definitions).hasSize(1)
+        assertThat(stub.definitions[0].pos).isEmpty()
+        assertThat(stub.definitions[0].glosses).hasSize(1)
+        assertThat(stub.definitions[0].glosses[0].definition).contains("law of gravity")
+
+        // The embedded full "ley" entry (carrying only data-xrentry) becomes its
+        // own main headword, reachable via __ref like any other homograph.
+        val ley = words[1]
+        assertThat(ley.mTitle).isEqualTo("ley")
+        assertThat(ley.dictionary).isEqualTo("Collins Spanish-English")
+        assertThat(ley.uri.toString()).contains("__ref=2")
+        assertThat(ley.definitions).hasSize(1)
+        assertThat(ley.definitions[0].pos).isEqualTo("feminine noun")
+        assertThat(ley.definitions[0].glosses).isNotEmpty()
+        assertThat(ley.definitions[0].glosses[0].definition).contains("law")
+
+        assertGolden(words, "ley")
+    }
 }

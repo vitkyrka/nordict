@@ -76,8 +76,14 @@ abstract class CollinsDictionary(
                 val item = items.getJSONObject(i)
                 val title = item.getString("title")
 
+                // Multi-word headwords arrive as "efectivo en caja". Collins
+                // canonical slugs are lower-cased with spaces as hyphens
+                // ("efectivo-en-caja"); a raw space (or %20) URL 301-redirects
+                // to a nonexistent "efectivoencaja" page, which renders a
+                // spellcheck page with no parseable entry.
+                val slug = title.replace(" ", "-").lowercase()
                 val uri =
-                    Uri.parse("$baseUrl/dictionary/${dictCode}/${title}")
+                    Uri.parse("$baseUrl/dictionary/${dictCode}/${slug}")
                 results.add(SearchResult(title, uri))
             }
         } catch (e: JSONException) {

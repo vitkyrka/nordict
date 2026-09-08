@@ -41,9 +41,15 @@ class CollinsIntegrationTest {
 
         val results = dictionary.search("cagar")
 
-        assertThat(results).hasSize(3)
+        assertThat(results).hasSize(4)
         assertThat(results[0].mTitle).isEqualTo("cagar")
         assertThat(results[0].uri.toString()).contains("/dictionary/spanish-english/cagar")
+
+        // Multi-word suggestions must be hyphenated into Collins's canonical
+        // slug, or the entry page 301s to a spellcheck page and fails to load.
+        val multiWord = results.first { it.mTitle == "efectivo en caja" }
+        assertThat(multiWord.uri.toString())
+            .isEqualTo("$baseUrl/dictionary/spanish-english/efectivo-en-caja")
 
         val request = server.takeRequest()
         assertThat(request.path).contains("/autocomplete/")
@@ -101,5 +107,31 @@ class CollinsIntegrationTest {
         assertThat(easy2).isNotNull()
         assertThat(easy2?.mTitle).isEqualTo("el frente")
         assertThat(easy2?.dictionary).isEqualTo("Collins Easy Learning")
+    }
+
+    @Test
+    fun testGetCrossReferenceEntry() {
+        val html = File("../testdata/colspan/ley+de+la+gravedad.html").readText()
+
+        // Default view -> the cross-reference stub headword.
+        server.enqueue(MockResponse().setBody(html))
+        val stubUri = Uri.parse("$baseUrl/dictionary/spanish-english/ley-de-la-gravedad")
+        val stub = dictionary.get(stubUri)
+        assertThat(stub).isNotNull()
+        assertThat(stub?.mTitle).isEqualTo("ley de la gravedad")
+        assertThat(stub?.dictionary).isEqualTo("Collins Spanish-English")
+        assertThat(stub?.definitions?.get(0)?.glosses).hasSize(1)
+        assertThat(stub?.definitions?.get(0)?.glosses?.get(0)?.definition).contains("law of gravity")
+
+        // __ref=2 -> the embedded full "ley" entry.
+        server.enqueue(MockResponse().setBody(html))
+        val refUri = Uri.parse("$baseUrl/dictionary/spanish-english/ley-de-la-gravedad").buildUpon()
+            .appendQueryParameter("__ref", "2").build()
+        val ley = dictionary.get(refUri)
+        assertThat(ley).isNotNull()
+        assertThat(ley?.mTitle).isEqualTo("ley")
+        assertThat(ley?.dictionary).isEqualTo("Collins Spanish-English")
+        assertThat(ley?.definitions?.get(0)?.pos).isEqualTo("feminine noun")
+        assertThat(ley?.audio).hasSize(2)
     }
 }
