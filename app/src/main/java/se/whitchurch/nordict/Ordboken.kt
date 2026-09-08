@@ -26,7 +26,11 @@ import okhttp3.CacheControl
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
-class Ordboken private constructor(context: Context, val client: OkHttpClient) {
+class Ordboken private constructor(
+    context: Context,
+    val client: OkHttpClient,
+    testDictionaries: Array<Dictionary>? = null
+) {
     private val mConnMgr: ConnectivityManager
     val mPrefs: SharedPreferences
     var images = ArrayList<String>()
@@ -36,8 +40,9 @@ class Ordboken private constructor(context: Context, val client: OkHttpClient) {
     var lastWhat: String? = null
         private set
     var currentCss: String = ""
-    lateinit var currentDictionary: Dictionary
+    lateinit     var currentDictionary: Dictionary
     var currentFlag: Int = R.drawable.flag_se
+    var onDictChanged: (() -> Unit)? = null
     private var currentIndex = 0
     private var dictionaries: Array<Dictionary>
     lateinit var dictMap: Map<String, Dictionary>
@@ -76,40 +81,8 @@ class Ordboken private constructor(context: Context, val client: OkHttpClient) {
         lastWhat = mPrefs.getString("lastWhat", "ordbok")
         mConnMgr = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
-        val so = SoDictionary(this.client)
-        so.init()
-
-        val ddo = DdoDictionary(this.client)
-        ddo.init()
-
-        val sdo = SdoDictionary(this.client)
-        sdo.init()
-
-        val dle = DleDictionary(this.client)
-        dle.init()
-
-        val est = EstDictionary(this.client)
-        est.init()
-
-        val colspan = CollinsSpanishEnglishDictionary(this.client)
-        colspan.init()
-
-        val lingpt = LingueeDictionary(this.client)
-        lingpt.init()
-
-        val infopedia = InfopediaDictionary(this.client)
-        infopedia.init()
-
-        val wfr = FrWiktionary(this.client)
-        wfr.init()
-
-        val rob = LeRobertDictionary(this.client)
-        rob.init()
-
-        val colfren = CollinsFrenchEnglishDictionary(this.client)
-        colfren.init()
-
-        dictionaries = arrayOf(so, ddo, sdo, dle, est, colspan, lingpt, infopedia, wfr, rob, colfren)
+        dictionaries = testDictionaries ?: defaultDictionaries()
+        dictionaries.forEach { it.init() }
         flags = dictionaries.map { it.flag }.toTypedArray()
         dictMap = dictionaries.associateBy { it.tag }
 
@@ -127,6 +100,21 @@ class Ordboken private constructor(context: Context, val client: OkHttpClient) {
         currentIndex = mPrefs.getInt("currentIndex", 0)
         currentDictionary = dictionaries[currentIndex]
         currentFlag = flags[currentIndex]
+    }
+
+    private fun defaultDictionaries(): Array<Dictionary> {
+        val so = SoDictionary(this.client)
+        val ddo = DdoDictionary(this.client)
+        val sdo = SdoDictionary(this.client)
+        val dle = DleDictionary(this.client)
+        val est = EstDictionary(this.client)
+        val colspan = CollinsSpanishEnglishDictionary(this.client)
+        val lingpt = LingueeDictionary(this.client)
+        val infopedia = InfopediaDictionary(this.client)
+        val wfr = FrWiktionary(this.client)
+        val rob = LeRobertDictionary(this.client)
+        val colfren = CollinsFrenchEnglishDictionary(this.client)
+        return arrayOf(so, ddo, sdo, dle, est, colspan, lingpt, infopedia, wfr, rob, colfren)
     }
 
     fun getWord(uri: Uri): Word? {
@@ -221,6 +209,7 @@ class Ordboken private constructor(context: Context, val client: OkHttpClient) {
             currentFlag = flags[index]
             saveDictIndex(currentDictionary.lang, index)
             activity.findViewById<ImageView>(R.id.dictFlag)?.setImageResource(flags[index])
+            onDictChanged?.invoke()
         }
     }
 
@@ -330,6 +319,18 @@ class Ordboken private constructor(context: Context, val client: OkHttpClient) {
                 sInstance = instance
             }
 
+            return instance
+        }
+
+        // Test-only: build a fresh Ordboken around a fixed set of dictionaries
+        // (e.g. MockWebServer-backed fixtures) instead of the real sources.
+        fun getInstance(
+            context: Context,
+            client: OkHttpClient,
+            dictionaries: Array<Dictionary>
+        ): Ordboken {
+            val instance = Ordboken(context, client, dictionaries)
+            sInstance = instance
             return instance
         }
 

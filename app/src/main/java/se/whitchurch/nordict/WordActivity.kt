@@ -36,7 +36,6 @@ import com.google.gson.Gson
 import se.whitchurch.nordict.OrdbokenContract.FavoritesEntry
 import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
 import java.io.StringReader
-import java.io.UnsupportedEncodingException
 import java.net.URLDecoder
 import java.util.*
 
@@ -313,34 +312,13 @@ class WordActivity : AppCompatActivity() {
     private inner class SearchLinkTask : AsyncTask<String, Void, SearchResult>() {
         override fun doInBackground(vararg params: String): SearchResult {
             val q = params[0]
-            val fake = SearchResult(q)
-            val results = mOrdboken?.currentDictionary?.search(q) ?: return fake
-
-            if (results.isEmpty()) {
-                return fake
-            }
-
-            val first = results[0]
-            if (first.mTitle != q) {
-                return fake
-            }
-
-            if (results.size == 1 || results[1].mTitle != first.mTitle) {
-                return first
-            }
-
-            return fake
+            val results = mOrdboken?.currentDictionary?.search(q) ?: return SearchResult(q)
+            return ExactMatch.resolve(q, results) ?: SearchResult(q)
         }
 
         override fun onPostExecute(result: SearchResult) {
             if (result.uri.host == "fake") {
-                try {
-                    mSearchView!!.setQuery(result.mTitle, false)
-                    mSearchView!!.isIconified = false
-                    mSearchView!!.requestFocusFromTouch()
-                } catch (e: UnsupportedEncodingException) {
-                    // Should not happen.
-                }
+                showSuggestions(result.mTitle)
             } else {
                 val intent = Intent(this@WordActivity, WordActivity::class.java).apply {
                     data = result.uri
@@ -350,6 +328,50 @@ class WordActivity : AppCompatActivity() {
 
             loadResource.decrement()
         }
+    }
+
+    // Triggered when the user taps a dictionary button for a different
+    // dictionary of the same language: search that dictionary for the current
+    // entry and, when there is a unique exact match, jump straight to it.
+    // Otherwise fill the search bar and show the new dictionary's suggestions.
+    private fun maybeSwitchDict() {
+        val ordboken = mOrdboken ?: return
+        val word = mWord ?: return
+
+        val newDict = ordboken.currentDictionary
+        val wordDict = ordboken.dictMap[word.dict] ?: return
+
+        // A language switch rebuilds the dictionary row and selects that
+        // language's default dictionary; don't cross-search languages.
+        if (newDict.lang != wordDict.lang) return
+
+        loadResource.increment()
+        SwitchDictTask().execute(word.mTitle)
+    }
+
+    private inner class SwitchDictTask : AsyncTask<String, Void, SearchResult>() {
+        override fun doInBackground(vararg params: String): SearchResult {
+            val q = params[0]
+            val results = mOrdboken?.currentDictionary?.search(q) ?: return SearchResult(q)
+            return ExactMatch.resolve(q, results) ?: SearchResult(q)
+        }
+
+        override fun onPostExecute(result: SearchResult) {
+            if (result.uri.host == "fake") {
+                showSuggestions(result.mTitle)
+            } else {
+                Ordboken.startWordActivity(this@WordActivity, result.mTitle, result.uri)
+            }
+
+            loadResource.decrement()
+        }
+    }
+
+    private fun showSuggestions(query: String) {
+        val searchView = mSearchView ?: return
+        searchView.setQuery(query, false)
+        searchView.isIconified = false
+        searchView.requestFocusFromTouch()
     }
 
     private inner class WordTask :
@@ -522,6 +544,7 @@ class WordActivity : AppCompatActivity() {
         super.onResume()
         mOrdboken!!.currentWord = mWord
         mOrdboken!!.onResume(this)
+        mOrdboken!!.onDictChanged = { maybeSwitchDict() }
 
         if (mWord != null) {
             StarUpdateTask().execute()

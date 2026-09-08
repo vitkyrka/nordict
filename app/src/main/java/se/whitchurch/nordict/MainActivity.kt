@@ -76,6 +76,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
 
         mOrdboken!!.onResume(this)
+        mOrdboken!!.onDictChanged = null
     }
 
     fun onListItemClick(l: ListView, v: View, position: Int, id: Long) {
