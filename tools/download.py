@@ -1,26 +1,32 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = ["curl_cffi"]
+# ///
 """Download a dictionary entry as HTML for use as a testdata fixture.
 
 Usage:
-    python3 tools/download.py est otro
-    python3 tools/download.py EST otro
+    uv run tools/download.py est otro
+    uv run tools/download.py COLSPAN otro
 
-Downloads https://www.rae.es/diccionario-estudiante/otro (EST) or
-https://dle.rae.es/otro (DLE) and writes the raw page (the same HTML the app
-fetches via OkHttp) to testdata/<tag>/<word>.html.
+Downloads https://www.rae.es/diccionario-estudiante/otro (EST),
+https://dle.rae.es/otro (DLE) or
+https://www.collinsdictionary.com/dictionary/spanish-english/otro (COLSPAN)
+and writes the raw page (the same HTML the app fetches via OkHttp) to
+testdata/<tag>/<word>.html.
 
-The RAE site is fronted by Cloudflare, which challenges plain curl requests
-(TLS/HTTP fingerprint) but serves real content to Python's stdlib urllib TLS
-stack. We mirror the app's request: plain GET, no Accept header, no cookies,
-and OkHttp's default user agent.
+The RAE and Collins sites are fronted by Cloudflare, which challenges plain
+curl/urllib requests (TLS/HTTP fingerprint) but serves real content to a
+Chrome TLS stack. OkHttp on Android also gets through, because its Conscrypt
+(Google BoringSSL) stack presents the same Chrome-family ClientHello. curl_cffi
+baits the same fingerprint, so we impersonate Chrome for every dictionary.
 """
 
 import argparse
-import gzip
-import io
 import sys
-import urllib.request
 from pathlib import Path
+
+from curl_cffi import requests
 
 ROOT = Path(__file__).resolve().parent.parent
 TESTDATA = ROOT / "testdata"
@@ -28,17 +34,15 @@ TESTDATA = ROOT / "testdata"
 DICTIONARIES = {
     "EST": "https://www.rae.es/diccionario-estudiante",
     "DLE": "https://dle.rae.es",
+    "COLSPAN": "https://www.collinsdictionary.com/dictionary/spanish-english",
 }
 
 
 def fetch(url: str) -> str:
-    request = urllib.request.Request(url, headers={"User-Agent": "okhttp/4.9.1"})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        body = response.read()
-        encoding = response.headers.get_content_charset() or "utf-8"
-        if response.headers.get("Content-Encoding") == "gzip":
-            body = gzip.decompress(body)
-        html = body.decode(encoding, errors="replace")
+    response = requests.get(url, impersonate="chrome", timeout=30)
+    if response.status_code != 200:
+        raise RuntimeError(f"HTTP {response.status_code} for {url}")
+    html = response.text
 
     if "Just a moment" in html or not html.strip():
         raise RuntimeError(
@@ -50,7 +54,12 @@ def fetch(url: str) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("dict", help="Dictionary abbreviation (EST or DLE; case-insensitive)")
+    parser.add_argument(
+        "dict",
+        help="Dictionary abbreviation ({0}; case-insensitive)".format(
+            ", ".join(DICTIONARIES)
+        ),
+    )
     parser.add_argument("word", help="Word to download")
     args = parser.parse_args()
 
