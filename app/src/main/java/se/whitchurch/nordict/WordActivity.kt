@@ -45,6 +45,7 @@ class WordActivity : AppCompatActivity() {
     internal val loadResource: CountingIdlingResource = CountingIdlingResource("search")
     private var mWebView: WebView? = null
     private var mScrollView: LockableNestedScrollView? = null
+    private var mBottomBar: BottomAppBar? = null
     private var mOrdboken: Ordboken? = null
     private var mWord: Word? = null
     private var mUrl: Uri? = null
@@ -76,6 +77,7 @@ class WordActivity : AppCompatActivity() {
         actionBar.setDisplayHomeAsUpEnabled(true)
 
         val bottomBar = findViewById<BottomAppBar>(R.id.bottom_app_bar)
+        mBottomBar = bottomBar
         bottomBar.replaceMenu(R.menu.bottom_word)
 
         autoPlay = getPreferences(Context.MODE_PRIVATE)?.getBoolean("autoPlay", false) ?: false
@@ -323,9 +325,13 @@ class WordActivity : AppCompatActivity() {
         mWebView?.post {
             val webView = mWebView ?: return@post
             val scrollView = mScrollView ?: return@post
+            val bottomBar = mBottomBar ?: return@post
+            // The bottom bar overlays the scroll view and never hides for JSON
+            // pages (the outer view is locked), so end the WebView viewport at
+            // the bar's top instead of letting it cover the last lines.
             val lp = webView.layoutParams
             lp.width = scrollView.width.coerceAtLeast(1)
-            lp.height = scrollView.height.coerceAtLeast(1)
+            lp.height = (bottomBar.top - scrollView.top).coerceAtLeast(1)
             webView.layoutParams = lp
         }
     }
