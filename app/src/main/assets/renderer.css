@@ -45,6 +45,47 @@ a.normalx {
     cursor: default !important;
 }
 
+/* ---- Homonym page (combined entries with anchor navigation) ---- */
+
+/* Nav row: repeated above each entry heading. */
+.homonym-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    padding: 0.4em 0;
+    font-size: 0.95em;
+}
+
+.homonym-nav a {
+    text-decoration: none;
+    color: var(--domain-color);
+    font-weight: 600;
+}
+
+.homonym-nav a.homonym-current {
+    color: var(--text-color);
+    font-weight: 700;
+}
+
+/* "|" separators between nav labels */
+.homonym-sep {
+    margin: 0 0.45em;
+    color: var(--muted-color);
+}
+
+/* RAE-style ordinal on duplicate headword labels (frente¹, frente², ...) */
+.homonym-ordinal {
+    font-size: 0.72em;
+    margin-left: 0.05em;
+}
+
+/* Each entry's section starts at its nav row; separate consecutive entries. */
+.homonym-entry + .homonym-entry {
+    margin-top: 1.2em;
+    padding-top: 0.8em;
+    border-top: 2px solid var(--muted-color);
+}
+
 span.grammar {
     color: var(--grammar-color);
     font-weight: bold;

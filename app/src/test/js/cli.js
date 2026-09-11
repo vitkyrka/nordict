@@ -37,21 +37,29 @@ inlineScript('jq-js', 'jquery.min.js');
 inlineScript('renderer-js', 'renderer.js');
 inlineScript('word-js', 'word.js');
 
-// Load one headword; for multiple headwords append one template article each.
-// (renderer.js exposes `template()` as a top-level const in the inline script.)
+// Load one headword; for multiple headwords the list is that dictionary's
+// homonym set (the parser-output shape), so render them the way the app does:
+// a single word carrying mHomonymEntries draws all entries as one page with
+// the per-heading nav rows. (renderer.js is inlined as a classic script, so
+// `renderWord` is in global scope here.)
 const json = JSON.stringify(words).replace(/<\/script>/g, '<\\/script>');
 const loadScript = words.length === 1 ? `
     loadWord(words[0]);
 ` : `
     $(document).ready(() => {
-        const content = document.getElementById('content');
-        words.forEach((word, i) => {
-            if (i > 0) {
-                content.insertAdjacentHTML('beforeend', '<hr class="cli-word-sep">');
-            }
-            content.insertAdjacentHTML('beforeend', template(word));
-        });
-        createLinks(content);
+        const homs = words.map(w => ({
+            mTitle: w.mTitle,
+            ref: (w.xrefs && w.xrefs[0]) || '',
+            dictionary: w.dictionary,
+            conjugation: w.conjugation || '',
+            participle: w.participle || '',
+            etymology: w.etymology || '',
+            definitions: w.definitions || [],
+            idioms: w.idioms || [],
+            audio: w.audio || []
+        }));
+        renderWord(Object.assign({}, words[0], { mHomonymEntries: homs }));
+        createLinks(document.getElementById('content'));
     });
 `;
 

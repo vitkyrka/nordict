@@ -249,4 +249,62 @@ class DleParserTest {
 
         assertGolden(words, "../testdata/dle/otro.json")
     }
+
+    @Test
+    fun testParseDleHomonyms() {
+        // A homonym page: two <article> lemmas sharing the same headword.
+        val page = """
+            <!DOCTYPE html><html><head></head><body>
+            <div id="resultados">
+            <article>
+                <header><h1>cura</h1></header>
+                <div class="n2 c-text-intro">Del lat. curas.</div>
+                <ol class="c-definitions">
+                    <li><div class="c-definitions__item">
+                        <div><span class="n_acep">1</span><abbr title="nombre femenino">f.</abbr> Cuidado de algo.</div>
+                    </div></li>
+                </ol>
+            </article>
+            <article>
+                <header><h1>cura</h1></header>
+                <div class="n2 c-text-intro">Del lat. cura.</div>
+                <ol class="c-definitions">
+                    <li><div class="c-definitions__item">
+                        <div><span class="n_acep">1</span><abbr title="nombre masculino">m.</abbr> Sacerdote católico.</div>
+                    </div></li>
+                </ol>
+            </article>
+            </div>
+            </body></html>
+        """.trimIndent()
+        val uri = Uri.parse("https://dle.rae.es/cura")
+        val words = DleParser.parse(page, uri, "DLE")
+
+        assertThat(words).hasSize(2)
+        assertThat(words.map { it.mTitle }).containsExactly("cura", "cura")
+
+        assertThat(words[0].uri.toString()).doesNotContain("__ref")
+        assertThat(words[0].xrefs).containsExactly("1")
+        assertThat(words[1].uri.toString()).endsWith("?__ref=2")
+        assertThat(words[1].xrefs).containsExactly("2")
+
+        for (word in words) {
+            assertThat(word.mHomographs).hasSize(2)
+            assertThat(word.mHomonymEntries).hasSize(2)
+            assertThat(word.mHomonymEntries.map { it.ref }).containsExactly("1", "2").inOrder()
+        }
+
+        val fem = words[0].mHomonymEntries[0]
+        assertThat(fem.etymology).isEqualTo("Del lat. curas.")
+        assertThat(fem.definitions).hasSize(1)
+        assertThat(fem.definitions[0].grammar).isEqualTo("nombre femenino")
+        assertThat(fem.definitions[0].gender).isEqualTo(Genders.FEMININE)
+        assertThat(fem.definitions[0].glosses[0].definition).isEqualTo("Cuidado de algo.")
+
+        val masc = words[0].mHomonymEntries[1]
+        assertThat(masc.etymology).isEqualTo("Del lat. cura.")
+        assertThat(masc.definitions).hasSize(1)
+        assertThat(masc.definitions[0].grammar).isEqualTo("nombre masculino")
+        assertThat(masc.definitions[0].glosses[0].definition).isEqualTo("Sacerdote católico.")
+    }
 }

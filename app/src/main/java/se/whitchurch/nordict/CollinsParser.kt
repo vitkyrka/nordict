@@ -123,8 +123,11 @@ class CollinsParser {
 
             if (words.size > 1) {
                 val homographs = words.map { SearchResult(it.mTitle, it.summary, it.uri) }
+                val entries = Word.homonymEntries(words)
+
                 for (word in words) {
                     word.mHomographs.addAll(homographs)
+                    word.mHomonymEntries.addAll(entries)
                 }
             }
 

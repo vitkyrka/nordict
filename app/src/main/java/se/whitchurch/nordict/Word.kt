@@ -31,6 +31,14 @@ class Word(
         get() = rawHeadword.takeIf { it.isNotBlank() } ?: mTitle
 
     val mHomographs: ArrayList<SearchResult>
+
+    // Full renderable content of every entry (homograph, sub-entry, Collins
+    // POS-group) on the page that produced this word, in page order and
+    // including this word itself. Only the JSON-rendered dictionaries (EST,
+    // DLE, COLSPAN) fill this; the renderer draws all entries as a single
+    // page with in-page anchor navigation between them. Empty elsewhere, so
+    // legacy dictionaries are unaffected.
+    val mHomonymEntries: ArrayList<HomonymEntry> = ArrayList()
     val mHasAudio: Boolean
     val idioms: ArrayList<Idiom> = ArrayList()
     val definitions: ArrayList<Definition> = ArrayList()
@@ -100,6 +108,25 @@ class Word(
         val synonyms: ArrayList<Synonym> = ArrayList()
         val antonyms: ArrayList<String> = ArrayList()
     }
+
+    // A flattened, serializable snapshot of a Word for the combined homonym
+    // page: everything renderer.js needs (`mTitle`, morphology, etymology,
+    // `dictionary` label, definitions, idioms) without the transient jsoup
+    // elements or the raw page HTML carried by Word itself. `ref` is the
+    // entry's `__ref` id and is used by the renderer to pick the current
+    // entry (anchor `hom-N`) and by word.js to keep nav anchors out of the
+    // auto-linking regex.
+    class HomonymEntry(
+        val mTitle: String,
+        val ref: String,
+        val dictionary: String = "",
+        val conjugation: String = "",
+        val participle: String = "",
+        val etymology: String = "",
+        val definitions: ArrayList<Definition> = ArrayList(),
+        val idioms: ArrayList<Idiom> = ArrayList(),
+        val audio: ArrayList<String> = ArrayList()
+    )
 
     fun getPage(chosenDefs: List<Definition>? = null, css: String? = null): String {
         val doc = element.clone()
@@ -175,5 +202,26 @@ class Word(
         // comma is the searchable key the autocomplete API and other dictionaries
         // expect (e.g. Collins keys "otro", "macabro").
         fun raeSearchKey(title: String): String = title.substringBefore(',').trim()
+
+        fun toHomonymEntry(word: Word): HomonymEntry {
+            return HomonymEntry(
+                mTitle = word.mTitle,
+                ref = word.xrefs.firstOrNull() ?: "",
+                dictionary = word.dictionary,
+                conjugation = word.conjugation,
+                participle = word.participle,
+                etymology = word.etymology,
+                definitions = ArrayList(word.definitions),
+                idioms = ArrayList(word.idioms),
+                audio = ArrayList(word.audio)
+            )
+        }
+
+        // Flatten a page's words into serializable homonym entries, in page
+        // order and including the caller's word, so the renderer can draw the
+        // whole set on one page.
+        fun homonymEntries(words: List<Word>): ArrayList<HomonymEntry> {
+            return ArrayList(words.map { toHomonymEntry(it) })
+        }
     }
 }

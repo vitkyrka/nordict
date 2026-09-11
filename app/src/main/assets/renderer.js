@@ -127,8 +127,61 @@ const template = (word) => `
     </article>
 `;
 
+// ---- Homonym page ----
+//
+// When a JSON dictionary page carries several entries (RAE homographs and
+// .sols sub-entries, Collins POS-group homs), every entry's full renderable
+// data is attached to the word under `mHomonymEntries` (page order, entry
+// included). The renderer draws all entries stacked on one page with a nav
+// row above each heading, each entry identified by an in-page anchor
+// (`#hom-N`). Each nav row shows the entry that follows it as bold text and
+// the others as `#hom-N` links. All labels are anchors (the current one
+// self-links) so word.js auto-linking skips them.
+
+// Label each entry; entries with a title that appears more than once get a
+// RAE-style ordinal (frente¹, frente², ...) so same-name homographs are
+// distinguishable in the nav.
+const homonymLabels = (entries) => {
+    const counts = {};
+    entries.forEach(e => {
+        const t = e.mTitle;
+        counts[t] = (counts[t] || 0) + 1;
+    });
+
+    const seen = {};
+    return entries.map(e => {
+        const t = e.mTitle;
+        const n = (seen[t] = (seen[t] || 0) + 1);
+        return { title: t, ordinal: counts[t] > 1 ? n : '' };
+    });
+};
+
+const renderHomonymNav = (entries, labels, currentIndex) => `
+    <nav class="homonym-nav">
+        ${entries.map((e, i) => `
+            ${i > 0 ? '<span class="homonym-sep">|</span>' : ''}
+            <a class="${i === currentIndex ? 'homonym-current' : 'homonym-link'}"
+               href="#hom-${i + 1}">${labels[i].title}${labels[i].ordinal ? `<sup class="homonym-ordinal">${labels[i].ordinal}</sup>` : ''}</a>
+        `).join('')}
+    </nav>
+`;
+
+const renderHomonymPage = (entries) => {
+    const labels = homonymLabels(entries);
+    return entries.map((entry, i) => `
+        <section id="hom-${i + 1}" class="homonym-entry">
+            ${renderHomonymNav(entries, labels, i)}
+            ${template(entry)}
+        </section>
+    `).join('');
+};
+
 function renderWord(word) {
-    $('#content').html(template(word));
+    const entries = (word.mHomonymEntries && word.mHomonymEntries.length > 1)
+        ? word.mHomonymEntries
+        : null;
+
+    $('#content').html(entries ? renderHomonymPage(entries) : template(word));
 }
 
 // For Node.js testing

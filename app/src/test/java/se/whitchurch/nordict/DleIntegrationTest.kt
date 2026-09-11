@@ -66,6 +66,60 @@ class DleIntegrationTest {
     }
 
     @Test
+    fun testGetHomonyms() {
+        // A homonym page: two <article> lemmas sharing the same headword.
+        val html = """
+            <!DOCTYPE html><html><head></head><body>
+            <div id="resultados">
+            <article>
+                <header><h1>cura</h1></header>
+                <div class="n2 c-text-intro">Del lat. curas.</div>
+                <ol class="c-definitions">
+                    <li><div class="c-definitions__item">
+                        <div><span class="n_acep">1</span><abbr title="nombre femenino">f.</abbr> Cuidado de algo.</div>
+                    </div></li>
+                </ol>
+            </article>
+            <article>
+                <header><h1>cura</h1></header>
+                <div class="n2 c-text-intro">Del lat. cura.</div>
+                <ol class="c-definitions">
+                    <li><div class="c-definitions__item">
+                        <div><span class="n_acep">1</span><abbr title="nombre masculino">m.</abbr> Sacerdote católico.</div>
+                    </div></li>
+                </ol>
+            </article>
+            </div>
+            </body></html>
+        """.trimIndent()
+
+        // Default URL resolves to the first homonym and carries both entries.
+        server.enqueue(MockResponse().setBody(html))
+        val uri = Uri.parse(server.url("/cura").toString())
+        val word = dictionary.get(uri)
+
+        assertThat(word).isNotNull()
+        assertThat(word?.mTitle).isEqualTo("cura")
+        assertThat(word?.mHomonymEntries).hasSize(2)
+        assertThat(word?.mHomonymEntries?.map { it.ref }).containsExactly("1", "2").inOrder()
+        assertThat(word?.mHomonymEntries?.get(0)?.definitions?.get(0)?.grammar)
+            .isEqualTo("nombre femenino")
+        assertThat(word?.mHomonymEntries?.get(1)?.definitions?.get(0)?.grammar)
+            .isEqualTo("nombre masculino")
+
+        // __ref selects the second homonym; the entry list still covers both.
+        server.enqueue(MockResponse().setBody(html))
+        val refUri = uri.buildUpon().appendQueryParameter("__ref", "2").build()
+        val word2 = dictionary.get(refUri)
+
+        assertThat(word2).isNotNull()
+        assertThat(word2?.mTitle).isEqualTo("cura")
+        assertThat(word2?.mHomonymEntries).hasSize(2)
+        assertThat(word2?.mHomonymEntries?.get(1)?.definitions?.get(0)?.glosses?.get(0)?.definition)
+            .isEqualTo("Sacerdote católico.")
+    }
+
+    @Test
     fun testRegistration() {
         Ordboken.reset()
         val ordboken = Ordboken.getInstance(ApplicationProvider.getApplicationContext(), client)

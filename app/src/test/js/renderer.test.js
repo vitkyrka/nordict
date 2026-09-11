@@ -197,6 +197,136 @@ test('exposes shared gender constants', () => {
     expect(GENDERS.MASCULINE).toBe('masculino');
 });
 
+/* ---- Homonym page (combined entries with anchor navigation) ---- */
+
+const homonymWord = (entries, xrefs = ['1']) => ({
+    mTitle: entries[0].mTitle,
+    xrefs,
+    mHomonymEntries: entries
+});
+
+const entry = (title, ref) => ({
+    mTitle: title,
+    ref,
+    dictionary: 'EST',
+    definitions: [
+        {
+            glosses: [
+                { definition: `definition of ${title}`, grammar: 'nombre masculino', gender: '', examples: [] }
+            ]
+        }
+    ],
+    idioms: []
+});
+
+test('renders all homonym entries on one page with a per-entry nav row', () => {
+    const word = homonymWord([entry('frente', '1'), entry('frente', '2'), entry('frente', '3')]);
+
+    renderWord(word);
+
+    expect($('.homonym-entry').length).toBe(3);
+    expect($('#hom-1').length).toBe(1);
+    expect($('#hom-2').length).toBe(1);
+    expect($('#hom-3').length).toBe(1);
+    // One nav row per entry, no sticky bar
+    expect($('.homonym-navbar').length).toBe(0);
+    expect($('.homonym-nav').length).toBe(3);
+
+    // Each entry's own heading and definition render
+    expect($('#hom-1 h1').text()).toBe('frente');
+    expect($('#hom-3 h1').text()).toBe('frente');
+    expect($('#hom-2 .definition').text()).toContain('definition of frente');
+});
+
+test('per-entry nav marks that entry as current; others are #hom-N links', () => {
+    const word = homonymWord([entry('frente', '1'), entry('frente', '2')]);
+
+    renderWord(word);
+
+    // Row above entry 1: entry 1 is current, entry 2 is a link
+    const row1 = $('#hom-1 > .homonym-nav');
+    expect(row1.find('.homonym-current').attr('href')).toBe('#hom-1');
+    expect(row1.find('.homonym-link').attr('href')).toBe('#hom-2');
+
+    // Row above entry 2: entry 2 is current, entry 1 is a link
+    const row2 = $('#hom-2 > .homonym-nav');
+    expect(row2.find('.homonym-current').attr('href')).toBe('#hom-2');
+    expect(row2.find('.homonym-link').attr('href')).toBe('#hom-1');
+
+    expect($('.homonym-nav a[href]').filter((_, el) => !$(el).attr('href').startsWith('#hom-')).length).toBe(0);
+});
+
+test('duplicate headword titles are numbered RAE-style in the nav', () => {
+    const word = homonymWord([entry('cura', '1'), entry('cura', '2'), entry('cura', '3')]);
+
+    renderWord(word);
+
+    const tails = $('#hom-1 > .homonym-nav a').map((_, el) => $(el).clone().find('.homonym-ordinal').remove().end().text().trim()).get();
+    expect(tails).toEqual(['cura', 'cura', 'cura']);
+    const ordinals = $('#hom-1 > .homonym-nav .homonym-ordinal').map((_, el) => $(el).text()).get();
+    expect(ordinals).toEqual(['1', '2', '3']);
+});
+
+test('distinct sub-entry titles are shown plain without ordinals', () => {
+    const word = homonymWord(
+        [entry('muerte', '1'), entry('muerte natural', '2'), entry('muerte violenta', '3')],
+        ['1']
+    );
+
+    renderWord(word);
+
+    const labels = $('#hom-1 > .homonym-nav a').map((_, el) => $(el).text()).get();
+    expect(labels).toEqual(['muerte', 'muerte natural', 'muerte violenta']);
+    expect($('.homonym-ordinal').length).toBe(0);
+});
+
+test('word without homonym entries renders as a single article (no nav)', () => {
+    const word = {
+        mTitle: 'frente',
+        definitions: [
+            { glosses: [{ definition: 'Parte superior de la cara.', grammar: '', gender: '', examples: [] }] }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('.homonym-navbar').length).toBe(0);
+    expect($('.homonym-entry').length).toBe(0);
+    expect($('article').length).toBe(1);
+});
+
+test('mHomonymEntries with a single entry does not produce a homonym page', () => {
+    renderWord(homonymWord([entry('frente', '1')]));
+
+    expect($('.homonym-navbar').length).toBe(0);
+    expect($('.homonym-entry').length).toBe(0);
+    expect($('article').length).toBe(1);
+    expect($('h1').text()).toBe('frente');
+});
+
+test('homonym entries render their own dictionary label and morphology', () => {
+    const rich = (ref) => ({
+        mTitle: 'morir',
+        ref,
+        dictionary: 'DLE',
+        conjugation: 'dormir',
+        participle: 'muerto',
+        etymology: 'Del lat. morī.',
+        definitions: [
+            { glosses: [{ definition: 'Llegar al término de la vida.', grammar: 'verbo intransitivo', gender: '', examples: [] }] }
+        ],
+        idioms: []
+    });
+    renderWord(homonymWord([rich('1'), rich('2')]));
+
+    expect($('.homonym-entry').length).toBe(2);
+    expect($('.dictionary-label').length).toBe(2);
+    expect($('.dictionary-label').text()).toBe('DLEDLE');
+    expect($('.etymology').length).toBe(2);
+    expect($('.morphology').length).toBe(2);
+});
+
 test('renders conjugation and participle in header', () => {
     const word = {
         mTitle: 'morir',

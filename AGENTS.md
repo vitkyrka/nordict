@@ -118,7 +118,9 @@ npm run render -- testdata-path /tmp/out.html   # cli.js, preview in browser
 
 `npm run render` (i.e. `node cli.js`) takes a JSON file (same schema as
 `testdata/est.json`) and emits a standalone HTML file with all assets inlined,
-for browser preview.
+for browser preview. A list of words (the parser-golden shape, e.g.
+`testdata/colspan/frente.json`) is treated as a homonym set and rendered as
+the combined page with per-heading nav rows, exactly like the app does.
 
 ### Instrumented tests
 
@@ -217,6 +219,16 @@ markers appear — "uso coloquial" / "usado en América" are dropped.
 - `Word` fields are read by `renderer.js` by exact JSON name; renaming fields
   in `Word.kt` requires updating the data classes in `EstParserTest.kt`,
   `testdata/est.json`, and `renderer.js`/its tests.
+- Multi-entry pages: when a JSON dictionary page yields more than one word
+  (RAE homographs/.sols sub-entries, Collins POS-group homs) each `Word`
+  carries a serializable `mHomonymEntries` list `HomonymEntry(mTitle, ref,
+  ...)` snapshotting every page entry (page order, itself included), filled
+  by `Word.homonymEntries(...)` in `EstParser`/`DleParser`/`CollinsParser`.
+  `renderer.js` draws all entries stacked on one page, with a nav row above
+  each heading (`#hom-N` anchors) listing every entry (duplicate titles get
+  RAE-style ordinals) and bolding the one that follows the row. Legacy
+  (non-JSON) dictionaries leave the list empty and keep the OS-level homograph
+  strip (`WordActivity.loadHomographs`, now skipped for `renderAsJson` words).
 - The `definitions`/`idioms` lists in `Word` carry plain fields only; jsoup
   `Element`s are `@Transient` and never reach the renderer.
 - `renderer.js` accepts both plain strings and structured `{text, href, plev}`

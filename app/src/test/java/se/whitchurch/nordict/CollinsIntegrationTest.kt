@@ -89,6 +89,10 @@ class CollinsIntegrationTest {
         assertThat(main).isNotNull()
         assertThat(main?.mTitle).isEqualTo("frente")
         assertThat(main?.dictionary).isEqualTo("Collins Spanish-English")
+        // The combined page carries every headword (main + easy-learning).
+        assertThat(main?.mHomonymEntries).hasSize(4)
+        assertThat(main?.mHomonymEntries?.map { it.mTitle })
+            .containsExactly("frente", "frente", "la frente", "el frente").inOrder()
 
         // __ref=1 -> the first easy-learning headword.
         server.enqueue(MockResponse().setBody(html))

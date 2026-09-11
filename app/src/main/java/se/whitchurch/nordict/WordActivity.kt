@@ -234,6 +234,11 @@ class WordActivity : AppCompatActivity() {
 
     @SuppressLint("SetTextI18n")
     private fun loadHomographs(word: Word) {
+        // JSON-rendered dictionaries (EST, DLE, Collins) draw all homonyms
+        // on a single page with in-page anchor navigation; skip the legacy
+        // OS-level strip for them.
+        if (word.renderAsJson) return
+
         val linearLayout = findViewById<LinearLayout>(R.id.linear_layout)
 
         linearLayout.removeAllViews()

@@ -84,6 +84,14 @@ class EstIntegrationTest {
         assertThat(word?.definitions).hasSize(1)
         assertThat(word?.idioms).isEmpty()
 
+        // All page entries are attached for the combined in-page rendering.
+        assertThat(word?.mHomonymEntries).hasSize(3)
+        assertThat(word?.mHomonymEntries?.map { it.mTitle })
+            .containsExactly("muerte", "muerte natural", "muerte violenta").inOrder()
+        assertThat(word?.mHomonymEntries?.map { it.ref })
+            .containsExactly("1", "2", "3").inOrder()
+        assertThat(word?.mHomonymEntries?.get(2)?.mTitle).isEqualTo("muerte violenta")
+
         // Homograph/ref URL selects another sub-entry.
         server.enqueue(MockResponse().setBody(html))
         val refUri = Uri.parse(server.url("/muerte").toString()).buildUpon()

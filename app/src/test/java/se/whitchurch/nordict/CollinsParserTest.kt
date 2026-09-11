@@ -170,6 +170,20 @@ class CollinsParserTest {
         assertThat(masc.uri.toString()).contains("__ref=4")
         assertThat(masc.xrefs).containsExactly("4")
 
+        // Every word on the page carries the full renderable entry list (main
+        // headwords first, then easy-learning), itself included.
+        for (w in words) {
+            assertThat(w.mHomonymEntries).hasSize(4)
+            assertThat(w.mHomonymEntries.map { it.ref }).containsExactly("3", "4", "1", "2").inOrder()
+        }
+        assertThat(fem.mHomonymEntries.map { it.mTitle })
+            .containsExactly("frente", "frente", "la frente", "el frente").inOrder()
+        assertThat(fem.mHomonymEntries[1].definitions[0].pos).isEqualTo("masculine noun")
+        assertThat(fem.mHomonymEntries[1].audio).hasSize(2)
+        assertThat(fem.mHomonymEntries[3].dictionary).isEqualTo("Collins Easy Learning")
+        // Every entry snapshot carries its own content.
+        assertThat(words[2].mHomonymEntries[2].mTitle).isEqualTo("la frente")
+
         // Easy-learning headwords follow (no audio).
         assertThat(words[2].mTitle).isEqualTo("la frente")
         assertThat(words[2].rawHeadword).isEqualTo("frente")

@@ -314,6 +314,22 @@ class EstParserTest {
         assertThat(words[2].definitions[0].glosses[0].examples)
             .containsExactly("La policía no descarta una muerte violenta a manos de su novio.")
 
+        // Every page word carries the full renderable entry list (page order,
+        // itself included) so the renderer can draw all entries in one page.
+        for (w in words) {
+            assertThat(w.mHomonymEntries).hasSize(3)
+            assertThat(w.mHomonymEntries.map { it.mTitle })
+                .containsExactly("muerte", "muerte natural", "muerte violenta").inOrder()
+            assertThat(w.mHomonymEntries.map { it.ref }).containsExactly("1", "2", "3").inOrder()
+        }
+        // Each entry snapshot carries that entry's own content.
+        assertThat(word.mHomonymEntries[0].definitions).hasSize(3)
+        assertThat(word.mHomonymEntries[1].mTitle).isEqualTo("muerte natural")
+        assertThat(word.mHomonymEntries[1].definitions).hasSize(1)
+        assertThat(word.mHomonymEntries[1].definitions[0].glosses[0].definition)
+            .contains("producida por enfermedad")
+        assertThat(word.mHomonymEntries[2].mTitle).isEqualTo("muerte violenta")
+
         assertGolden(words, "../testdata/est/muerte.json")
     }
 
@@ -359,5 +375,58 @@ class EstParserTest {
         assertThat(def4.glosses[1].grammar).isEqualTo("")
 
         assertGolden(words, "../testdata/est/otro.json")
+    }
+
+    @Test
+    fun testParseEstTrueHomonyms() {
+        // A real homonym page: two <article> lemmas sharing the same headword
+        // ("cura"), each with its own etymology and definitions.
+        val page = """
+            <!DOCTYPE html><html><head></head><body>
+            <div id="resultados">
+            <article>
+                <header><span class="entrada">cura</span></header>
+                <div class="acep"><abbr class="gram" title="nombre femenino">f.</abbr>
+                    <span class="def">Atención o cuidado.</span></div>
+            </article>
+            <article>
+                <header><span class="entrada">cura</span></header>
+                <div class="acep"><span class="def">Persona que ejerce el sacerdocio.</span></div>
+            </article>
+            </div>
+            </body></html>
+        """.trimIndent()
+        val uri = Uri.parse("https://www.rae.es/diccionario-estudiante/cura")
+        val words = EstParser.parse(page, uri, "EST")
+
+        assertThat(words).hasSize(2)
+        assertThat(words.map { it.mTitle }).containsExactly("cura", "cura")
+
+        // First homonym keeps the canonical URL; the second resolves via __ref.
+        assertThat(words[0].uri.toString()).doesNotContain("__ref")
+        assertThat(words[0].xrefs).containsExactly("1")
+        assertThat(words[1].uri.toString()).endsWith("?__ref=2")
+        assertThat(words[1].xrefs).containsExactly("2")
+
+        // Each entry snapshots the whole set, keyed by the same refs.
+        for (word in words) {
+            assertThat(word.mHomographs).hasSize(2)
+            assertThat(word.mHomonymEntries).hasSize(2)
+            assertThat(word.mHomonymEntries.map { it.ref }).containsExactly("1", "2").inOrder()
+            assertThat(word.mHomonymEntries.map { it.mTitle }).containsExactly("cura", "cura").inOrder()
+        }
+
+        // Entry snapshots keep each homonym's own definitions.
+        val first = words[0].mHomonymEntries[0]
+        assertThat(first.definitions).hasSize(1)
+        assertThat(first.definitions[0].glosses[0].grammar).isEqualTo("nombre femenino")
+        assertThat(first.definitions[0].glosses[0].definition).isEqualTo("Atención o cuidado.")
+        assertThat(first.definitions[0].glosses[0].gender).isEqualTo(Genders.FEMININE)
+
+        val second = words[0].mHomonymEntries[1]
+        assertThat(second.definitions).hasSize(1)
+        assertThat(second.definitions[0].glosses[0].grammar).isEmpty()
+        assertThat(second.definitions[0].glosses[0].definition)
+            .isEqualTo("Persona que ejerce el sacerdocio.")
     }
 }
