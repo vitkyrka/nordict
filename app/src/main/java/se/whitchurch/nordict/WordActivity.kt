@@ -18,6 +18,7 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.view.ViewGroup
 import android.view.Window
 import android.webkit.*
 import android.widget.*
@@ -43,6 +44,7 @@ import java.util.*
 class WordActivity : AppCompatActivity() {
     internal val loadResource: CountingIdlingResource = CountingIdlingResource("search")
     private var mWebView: WebView? = null
+    private var mScrollView: LockableNestedScrollView? = null
     private var mOrdboken: Ordboken? = null
     private var mWord: Word? = null
     private var mUrl: Uri? = null
@@ -112,6 +114,7 @@ class WordActivity : AppCompatActivity() {
 
         val webView = findViewById<View>(R.id.webView) as WebView ?: return
         mWebView = webView
+        mScrollView = findViewById(R.id.scroll_view)
         mWebView!!.webChromeClient = WebChromeClient()
         val settings = mWebView!!.settings.apply {
             builtInZoomControls = true
@@ -272,6 +275,13 @@ class WordActivity : AppCompatActivity() {
 
     private fun loadWebView(word: Word) {
         if (word.renderAsJson) {
+            // JSON pages are taller than the screen inside the outer scroll
+            // view, which would swallow in-page #hom-N anchor navigation.
+            // Lock the outer view and size the WebView to the viewport so the
+            // WebView scrolls internally and anchors land on their headings.
+            mScrollView?.scrollLocked = true
+            pinWebViewToViewport()
+
             val gson = Gson()
             val json = gson.toJson(word)
             val template = assets.open("word_template.html").bufferedReader().use { it.readText() }
@@ -289,6 +299,11 @@ class WordActivity : AppCompatActivity() {
             return
         }
 
+        // Legacy dictionaries render original HTML that the outer scroll view
+        // scrolls, so undo the JSON-page viewport pinning.
+        mScrollView?.scrollLocked = false
+        unpinWebView()
+
         val text = word.getPage()
         val footer = ("<script src='file:///android_asset/jquery.min.js'></script>"
                 + "<link rel='stylesheet' type='text/css' href='file:///android_asset/word.css'>"
@@ -302,6 +317,29 @@ class WordActivity : AppCompatActivity() {
             word.baseUrl, builder.toString(),
             "text/html", "UTF-8", null
         )
+    }
+
+    private fun pinWebViewToViewport() {
+        mWebView?.post {
+            val webView = mWebView ?: return@post
+            val scrollView = mScrollView ?: return@post
+            val lp = webView.layoutParams
+            lp.width = scrollView.width.coerceAtLeast(1)
+            lp.height = scrollView.height.coerceAtLeast(1)
+            webView.layoutParams = lp
+        }
+    }
+
+    private fun unpinWebView() {
+        mWebView?.post {
+            val webView = mWebView ?: return@post
+            val lp = webView.layoutParams
+            if (lp.height != ViewGroup.LayoutParams.WRAP_CONTENT) {
+                lp.width = ViewGroup.LayoutParams.MATCH_PARENT
+                lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
+                webView.layoutParams = lp
+            }
+        }
     }
 
     private fun updateStar() {

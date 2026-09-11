@@ -229,6 +229,12 @@ markers appear — "uso coloquial" / "usado en América" are dropped.
   RAE-style ordinals) and bolding the one that follows the row. Legacy
   (non-JSON) dictionaries leave the list empty and keep the OS-level homograph
   strip (`WordActivity.loadHomographs`, now skipped for `renderAsJson` words).
+  The word-view WebView sits `wrap_content` inside a `LockableNestedScrollView`
+  (`activity_word.xml`, id `scroll_view`). For `renderAsJson` words,
+  `WordActivity.loadWebView` locks the outer view and sizes the WebView to the
+  viewport (`pinWebViewToViewport`), so the WebView scrolls internally and the
+  `#hom-N` anchors jump reliably; otherwise (legacy dictionaries) the outer
+  view scrolls the whole page (`unpinWebView` unlocks both).
 - The `definitions`/`idioms` lists in `Word` carry plain fields only; jsoup
   `Element`s are `@Transient` and never reach the renderer.
 - `renderer.js` accepts both plain strings and structured `{text, href, plev}`
