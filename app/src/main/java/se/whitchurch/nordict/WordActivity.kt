@@ -655,6 +655,14 @@ class WordActivity : AppCompatActivity() {
             StarToggleTask().execute()
         }
 
+        if (item.itemId == R.id.menu_open_in_browser) {
+            mWord?.uri?.let { url ->
+                val browserIntent = Intent(Intent.ACTION_VIEW, url.toAndroidUri())
+                startActivity(browserIntent)
+            }
+            return true
+        }
+
         return super.onOptionsItemSelected(item)
     }
 }

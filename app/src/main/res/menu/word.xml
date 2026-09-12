@@ -8,4 +8,10 @@
         android:visible="true"
         app:showAsAction="never" />
 
+    <item
+        android:id="@+id/menu_open_in_browser"
+        android:title="@string/open_in_browser"
+        android:visible="true"
+        app:showAsAction="never" />
+
 </menu>
