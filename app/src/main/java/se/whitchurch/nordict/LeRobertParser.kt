@@ -35,7 +35,7 @@ class LeRobertParser {
                 first = false
 
                 val headword = Word(
-                    tag, word, word, word.toString(), cleanpage, newUri,
+                    tag, word, word, word.toString(), cleanpage, newUri.toHttpUrl(),
                     "https://dictionnaire.lerobert.com/",
                     main,
                     doc.head().html() + "<body>",

@@ -9,3 +9,9 @@ build/
 .settings
 .gradle
 testdata/
+node_modules/
+.idea/
+.artifacts/
+app/src/test/js/output.html
+app/src/test/js/test_output.html
+gradle-daemon-jvm.properties

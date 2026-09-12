@@ -9,7 +9,7 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class ExactMatchTest {
 
-    private fun result(title: String, uri: String) = SearchResult(title, Uri.parse(uri))
+    private fun result(title: String, uri: String) = SearchResult(title, Uri.parse(uri).toHttpUrl())
 
     @Test
     fun uniqueExactMatchNavigates() {

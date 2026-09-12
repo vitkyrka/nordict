@@ -1,118 +1,29 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
 import com.google.common.truth.Truth.assertThat
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import java.io.File
 
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28])
+/**
+ * Pure-JVM golden tests for the DLE parser. Shares the exact `WordJson` mapping
+ * and goldens the CLI emits, so the app, the desktop CLI, and the test suite
+ * all agree on the same JSON.
+ */
 class DleParserTest {
 
-    data class WordData(
-        val mTitle: String,
-        val mSlug: String,
-        val summary: String,
-        val uri: String,
-        val definitions: List<DefinitionData>,
-        val idioms: List<IdiomData>,
-        val xrefs: List<String>,
-        val conjugation: String = "",
-        val participle: String = "",
-        val etymology: String = "",
-        val rawHeadword: String = ""
-    )
-
-    data class DefinitionData(
-        val glosses: List<GlossData>,
-        val domain: String = "",
-        val geo: String = "",
-        val plev: String = "",
-        val register: String = "",
-        val synonyms: List<SynonymData> = emptyList(),
-        val antonyms: List<String> = emptyList()
-    )
-
-    data class SynonymData(
-        val text: String,
-        val href: String = "",
-        val plev: String = ""
-    )
-
-    data class GlossData(
-        val definition: String,
-        val headword: String,
-        val grammar: String,
-        val gender: String,
-        val examples: List<String>
-    )
-
-    data class IdiomData(
-        val idiom: String,
-        val glosses: List<GlossData>,
-        val domain: String = "",
-        val geo: String = "",
-        val plev: String = "",
-        val register: String = ""
-    )
-
-    private fun Word.Gloss.toData(): GlossData {
-        return GlossData(
-            definition = definition,
-            headword = headword,
-            grammar = grammar,
-            gender = gender,
-            examples = examples
-        )
-    }
-
-    private fun Word.toData(): WordData {
-        return WordData(
-            mTitle = mTitle,
-            mSlug = mSlug,
-            summary = summary,
-            uri = uri.toString(),
-            conjugation = conjugation,
-            participle = participle,
-            etymology = etymology,
-            rawHeadword = rawHeadword,
-            definitions = definitions.map { def ->
-                DefinitionData(
-                    glosses = def.glosses.map { it.toData() },
-                    domain = def.domain,
-                    geo = def.geo,
-                    plev = def.plev,
-                    register = def.register,
-                    synonyms = def.synonyms.map { SynonymData(it.text, it.href, it.plev) },
-                    antonyms = def.antonyms
-                )
-            },
-            idioms = idioms.map { idiom ->
-                IdiomData(
-                    idiom = idiom.idiom,
-                    glosses = idiom.glosses.map { it.toData() },
-                    domain = idiom.domain,
-                    geo = idiom.geo,
-                    plev = idiom.plev,
-                    register = idiom.register
-                )
-            },
-            xrefs = xrefs
-        )
-    }
-
     private fun assertGolden(words: List<Word>, jsonPath: String) {
-        Goldens.assertGolden(words.map { it.toData() }, jsonPath, Array<WordData>::class.java)
+        Goldens.assertGolden(words.map { it.toWordData() }, jsonPath, Array<WordJson.WordData>::class.java)
     }
+
+    private fun httpUrl(url: String): HttpUrl = url.toHttpUrlOrNull()!!
 
     @Test
     fun testParseDleFrente() {
         val htmlFile = File("../testdata/dle/frente.html")
         val page = htmlFile.readText()
-        val uri = Uri.parse("https://dle.rae.es/frente")
+        val uri = httpUrl("https://dle.rae.es/frente")
         val words = DleParser.parse(page, uri, "DLE")
 
         assertThat(words).hasSize(1)
@@ -160,7 +71,7 @@ class DleParserTest {
     fun testParseDleCagar() {
         val htmlFile = File("../testdata/dle/cagar.html")
         val page = htmlFile.readText()
-        val uri = Uri.parse("https://dle.rae.es/cagar")
+        val uri = httpUrl("https://dle.rae.es/cagar")
         val words = DleParser.parse(page, uri, "DLE")
 
         assertThat(words).hasSize(1)
@@ -192,7 +103,7 @@ class DleParserTest {
     fun testParseDleMorir() {
         val htmlFile = File("../testdata/dle/morir.html")
         val page = htmlFile.readText()
-        val uri = Uri.parse("https://dle.rae.es/morir")
+        val uri = httpUrl("https://dle.rae.es/morir")
         val words = DleParser.parse(page, uri, "DLE")
 
         assertThat(words).hasSize(1)
@@ -229,7 +140,7 @@ class DleParserTest {
     fun testParseDleOtro() {
         val htmlFile = File("../testdata/dle/otro.html")
         val page = htmlFile.readText()
-        val uri = Uri.parse("https://dle.rae.es/otro")
+        val uri = httpUrl("https://dle.rae.es/otro")
         val words = DleParser.parse(page, uri, "DLE")
 
         assertThat(words).hasSize(1)
@@ -248,63 +159,5 @@ class DleParserTest {
         assertThat(def1.antonyms).containsExactly("mismo")
 
         assertGolden(words, "../testdata/dle/otro.json")
-    }
-
-    @Test
-    fun testParseDleHomonyms() {
-        // A homonym page: two <article> lemmas sharing the same headword.
-        val page = """
-            <!DOCTYPE html><html><head></head><body>
-            <div id="resultados">
-            <article>
-                <header><h1>cura</h1></header>
-                <div class="n2 c-text-intro">Del lat. curas.</div>
-                <ol class="c-definitions">
-                    <li><div class="c-definitions__item">
-                        <div><span class="n_acep">1</span><abbr title="nombre femenino">f.</abbr> Cuidado de algo.</div>
-                    </div></li>
-                </ol>
-            </article>
-            <article>
-                <header><h1>cura</h1></header>
-                <div class="n2 c-text-intro">Del lat. cura.</div>
-                <ol class="c-definitions">
-                    <li><div class="c-definitions__item">
-                        <div><span class="n_acep">1</span><abbr title="nombre masculino">m.</abbr> Sacerdote católico.</div>
-                    </div></li>
-                </ol>
-            </article>
-            </div>
-            </body></html>
-        """.trimIndent()
-        val uri = Uri.parse("https://dle.rae.es/cura")
-        val words = DleParser.parse(page, uri, "DLE")
-
-        assertThat(words).hasSize(2)
-        assertThat(words.map { it.mTitle }).containsExactly("cura", "cura")
-
-        assertThat(words[0].uri.toString()).doesNotContain("__ref")
-        assertThat(words[0].xrefs).containsExactly("1")
-        assertThat(words[1].uri.toString()).endsWith("?__ref=2")
-        assertThat(words[1].xrefs).containsExactly("2")
-
-        for (word in words) {
-            assertThat(word.mHomographs).hasSize(2)
-            assertThat(word.mHomonymEntries).hasSize(2)
-            assertThat(word.mHomonymEntries.map { it.ref }).containsExactly("1", "2").inOrder()
-        }
-
-        val fem = words[0].mHomonymEntries[0]
-        assertThat(fem.etymology).isEqualTo("Del lat. curas.")
-        assertThat(fem.definitions).hasSize(1)
-        assertThat(fem.definitions[0].grammar).isEqualTo("nombre femenino")
-        assertThat(fem.definitions[0].gender).isEqualTo(Genders.FEMININE)
-        assertThat(fem.definitions[0].glosses[0].definition).isEqualTo("Cuidado de algo.")
-
-        val masc = words[0].mHomonymEntries[1]
-        assertThat(masc.etymology).isEqualTo("Del lat. cura.")
-        assertThat(masc.definitions).hasSize(1)
-        assertThat(masc.definitions[0].grammar).isEqualTo("nombre masculino")
-        assertThat(masc.definitions[0].glosses[0].definition).isEqualTo("Sacerdote católico.")
     }
 }

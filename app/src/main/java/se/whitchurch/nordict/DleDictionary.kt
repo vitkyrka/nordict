@@ -43,7 +43,7 @@ class DleDictionary(client: OkHttpClient, private val baseUrl: String = "https:/
                     .replace("<[^>]+?>".toRegex(), "")
 
                 val uri = Uri.parse("$baseUrl/${item}")
-                results.add(SearchResult(item, uri))
+                results.add(SearchResult(item, uri.toHttpUrl()))
             }
         } catch (_: JSONException) {
         }
@@ -67,7 +67,7 @@ class DleDictionary(client: OkHttpClient, private val baseUrl: String = "https:/
         val newUri = builder.build()
         val page = fetch(newUri.toString())
 
-        val words = DleParser.parse(page, newUri, tag, baseUrl)
+        val words = DleParser.parse(page, newUri.toHttpUrl(), tag, baseUrl)
         if (words.isEmpty()) return null
 
         val ref = uri.getQueryParameter(REFPARAM) ?: return words[0]

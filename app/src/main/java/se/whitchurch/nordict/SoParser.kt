@@ -200,7 +200,7 @@ class SoParser {
 
                 val headword = Word(
                     tag, word, word, summary.toString(), cleanpage,
-                    Uri.parse("https://svenska.se/so/?id=$id&ref=${xrefs[0]}"),
+                    Uri.parse("https://svenska.se/so/?id=$id&ref=${xrefs[0]}").toHttpUrl(),
                     // Required to avoid CORS errors in getCSS
                     "file://",
                     element, header, lemma

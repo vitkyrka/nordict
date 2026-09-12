@@ -43,7 +43,7 @@ abstract class DslDictionary(client: OkHttpClient) : Dictionary(client) {
             }
 
             val otherId = href.substring(1)
-            word.addHomograph(SearchResult(wordLink.text(), getEntryUri(otherId)))
+            word.addHomograph(SearchResult(wordLink.text(), getEntryUri(otherId).toHttpUrl()))
         }
 
         return word
@@ -92,7 +92,7 @@ abstract class DslDictionary(client: OkHttpClient) : Dictionary(client) {
             results.add(
                 SearchResult(
                     k.text(),
-                    Uri.parse("https://ordnet.dk/${shortName}/ordbog?entry_id=$id&query=.")
+                    Uri.parse("https://ordnet.dk/${shortName}/ordbog?entry_id=$id&query=.").toHttpUrl()
                 )
             )
         }
@@ -136,7 +136,7 @@ abstract class DslDictionary(client: OkHttpClient) : Dictionary(client) {
                                     words.getString(i)
                                 )
                             }"
-                        )
+                        ).toHttpUrl()
                     )
                 )
             }

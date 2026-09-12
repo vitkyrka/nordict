@@ -43,7 +43,7 @@ class EstDictionary(client: OkHttpClient, private val baseUrl: String = "https:/
                     .replace("<[^>]+?>".toRegex(), "")
 
                 val uri = Uri.parse(baseUrl).buildUpon().appendPath(item).build()
-                results.add(SearchResult(item, uri))
+                results.add(SearchResult(item, uri.toHttpUrl()))
             }
         } catch (_: JSONException) {
         }

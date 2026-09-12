@@ -1,13 +1,13 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
+import okhttp3.HttpUrl
 import org.jsoup.nodes.Element
 import java.util.*
 
 class Word(
     val dict: String, val mTitle: String, val mSlug: String, val summary: String,
-    val mText: String, internal val uri: Uri,
-    internal val baseUrl: String,
+    val mText: String, val uri: HttpUrl,
+    val baseUrl: String,
     @Transient val element: Element,
     val header: String, @Transient val lemma: Element? = null,
     val xrefs: ArrayList<String> = ArrayList<String>(),

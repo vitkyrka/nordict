@@ -267,7 +267,7 @@ class WordActivity : AppCompatActivity() {
             }
 
             text.setOnClickListener {
-                Ordboken.startWordActivity(this, "", homograph.uri)
+                Ordboken.startWordActivity(this, "", homograph.uri.toAndroidUri())
             }
 
             linearLayout.addView(text, pos)
@@ -370,7 +370,7 @@ class WordActivity : AppCompatActivity() {
                 showSuggestions(result.mTitle)
             } else {
                 val intent = Intent(this@WordActivity, WordActivity::class.java).apply {
-                    data = result.uri
+                    data = result.uri.toAndroidUri()
                 }
                 startActivity(intent)
             }
@@ -409,7 +409,7 @@ class WordActivity : AppCompatActivity() {
             if (result.uri.host == "fake") {
                 showSuggestions(result.mTitle)
             } else {
-                Ordboken.startWordActivity(this@WordActivity, result.mTitle, result.uri)
+                Ordboken.startWordActivity(this@WordActivity, result.mTitle, result.uri.toAndroidUri())
             }
 
             loadResource.decrement()

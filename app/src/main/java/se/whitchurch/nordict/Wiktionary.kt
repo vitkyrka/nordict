@@ -74,7 +74,7 @@ abstract class Wiktionary(client: OkHttpClient) : Dictionary(client) {
                 results.add(
                     SearchResult(
                         title,
-                        Uri.parse("https://${shortName}.m.wiktionary.org/?curid=${id}")
+                        Uri.parse("https://${shortName}.m.wiktionary.org/?curid=${id}").toHttpUrl()
                     )
                 )
             }

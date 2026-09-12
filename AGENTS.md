@@ -10,20 +10,32 @@ HTML entries in a WebView, adding cross-linking between words, pronunciation
 autoplay, gender highlighting, and AnkiDroid integration.
 
 There are no Kotlin libraries beyond the Android SDK, `org.jsoup` for HTML
-parsing, and Gson for JSON serialization. JS assets run inside an Android
+parsing, Gson for JSON serialization, and OkHttp (its `HttpUrl` is used as the
+JVM-neutral URL type in the shared module). JS assets run inside an Android
 WebView; the jQuery-based rendering code is separated out and unit-tested with
 Node/Jest.
+
+The parsing core is a pure-JVM module (`:core`) shared by the Android app and a
+desktop CLI (`:cli`), so the same parser code runs headlessly on a laptop. The
+Android app keeps `android.net.Uri` at the UI boundary and converts to
+`okhttp3.HttpUrl` for anything touching the shared model
+(`app/.../HttpUrlBridge.kt`).
 
 ## Layout
 
 ```
-app/src/main/java/se/whitchurch/nordict/   Kotlin source (single package)
-app/src/main/assets/                        WebView assets (HTML/JS/CSS/jquery)
-app/src/test/java/se/whitchurch/nordict/   Robolectric unit + MockWebServer tests
-app/src/test/js/                            Jest tests + CLI for the JS renderer
+core/src/                               Shared PURE-JVM parser core (no Android)
+  main/java/...            Word, SearchResult, DleParser, Genders, Pos,
+                           WordJson (golden-schema JSON mapping)
+  test/java/...            DleParserTest (plain JUnit, no Robolectric), Goldens
+cli/src/main/...                        Desktop CLI (application) using :core
+app/src/main/java/...      Android-only Kotlin (dictionaries, activities, UI)
+app/src/main/assets/        WebView assets (HTML/JS/CSS/jquery)
+app/src/test/java/...      Robolectric unit + MockWebServer tests
+app/src/test/js/            Jest tests + CLI for the JS renderer
 app/src/androidTest/java/...                Instrumented tests (WordTest.kt)
-testdata/                                   Golden fixtures (.html/.json) for parser tests (separate git repo; gitignored here)
-tools/                                      Standalone python scripts (crawl.py, parse.py, ...)
+testdata/                   Golden fixtures (.html/.json) for parser tests (separate git repo; gitignored here)
+tools/                      Standalone python scripts (crawl.py, parse.py, ...)
 ```
 
 ## Core architecture
@@ -42,9 +54,12 @@ tools/                                      Standalone python scripts (crawl.py,
   (falls back to the first dict of a language); `currentIndex` remains the
   global index.
 - **`<Name>Parser.kt`** — companion-object parsers that take a raw HTML page,
-  `Uri`, and dict `tag`, and return `List<Word>`. They use Jsoup and clone the
-  fragments they keep in `Word.element`.
-- **`Word.kt`** — the model serialized to JSON. `Word.Definition` and
+  `Uri` (the shared ones take `okhttp3.HttpUrl`), and dict `tag`, and return
+  `List<Word>`. They use Jsoup and clone the fragments they keep in
+  `Word.element`.
+- **`core/.../Word.kt`** — the model serialized to JSON. Lives in the shared
+  `:core` module; `uri`/`baseUrl` are `okhttp3.HttpUrl` / plain `String` so the
+  class runs on a desktop JVM. `Word.Definition` and
   `Word.Idiom` are nested classes; `element`/`lemma` fields are `@Transient`
   (excluded from Gson output). `Word.Synonym` carries the display `text`, an
   `href` (the full source link target, e.g. a RAE DLE `?id=` deep-link), and a
@@ -81,28 +96,55 @@ tools/                                      Standalone python scripts (crawl.py,
 
 ## Commands
 
+### Shared-core tests + desktop CLI
+
+The DLE parser and golden JSON mapping live in `:core` (pure JVM — no Android,
+no Robolectric):
+
+```sh
+./gradlew :core:test                          # DleParserTest golden tests
+./gradlew :core:test --tests se.whitchurch.nordict.DleParserTest
+```
+
+The `:cli` module runs the *same* parser against arbitrary DLE pages and dumps
+the shared JSON schema (identical to `testdata/dle/*.json`):
+
+```sh
+./gradlew :cli:run --args="frente"                                  # live fetch dle.rae.es/frente
+./gradlew :cli:run --args="--url https://dle.rae.es/cagar"
+./gradlew :cli:run --args="--file ../testdata/dle/morir.html"       # offline, no network
+./gradlew :cli:run --args="frente -o /tmp/frente.json"              # write to file
+```
+
+JSON goes to stdout (summary on stderr; nonzero exit on failure). Pipe the
+output to the JS renderer for a browser preview:
+`cd app/src/test/js && npm run render -- /tmp/frente.json`.
+
 ### Kotlin unit tests (Robolectric)
 
 ```sh
 ./gradlew testDebugUnitTest                              # all
 ./gradlew testDebugUnitTest --tests 'se.whitchurch.nordict.EstParserTest'
 ./gradlew testDebugUnitTest --tests 'se.whitchurch.nordict.EstIntegrationTest'
-./gradlew testDebugUnitTest --tests 'se.whitchurch.nordict.DleParserTest'
+./gradlew testDebugUnitTest --tests 'se.whitchurch.nordict.DleIntegrationTest'
 ```
 
-Parser tests read fixtures relatively as `../testdata/<name>.json` (they run in
-`app/` working dir). Integration tests spin up a MockWebServer serving
-`testdata/<tag>-search.json` / `testdata/<tag>.html`.
+The app-side parser tests (`EstParserTest`, `CollinsParserTest`) read fixtures
+relatively as `../testdata/<name>.json` (they run in `app/` working dir);
+`DleParserTest` runs in `:core` with the same relative path. Integration tests
+spin up a MockWebServer serving `testdata/<tag>-search.json` /
+`testdata/<tag>.html`.
 
 The parser tests (`CollinsParserTest`, `EstParserTest`, `DleParserTest`) use a
 true golden pattern via the shared `Goldens.assertGolden(...)` helper
-(`Goldens.kt`): the parsed output is asserted against the committed JSON
-fixture (`testdata/colspan/`, `testdata/est/`, `testdata/dle/`) and is never
-rewritten in normal runs. When parser behavior changes intentionally,
-regenerate the fixtures with
+(`core/.../Goldens.kt`, mirrored in `app/src/test`): the parsed output is
+asserted against the committed JSON fixture (`testdata/colspan/`,
+`testdata/est/`, `testdata/dle/`) and is never rewritten in normal runs. When
+parser behavior changes intentionally, regenerate the fixtures with
 
 ```sh
-UPDATE_GOLDEN=1 ./gradlew testDebugUnitTest --tests 'se.whitchurch.nordict.CollinsParserTest'
+UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.DleParserTest'   # shared DLE parser
+UPDATE_GOLDEN=1 ./gradlew testDebugUnitTest --tests 'se.whitchurch.nordict.CollinsParserTest'   # app-side parsers
 ```
 
 (or any parser test class), then review the git diff; keep the test's semantic
@@ -200,8 +242,8 @@ and the homograph link), not as trailing definitions of the parent lemma.
 
 Same pattern as EST but that site has no structured domain/geo markup: the
 parser just snapshots whole `<li>` fragments and the markers are embedded in
-the definition text. Tests: `DleParserTest.kt`, `DleIntegrationTest.kt`,
-fixtures `testdata/dle.{html,json,search.json}`.
+the definition text. Tests: `DleParserTest.kt` (in `:core`, plain JUnit),
+`DleIntegrationTest.kt` (in `app`), fixtures `testdata/dle.{html,json,search.json}`.
 
 Synonyms in the DLE footer (`.c-word-list__items .sin`) are parsed into
 structured `Word.Synonym` objects: `text` is the display form, `href` is the
@@ -216,9 +258,11 @@ markers appear — "uso coloquial" / "usado en América" are dropped.
   `main` and `test`.
 - Unit tests use Robolectric (`@RunWith(RobolectricTestRunner::class)`,
   `@Config(sdk = [28])`) because Android classes (e.g. `Uri`) are involved.
+  The shared `:core` tests (e.g. `DleParserTest`) are plain JUnit and run on a
+  desktop JVM.
 - `Word` fields are read by `renderer.js` by exact JSON name; renaming fields
-  in `Word.kt` requires updating the data classes in `EstParserTest.kt`,
-  `testdata/est.json`, and `renderer.js`/its tests.
+  in `Word.kt` requires updating the golden-schema data classes in
+  `core/.../WordJson.kt`, `testdata/dle/` fixtures, and `renderer.js`/its tests.
 - Multi-entry pages: when a JSON dictionary page yields more than one word
   (RAE homographs/.sols sub-entries, Collins POS-group homs) each `Word`
   carries a serializable `mHomonymEntries` list `HomonymEntry(mTitle, ref,

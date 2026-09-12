@@ -45,7 +45,7 @@ class EstParser {
                 val summary = StringBuilder(word)
 
                 val headword = Word(
-                    tag, word, word, summary.toString(), page, newUri,
+                    tag, word, word, summary.toString(), page, newUri.toHttpUrl(),
                     finalBaseUrl,
                     doc,
                     "",
@@ -107,7 +107,7 @@ class EstParser {
                     val subUri = uri.buildUpon()
                         .appendQueryParameter("__ref", ref.toString()).build()
                     val sub = Word(
-                        tag, subTitle, subTitle, subTitle, page, subUri,
+                        tag, subTitle, subTitle, subTitle, page, subUri.toHttpUrl(),
                         finalBaseUrl, doc, "", null, renderAsJson = true
                     )
                     sub.rawHeadword = subTitle

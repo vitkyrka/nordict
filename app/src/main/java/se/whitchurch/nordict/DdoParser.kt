@@ -78,7 +78,7 @@ class DdoParser {
             }
 
             val headword = Word(
-                tag, word, word, summary.toString(), cleanpage, uri,
+                tag, word, word, summary.toString(), cleanpage, uri.toHttpUrl(),
                 "https://ordnet.dk/ddo/", element,
                 doc.head().html() + "<body>"
             )

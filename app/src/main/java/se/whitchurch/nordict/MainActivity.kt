@@ -41,7 +41,7 @@ class MainActivity : AppCompatActivity() {
 
         mListView?.setOnItemClickListener { parent, view, position, id ->
             val searchResult = (parent as ListView).getItemAtPosition(position) as SearchResult
-            Ordboken.startWordActivity(this, searchResult.mTitle, searchResult.uri)
+            Ordboken.startWordActivity(this, searchResult.mTitle, searchResult.uri.toAndroidUri())
         }
 
 

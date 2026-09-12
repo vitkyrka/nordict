@@ -98,7 +98,7 @@ class CollinsParser {
                 else uri.buildUpon().appendQueryParameter(REFPARAM, head.ref).build()
 
                 val headword = Word(
-                    tag, head.title, head.title, head.title, page, headUri,
+                    tag, head.title, head.title, head.title, page, headUri.toHttpUrl(),
                     baseRoot + "/",
                     doc,
                     "",

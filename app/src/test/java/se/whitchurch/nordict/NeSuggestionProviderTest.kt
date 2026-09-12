@@ -38,7 +38,7 @@ class NeSuggestionProviderTest {
     fun emptyQuerySuggestionUsesTheRawHeadword() {
         val word = Word(
             "DLE", "otro, tra", "otro, tra", "otro, tra",
-            "", Uri.parse("https://dle.rae.es/otro"),
+            "", Uri.parse("https://dle.rae.es/otro").toHttpUrl(),
             "https://dle.rae.es/", Jsoup.parse("<body></body>").body(),
             "", null, renderAsJson = true
         )

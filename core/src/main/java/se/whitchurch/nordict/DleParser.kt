@@ -1,12 +1,12 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
+import okhttp3.HttpUrl
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
 class DleParser {
     companion object {
-        fun parse(page: String, uri: Uri, tag: String, baseUrl: String = "https://dle.rae.es/"): List<Word> {
+        fun parse(page: String, uri: HttpUrl, tag: String, baseUrl: String = "https://dle.rae.es/"): List<Word> {
             val words: ArrayList<Word> = ArrayList()
             var doc = Jsoup.parse(page)
 
@@ -38,7 +38,7 @@ class DleParser {
                 val newUri = if (first) {
                     uri
                 } else {
-                    uri.buildUpon().appendQueryParameter("__ref", ref.toString()).build()
+                    uri.newBuilder().addQueryParameter("__ref", ref.toString()).build()
                 }
 
                 first = false

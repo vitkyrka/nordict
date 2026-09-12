@@ -80,7 +80,7 @@ class LeRobertDictionary(client: OkHttpClient) : Dictionary(client) {
                 }
 
                 val uri = Uri.parse("https://dictionnaire.lerobert.com${page}")
-                results.add(SearchResult(title, uri))
+                results.add(SearchResult(title, uri.toHttpUrl()))
             }
         } catch (e: JSONException) {
         }

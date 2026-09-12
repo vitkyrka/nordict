@@ -72,7 +72,7 @@ class InfopediaParser {
 //                summary.append(" $meanings")
 
                 val headword = Word(
-                    tag, word, word, summary.toString(), page, newUri,
+                    tag, word, word, summary.toString(), page, newUri.toHttpUrl(),
                     "https://www.infopedia.pt/",
                     doc,
                     "",
@@ -123,7 +123,7 @@ class InfopediaParser {
 
             return doc.select("li").map {
                 val title = it.attr("title")
-                SearchResult(title, base.buildUpon().appendEncodedPath(title).build())
+                SearchResult(title, base.buildUpon().appendEncodedPath(title).build().toHttpUrl())
             }
         }
     }

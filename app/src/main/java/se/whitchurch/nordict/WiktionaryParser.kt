@@ -210,7 +210,7 @@ class WiktionaryParser {
                 first = false
 
                 val headword = Word(
-                    tag, word, word, summary.toString(), cleanpage, newUri,
+                    tag, word, word, summary.toString(), cleanpage, newUri.toHttpUrl(),
                     "https://${shortName}.m.wiktionary.org/",
                     element,
                     doc.head().html() + "<body>",

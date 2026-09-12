@@ -45,7 +45,7 @@ class NeSuggestionProvider : ContentProvider() {
             val lastWord = Ordboken.getInstance(context!!).currentWord
 
             if (lastWord != null) {
-                cursor.addRow(arrayOf(0, lastWord.searchHeadword, "", null, lastWord.uri, lastWord.mTitle))
+                cursor.addRow(arrayOf(0, lastWord.searchHeadword, "", null, lastWord.uri.toAndroidUri(), lastWord.mTitle))
             }
             return cursor
         }
@@ -61,7 +61,7 @@ class NeSuggestionProvider : ContentProvider() {
                     result.mTitle,
                     result.mSummary,
                     flag,
-                    result.uri,
+                    result.uri.toAndroidUri(),
                     result.mTitle
                 )
             )

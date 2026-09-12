@@ -57,7 +57,7 @@ class LingueeParser {
                 summary.append(" $meanings")
 
                 val headword = Word(
-                    tag, word, word, summary.toString(), page, newUri,
+                    tag, word, word, summary.toString(), page, newUri.toHttpUrl(),
                     "https://www.linguee.pt/",
                     doc,
                     "",
@@ -105,7 +105,7 @@ class LingueeParser {
                 results.add(
                     SearchResult(
                         it.text(),
-                        Uri.parse("https://www.linguee.pt" + it.attr("href"))
+                        Uri.parse("https://www.linguee.pt" + it.attr("href")).toHttpUrl()
                     )
                 )
             }

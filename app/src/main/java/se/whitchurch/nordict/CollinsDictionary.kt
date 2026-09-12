@@ -84,7 +84,7 @@ abstract class CollinsDictionary(
                 val slug = title.replace(" ", "-").lowercase()
                 val uri =
                     Uri.parse("$baseUrl/dictionary/${dictCode}/${slug}")
-                results.add(SearchResult(title, uri))
+                results.add(SearchResult(title, uri.toHttpUrl()))
             }
         } catch (e: JSONException) {
         }

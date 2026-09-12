@@ -45,7 +45,7 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
                 val word = words.getJSONObject(i)
                 val label = word.getString("label")
                 val link = word.getString("link")
-                results.add(SearchResult(label, Uri.parse("https://svenska.se/$link")))
+                results.add(SearchResult(label, Uri.parse("https://svenska.se/$link").toHttpUrl()))
             }
         } catch (e: JSONException) {
         }
