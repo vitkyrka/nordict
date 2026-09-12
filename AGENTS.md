@@ -25,9 +25,10 @@ Android app keeps `android.net.Uri` at the UI boundary and converts to
 
 ```
 core/src/                               Shared PURE-JVM parser core (no Android)
-  main/java/...            Word, SearchResult, DleParser, Genders, Pos,
-                           WordJson (golden-schema JSON mapping)
-  test/java/...            DleParserTest (plain JUnit, no Robolectric), Goldens
+  main/java/...            Word, SearchResult, DleParser, EstParser, CollinsParser,
+                           WordJson (golden-schema JSON mapping), Genders, Pos
+  test/java/...            DleParserTest, EstParserTest, CollinsParserTest
+                           (plain JUnit, no Robolectric), Goldens
 cli/src/main/...                        Desktop CLI (application) using :core
 app/src/main/java/...      Android-only Kotlin (dictionaries, activities, UI)
 app/src/main/assets/        WebView assets (HTML/JS/CSS/jquery)
@@ -54,9 +55,10 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
   (falls back to the first dict of a language); `currentIndex` remains the
   global index.
 - **`<Name>Parser.kt`** — companion-object parsers that take a raw HTML page,
-  `Uri` (the shared ones take `okhttp3.HttpUrl`), and dict `tag`, and return
-  `List<Word>`. They use Jsoup and clone the fragments they keep in
-  `Word.element`.
+  `okhttp3.HttpUrl`, and dict `tag`, and return `List<Word>`. They use Jsoup and
+  clone the fragments they keep in `Word.element`. DLE, EST, and Collins all
+  live in `:core` with `HttpUrl`-typed uris (the remaining app-side parsers
+  still take `android.net.Uri`).
 - **`core/.../Word.kt`** — the model serialized to JSON. Lives in the shared
   `:core` module; `uri`/`baseUrl` are `okhttp3.HttpUrl` / plain `String` so the
   class runs on a desktop JVM. `Word.Definition` and
@@ -98,23 +100,33 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
 
 ### Shared-core tests + desktop CLI
 
-The DLE parser and golden JSON mapping live in `:core` (pure JVM — no Android,
-no Robolectric):
+The DLE, EST, and Collins parsers and the golden JSON mapping live in `:core`
+(pure JVM — no Android, no Robolectric):
 
 ```sh
-./gradlew :core:test                          # DleParserTest golden tests
-./gradlew :core:test --tests se.whitchurch.nordict.DleParserTest
+./gradlew :core:test                          # DleParserTest/EstParserTest/CollinsParserTest golden tests
+./gradlew :core:test --tests se.whitchurch.nordict.EstParserTest
+./gradlew :core:test --tests se.whitchurch.nordict.CollinsParserTest
 ```
 
-The `:cli` module runs the *same* parser against arbitrary DLE pages and dumps
-the shared JSON schema (identical to `testdata/dle/*.json`):
+The `:cli` module runs the *same* parsers against arbitrary dictionary pages and
+dumps the shared JSON schema (identical to `testdata/{dle,est,colspan}/*.json`):
 
 ```sh
-./gradlew :cli:run --args="frente"                                  # live fetch dle.rae.es/frente
+./gradlew :cli:run --args="frente"                                  # default dict DLE: dle.rae.es/frente
+./gradlew :cli:run --args="est frente"                              # RAE Diccionario del estudiante
+./gradlew :cli:run --args="colspan frente"                          # Collins Spanish-English
+./gradlew :cli:run --args="--dict est --file ../testdata/est/morir.html"   # offline, no network
 ./gradlew :cli:run --args="--url https://dle.rae.es/cagar"
-./gradlew :cli:run --args="--file ../testdata/dle/morir.html"       # offline, no network
 ./gradlew :cli:run --args="frente -o /tmp/frente.json"              # write to file
 ```
+
+Positional first arg selects the dict (default `dle`; aliases: `est`,
+`colspan`/`col`); `--dict <name>` also works. Collins slugs turn spaces into
+hyphens (`colspan ley de la gravedad`). Note: collinsdictionary.com serves a
+Cloudflare JS challenge to datacenter IPs, so live `colspan` fetches can 403
+from this machine — use `--file` against the fixtures instead (the parser
+itself is fully covered by tests).
 
 JSON goes to stdout (summary on stderr; nonzero exit on failure). Pipe the
 output to the JS renderer for a browser preview:
@@ -124,27 +136,25 @@ output to the JS renderer for a browser preview:
 
 ```sh
 ./gradlew testDebugUnitTest                              # all
-./gradlew testDebugUnitTest --tests 'se.whitchurch.nordict.EstParserTest'
 ./gradlew testDebugUnitTest --tests 'se.whitchurch.nordict.EstIntegrationTest'
 ./gradlew testDebugUnitTest --tests 'se.whitchurch.nordict.DleIntegrationTest'
 ```
 
-The app-side parser tests (`EstParserTest`, `CollinsParserTest`) read fixtures
-relatively as `../testdata/<name>.json` (they run in `app/` working dir);
-`DleParserTest` runs in `:core` with the same relative path. Integration tests
-spin up a MockWebServer serving `testdata/<tag>-search.json` /
-`testdata/<tag>.html`.
+The parser tests (`DleParserTest`, `EstParserTest`, `CollinsParserTest`) all
+run in `:core` as plain JUnit and read fixtures relatively as
+`../testdata/...` (working dir `core/`). App-side integration tests spin up a
+MockWebServer serving `testdata/<tag>-search.json` / `testdata/<tag>.html`.
 
-The parser tests (`CollinsParserTest`, `EstParserTest`, `DleParserTest`) use a
-true golden pattern via the shared `Goldens.assertGolden(...)` helper
-(`core/.../Goldens.kt`, mirrored in `app/src/test`): the parsed output is
-asserted against the committed JSON fixture (`testdata/colspan/`,
-`testdata/est/`, `testdata/dle/`) and is never rewritten in normal runs. When
-parser behavior changes intentionally, regenerate the fixtures with
+The parser tests use a true golden pattern via the shared
+`Goldens.assertGolden(...)` helper (`core/.../Goldens.kt`): the parsed output
+is asserted against the committed JSON fixture (`testdata/dle/`,
+`testdata/est/`, `testdata/colspan/`) and is never rewritten in normal runs.
+When parser behavior changes intentionally, regenerate the fixtures with
 
 ```sh
-UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.DleParserTest'   # shared DLE parser
-UPDATE_GOLDEN=1 ./gradlew testDebugUnitTest --tests 'se.whitchurch.nordict.CollinsParserTest'   # app-side parsers
+UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.DleParserTest'
+UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.EstParserTest'
+UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.CollinsParserTest'
 ```
 
 (or any parser test class), then review the git diff; keep the test's semantic
@@ -225,8 +235,9 @@ CTRL_ON 29`) + delete.
   `examples` (`.ejemplo`). Idioms carry
   `grammar`, `geo`, `plev`, and `examples` too.
 
-Relevant files: `EstParser.kt`, `EstDictionary.kt`, `Word.kt`,
-`assets/renderer.js`, `assets/renderer.css`, `EstParserTest.kt`,
+Relevant files: `core/.../EstParser.kt`, `EstDictionary.kt`, `Word.kt`,
+`assets/renderer.js`, `assets/renderer.css`,
+`core/.../EstParserTest.kt`,
 `EstIntegrationTest.kt`, `testdata/est.{html,json,search.json}`,
 `testdata/est/cagar.{html,json}` (golden test for the `plev` "malsonante"
 marker: 4 definitions + 3 idioms). `testdata/est/muerte.{html,json}`
@@ -258,11 +269,12 @@ markers appear — "uso coloquial" / "usado en América" are dropped.
   `main` and `test`.
 - Unit tests use Robolectric (`@RunWith(RobolectricTestRunner::class)`,
   `@Config(sdk = [28])`) because Android classes (e.g. `Uri`) are involved.
-  The shared `:core` tests (e.g. `DleParserTest`) are plain JUnit and run on a
-  desktop JVM.
+  The shared `:core` tests (e.g. `DleParserTest`, `EstParserTest`,
+  `CollinsParserTest`) are plain JUnit and run on a desktop JVM.
 - `Word` fields are read by `renderer.js` by exact JSON name; renaming fields
   in `Word.kt` requires updating the golden-schema data classes in
-  `core/.../WordJson.kt`, `testdata/dle/` fixtures, and `renderer.js`/its tests.
+  `core/.../WordJson.kt`, the `testdata/{dle,est,colspan}/` fixtures, and
+  `renderer.js`/its tests.
 - Multi-entry pages: when a JSON dictionary page yields more than one word
   (RAE homographs/.sols sub-entries, Collins POS-group homs) each `Word`
   carries a serializable `mHomonymEntries` list `HomonymEntry(mTitle, ref,

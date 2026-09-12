@@ -35,7 +35,7 @@ abstract class CollinsDictionary(
 
         val page = fetch(buildUri.toString())
 
-        val words = CollinsParser.parse(page, buildUri, tag, dictCode, baseUrl)
+        val words = CollinsParser.parse(page, buildUri.toHttpUrl(), tag, dictCode, baseUrl)
         if (words.isEmpty()) return null
 
         if (ref != null) {

@@ -29,7 +29,9 @@ object WordJson {
         val conjugation: String = "",
         val participle: String = "",
         val etymology: String = "",
-        val rawHeadword: String = ""
+        val rawHeadword: String = "",
+        val dictionary: String = "",
+        val audio: List<String> = emptyList()
     )
 
     data class DefinitionData(
@@ -90,6 +92,8 @@ fun Word.toWordData(): WordJson.WordData {
             participle = participle,
             etymology = etymology,
             rawHeadword = rawHeadword,
+            dictionary = dictionary,
+            audio = audio,
             definitions = definitions.map { def ->
                 WordJson.DefinitionData(
                     glosses = def.glosses.map { it.toData() },

@@ -67,7 +67,7 @@ class EstDictionary(client: OkHttpClient, private val baseUrl: String = "https:/
         val newUri = builder.build()
         val page = fetch(newUri.toString())
 
-        val words = EstParser.parse(page, newUri, tag, baseUrl)
+        val words = EstParser.parse(page, newUri.toHttpUrl(), tag, baseUrl)
         if (words.isEmpty()) return null
 
         val ref = uri.getQueryParameter(REFPARAM)

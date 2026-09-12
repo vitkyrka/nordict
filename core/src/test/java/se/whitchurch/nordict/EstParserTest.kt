@@ -1,112 +1,32 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
 import com.google.common.truth.Truth.assertThat
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import java.io.File
 
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28])
+/**
+ * Pure-JVM golden tests for the EST parser. Maps parsed `Word`s through the
+ * exact same `WordJson.toWordData()` mapping the desktop CLI emits, so the app,
+ * the CLI, and the test suite all agree on one JSON schema.
+ */
 class EstParserTest {
 
-    data class WordData(
-        val mTitle: String,
-        val mSlug: String,
-        val summary: String,
-        val uri: String,
-        val definitions: List<DefinitionData>,
-        val idioms: List<IdiomData>,
-        val xrefs: List<String>,
-        val conjugation: String = "",
-        val participle: String = "",
-        val rawHeadword: String = ""
-    )
-
-    data class DefinitionData(
-        val glosses: List<GlossData>,
-        val domain: String = "",
-        val geo: String = "",
-        val plev: String = "",
-        val register: String = "",
-        val synonyms: List<SynonymData> = emptyList()
-    )
-
-    data class SynonymData(
-        val text: String,
-        val href: String,
-        val plev: String
-    )
-
-    data class GlossData(
-        val definition: String,
-        val headword: String,
-        val grammar: String,
-        val gender: String,
-        val examples: List<String>
-    )
-
-    data class IdiomData(
-        val idiom: String,
-        val glosses: List<GlossData>,
-        val geo: String = "",
-        val plev: String = "",
-        val register: String = ""
-    )
-
-    private fun Word.Gloss.toData(): GlossData {
-        return GlossData(
-            definition = definition,
-            headword = headword,
-            grammar = grammar,
-            gender = gender,
-            examples = examples
-        )
-    }
-
-    private fun Word.toData(): WordData {
-        return WordData(
-            mTitle = mTitle,
-            mSlug = mSlug,
-            summary = summary,
-            uri = uri.toString(),
-            conjugation = conjugation,
-            participle = participle,
-            rawHeadword = rawHeadword,
-            definitions = definitions.map { def ->
-                DefinitionData(
-                    glosses = def.glosses.map { it.toData() },
-                    domain = def.domain,
-                    geo = def.geo,
-                    plev = def.plev,
-                    register = def.register,
-                    synonyms = def.synonyms.map { SynonymData(it.text, it.href, it.plev) }
-                )
-            },
-            idioms = idioms.map { idiom ->
-                IdiomData(
-                    idiom = idiom.idiom,
-                    glosses = idiom.glosses.map { it.toData() },
-                    geo = idiom.geo,
-                    plev = idiom.plev,
-                    register = idiom.register
-                )
-            },
-            xrefs = xrefs
-        )
-    }
-
     private fun assertGolden(words: List<Word>, jsonPath: String) {
-        Goldens.assertGolden(words.map { it.toData() }, jsonPath, Array<WordData>::class.java)
+        Goldens.assertGolden(words.map { it.toWordData() }, jsonPath, Array<WordJson.WordData>::class.java)
     }
+
+    private fun httpUrl(url: String): HttpUrl = url.toHttpUrlOrNull()!!
+
+    private fun synonyms(word: Word, index: Int): List<WordJson.SynonymData> =
+        word.definitions[index].synonyms.map { WordJson.SynonymData(it.text, it.href, it.plev) }
 
     @Test
     fun testParseEst() {
         val htmlFile = File("../testdata/est.html")
         val page = htmlFile.readText()
-        val uri = Uri.parse("https://www.rae.es/diccionario-estudiante/frente")
+        val uri = httpUrl("https://www.rae.es/diccionario-estudiante/frente")
         val words = EstParser.parse(page, uri, "EST")
 
         assertThat(words).hasSize(1)
@@ -123,7 +43,7 @@ class EstParserTest {
     fun testParseEstCagar() {
         val htmlFile = File("../testdata/est/cagar.html")
         val page = htmlFile.readText()
-        val uri = Uri.parse("https://www.rae.es/diccionario-estudiante/cagar")
+        val uri = httpUrl("https://www.rae.es/diccionario-estudiante/cagar")
         val words = EstParser.parse(page, uri, "EST")
 
         assertThat(words).hasSize(1)
@@ -156,7 +76,7 @@ class EstParserTest {
     fun testParseEstMorir() {
         val htmlFile = File("../testdata/est/morir.html")
         val page = htmlFile.readText()
-        val uri = Uri.parse("https://www.rae.es/diccionario-estudiante/morir")
+        val uri = httpUrl("https://www.rae.es/diccionario-estudiante/morir")
         val words = EstParser.parse(page, uri, "EST")
 
         assertThat(words).hasSize(1)
@@ -177,8 +97,8 @@ class EstParserTest {
         assertThat(def1.glosses[1].grammar).isEqualTo("")
         assertThat(def1.glosses[1].definition).isEqualTo("También prnl.")
         assertThat(def1.glosses[1].examples).containsExactly("Se ha muerto de un ataque al corazón.")
-        assertThat(def1.synonyms.map { SynonymData(it.text, it.href, it.plev) }).containsExactly(
-            SynonymData("expirar", "https://www.rae.es/diccionario-estudiante/expirar", "")
+        assertThat(synonyms(word, 0)).containsExactly(
+            WordJson.SynonymData("expirar", "https://www.rae.es/diccionario-estudiante/expirar", "")
         )
         // Def 1 is non-pronominal on its primary gloss; the "También prnl."
         // secondary gloss grammar is empty, so neither gets a headword.
@@ -257,7 +177,7 @@ class EstParserTest {
     fun testParseEstMuerte() {
         val htmlFile = File("../testdata/est/muerte.html")
         val page = htmlFile.readText()
-        val uri = Uri.parse("https://www.rae.es/diccionario-estudiante/muerte")
+        val uri = httpUrl("https://www.rae.es/diccionario-estudiante/muerte")
         val words = EstParser.parse(page, uri, "EST")
 
         assertThat(words).hasSize(3)
@@ -276,8 +196,8 @@ class EstParserTest {
         assertThat(def1.glosses[0].definition).isEqualTo(
             "Término de la vida de una persona o de otro ser vivo."
         )
-        assertThat(def1.synonyms.map { SynonymData(it.text, it.href, it.plev) }).containsExactly(
-            SynonymData("defunción", "https://www.rae.es/diccionario-estudiante/defunción", "")
+        assertThat(synonyms(word, 0)).containsExactly(
+            WordJson.SynonymData("defunción", "https://www.rae.es/diccionario-estudiante/defunción", "")
         )
 
         // Regression: every idiom must be a real acep, not the <a class="acep">
@@ -337,7 +257,7 @@ class EstParserTest {
     fun testParseEstOtro() {
         val htmlFile = File("../testdata/est/otro.html")
         val page = htmlFile.readText()
-        val uri = Uri.parse("https://www.rae.es/diccionario-estudiante/otro")
+        val uri = httpUrl("https://www.rae.es/diccionario-estudiante/otro")
         val words = EstParser.parse(page, uri, "EST")
 
         assertThat(words).hasSize(1)
@@ -396,7 +316,7 @@ class EstParserTest {
             </div>
             </body></html>
         """.trimIndent()
-        val uri = Uri.parse("https://www.rae.es/diccionario-estudiante/cura")
+        val uri = httpUrl("https://www.rae.es/diccionario-estudiante/cura")
         val words = EstParser.parse(page, uri, "EST")
 
         assertThat(words).hasSize(2)

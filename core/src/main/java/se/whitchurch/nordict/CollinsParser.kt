@@ -1,6 +1,6 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
+import okhttp3.HttpUrl
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
@@ -14,7 +14,7 @@ class CollinsParser {
         private const val EASY_LABEL_FR = "Collins Easy Learning"
         private const val MAIN_LABEL_FR = "Collins French-English"
 
-        fun parse(page: String, uri: Uri, tag: String, dictCode: String, baseUrl: String = "https://www.collinsdictionary.com"): List<Word> {
+        fun parse(page: String, uri: HttpUrl, tag: String, dictCode: String, baseUrl: String = "https://www.collinsdictionary.com"): List<Word> {
             val words: ArrayList<Word> = ArrayList()
             val baseRoot = "$baseUrl/dictionary/${dictCode}"
             val doc = Jsoup.parse(page, baseRoot)
@@ -95,10 +95,10 @@ class CollinsParser {
                 // history/starring stay clean; every other headword resolves via
                 // its own __ref.
                 val headUri = if (index == 0) uri
-                else uri.buildUpon().appendQueryParameter(REFPARAM, head.ref).build()
+                else uri.newBuilder().addQueryParameter(REFPARAM, head.ref).build()
 
                 val headword = Word(
-                    tag, head.title, head.title, head.title, page, headUri.toHttpUrl(),
+                    tag, head.title, head.title, head.title, page, headUri,
                     baseRoot + "/",
                     doc,
                     "",
@@ -134,7 +134,7 @@ class CollinsParser {
             return words
         }
 
-        private const val REFPARAM = CollinsDictionary.REFPARAM
+        private const val REFPARAM = "__ref"
 
         // Spanish determiners shown in Collins Easy Learning headwords ("la
         // frente") that the RAE dictionaries do not key on.

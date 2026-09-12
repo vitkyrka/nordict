@@ -1,12 +1,12 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
+import okhttp3.HttpUrl
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
 class EstParser {
     companion object {
-        fun parse(page: String, uri: Uri, tag: String, baseUrl: String = "https://www.rae.es/diccionario-estudiante/"): List<Word> {
+        fun parse(page: String, uri: HttpUrl, tag: String, baseUrl: String = "https://www.rae.es/diccionario-estudiante/"): List<Word> {
             val words: ArrayList<Word> = ArrayList()
             var doc = Jsoup.parse(page)
 
@@ -35,7 +35,7 @@ class EstParser {
                 val newUri = if (first) {
                     uri
                 } else {
-                    uri.buildUpon().appendQueryParameter("__ref", ref.toString()).build()
+                    uri.newBuilder().addQueryParameter("__ref", ref.toString()).build()
                 }
 
                 first = false
@@ -45,7 +45,7 @@ class EstParser {
                 val summary = StringBuilder(word)
 
                 val headword = Word(
-                    tag, word, word, summary.toString(), page, newUri.toHttpUrl(),
+                    tag, word, word, summary.toString(), page, newUri,
                     finalBaseUrl,
                     doc,
                     "",
@@ -104,10 +104,10 @@ class EstParser {
                     val subTitle = fc.selectFirst(".headword-fc")?.text()?.trim() ?: ""
                     if (subTitle.isEmpty()) return@forEach
 
-                    val subUri = uri.buildUpon()
-                        .appendQueryParameter("__ref", ref.toString()).build()
+                    val subUri = uri.newBuilder()
+                        .addQueryParameter("__ref", ref.toString()).build()
                     val sub = Word(
-                        tag, subTitle, subTitle, subTitle, page, subUri.toHttpUrl(),
+                        tag, subTitle, subTitle, subTitle, page, subUri,
                         finalBaseUrl, doc, "", null, renderAsJson = true
                     )
                     sub.rawHeadword = subTitle

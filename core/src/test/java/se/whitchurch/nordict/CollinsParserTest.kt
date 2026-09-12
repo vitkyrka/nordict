@@ -1,125 +1,34 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
 import com.google.common.truth.Truth.assertThat
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
-import org.robolectric.annotation.Config
 import java.io.File
 
-@RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28])
+/**
+ * Pure-JVM golden tests for the Collins Spanish-English parser. Maps parsed
+ * `Word`s through the exact same `WordJson.toWordData()` mapping the desktop
+ * CLI emits, so the app, the CLI, and the test suite all agree on one JSON
+ * schema.
+ */
 class CollinsParserTest {
 
-    data class WordData(
-        val mTitle: String,
-        val mSlug: String,
-        val summary: String,
-        val uri: String,
-        val dictionary: String = "",
-        val xrefs: List<String> = emptyList(),
-        val audio: List<String> = emptyList(),
-        val definitions: List<DefinitionData> = emptyList(),
-        val idioms: List<IdiomData> = emptyList(),
-        val rawHeadword: String = ""
-    )
-
-    data class DefinitionData(
-        val glosses: List<GlossData> = emptyList(),
-        val pos: String = "",
-        val idioms: List<PhraseData> = emptyList(),
-        val phrases: List<PhraseData> = emptyList(),
-        val domain: String = "",
-        val geo: String = "",
-        val plev: String = "",
-        val register: String = ""
-    )
-
-    data class PhraseData(
-        val headword: String,
-        val translation: String = "",
-        val examples: List<String> = emptyList()
-    )
-
-    data class GlossData(
-        val definition: String,
-        val headword: String,
-        val grammar: String,
-        val gender: String,
-        val examples: List<String>,
-        val idioms: List<PhraseData> = emptyList(),
-        val phrases: List<PhraseData> = emptyList()
-    )
-
-    data class IdiomData(
-        val idiom: String,
-        val glosses: List<GlossData>,
-        val geo: String = "",
-        val plev: String = "",
-        val register: String = ""
-    )
-
-    private fun Word.Gloss.toData(): GlossData = GlossData(
-        definition = definition,
-        headword = headword,
-        grammar = grammar,
-        gender = gender,
-        examples = examples,
-        idioms = idioms.map { it.toData() },
-        phrases = phrases.map { it.toData() }
-    )
-
-    private fun Word.Phrase.toData(): PhraseData = PhraseData(
-        headword = headword,
-        translation = translation,
-        examples = examples
-    )
-
-    private fun Word.toData(): WordData = WordData(
-        mTitle = mTitle,
-        mSlug = mSlug,
-        summary = summary,
-        uri = uri.toString(),
-        dictionary = dictionary,
-        xrefs = xrefs,
-        audio = audio,
-        definitions = definitions.map { def ->
-            DefinitionData(
-                glosses = def.glosses.map { it.toData() },
-                pos = def.pos,
-                idioms = def.idioms.map { it.toData() },
-                phrases = def.phrases.map { it.toData() },
-                domain = def.domain,
-                geo = def.geo,
-                plev = def.plev,
-                register = def.register
-            )
-        },
-        idioms = idioms.map { idiom ->
-            IdiomData(
-                idiom = idiom.idiom,
-                glosses = idiom.glosses.map { it.toData() },
-                geo = idiom.geo,
-                plev = idiom.plev,
-                register = idiom.register
-            )
-        },
-        rawHeadword = rawHeadword
-    )
-
-    // Golden-file comparison: asserts the parsed output equals the committed
-    // testdata/colspan/<name>.json fixture and never rewrites it in normal runs
-    // (see Goldens.kt for the UPDATE_GOLDEN=1 regen workflow).
     private fun assertGolden(words: List<Word>, name: String) {
-        Goldens.assertGolden(words.map { it.toData() }, "../testdata/colspan/$name.json", Array<WordData>::class.java)
+        Goldens.assertGolden(
+            words.map { it.toWordData() },
+            "../testdata/colspan/$name.json",
+            Array<WordJson.WordData>::class.java
+        )
     }
+
+    private fun httpUrl(url: String): HttpUrl = url.toHttpUrlOrNull()!!
 
     @Test
     fun testParseFrente() {
         val htmlFile = File("../testdata/colspan/frente.html")
         val page = htmlFile.readText()
-        val uri = Uri.parse("https://www.collinsdictionary.com/dictionary/spanish-english/frente")
+        val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/frente")
         val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
 
         assertThat(words).hasSize(4)
@@ -203,7 +112,7 @@ class CollinsParserTest {
     fun testParseCagar() {
         val htmlFile = File("../testdata/colspan/cagar.html")
         val page = htmlFile.readText()
-        val uri = Uri.parse("https://www.collinsdictionary.com/dictionary/spanish-english/cagar")
+        val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/cagar")
         val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
 
         assertThat(words).hasSize(3)
@@ -241,7 +150,7 @@ class CollinsParserTest {
     fun testParseMorir() {
         val htmlFile = File("../testdata/colspan/morir.html")
         val page = htmlFile.readText()
-        val uri = Uri.parse("https://www.collinsdictionary.com/dictionary/spanish-english/morir")
+        val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/morir")
         val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
 
         assertThat(words).hasSize(3)
@@ -281,7 +190,7 @@ class CollinsParserTest {
     fun testParseMuerte() {
         val htmlFile = File("../testdata/colspan/muerte.html")
         val page = htmlFile.readText()
-        val uri = Uri.parse("https://www.collinsdictionary.com/dictionary/spanish-english/muerte")
+        val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/muerte")
         val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
 
         assertThat(words).hasSize(2)
@@ -316,7 +225,7 @@ class CollinsParserTest {
     fun testParseOtro() {
         val htmlFile = File("../testdata/colspan/otro.html")
         val page = htmlFile.readText()
-        val uri = Uri.parse("https://www.collinsdictionary.com/dictionary/spanish-english/otro")
+        val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/otro")
         val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
 
         assertThat(words).hasSize(3)
@@ -361,7 +270,7 @@ class CollinsParserTest {
     fun testParseLeyDeLaGravedad() {
         val htmlFile = File("../testdata/colspan/ley+de+la+gravedad.html")
         val page = htmlFile.readText()
-        val uri = Uri.parse("https://www.collinsdictionary.com/dictionary/spanish-english/ley-de-la-gravedad")
+        val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/ley-de-la-gravedad")
         val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
 
         assertThat(words).hasSize(2)
