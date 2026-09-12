@@ -60,6 +60,7 @@ class WordActivity : AppCompatActivity() {
     private var autoPlay: Boolean = false
     private var mFilterName: String? = null
     private var mWordList: WordList = WordList(position = -1)
+    private var mResetZoomNextPause = false
 
     @SuppressLint("AddJavascriptInterface")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -613,7 +614,12 @@ class WordActivity : AppCompatActivity() {
 
         // If the WebView was not made visible, getScale() does not
         // return the initalScale, but the default one.
-        if (mWebView!!.visibility == View.VISIBLE) {
+        if (mResetZoomNextPause) {
+            // The zoom was just reset: keep the cleared scale instead of
+            // re-saving the still-zoomed page's scale, or the next open
+            // would apply the large zoom again.
+            mResetZoomNextPause = false
+        } else if (mWebView!!.visibility == View.VISIBLE) {
             // getScale() is supposed to be deprecated, but its replacement
             // onScaleChanged() doesn't get called when zooming using pinch.
             val scale = (mWebView!!.scale * 100).toInt()
@@ -664,14 +670,12 @@ class WordActivity : AppCompatActivity() {
         }
 
         if (item.itemId == R.id.menu_reset_zoom) {
-            // setInitialScale() only affects the scale at page load and is a
-            // no-op on the loaded page, so rescale the live view instead.
-            val webView = mWebView
-            if (webView != null && webView.scale > 0f) {
-                webView.zoomBy(1f / webView.scale)
-            }
-            // Clear the remembered scale from wherever it may live so the next
+            // The WebView zoom is only persisted through the saved "scale"
+            // preference that setInitialScale() applies on the next page
+            // load (there is no reliable API to read or set the zoom of the
+            // currently displayed page). Reset it to the default so the next
             // word opens at the default zoom.
+            mResetZoomNextPause = true
             mOrdboken?.mPrefs?.edit()?.putInt("scale", 0)?.apply()
             getPreferences(Context.MODE_PRIVATE)?.let { pref ->
                 with(pref.edit()) {
