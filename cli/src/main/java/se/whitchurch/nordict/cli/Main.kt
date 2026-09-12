@@ -9,8 +9,10 @@ import se.whitchurch.nordict.DiccionariParser
 import se.whitchurch.nordict.DidacParser
 import se.whitchurch.nordict.DleParser
 import se.whitchurch.nordict.EstParser
-import se.whitchurch.nordict.SearchResult
-import se.whitchurch.nordict.Word
+import se.whitchurch.nordict.AgentCommand
+import se.whitchurch.nordict.AgentOps
+import se.whitchurch.nordict.AgentProtocol
+import se.whitchurch.nordict.AgentResult
 import se.whitchurch.nordict.WordJson
 import java.io.File
 import kotlin.system.exitProcess
@@ -82,6 +84,7 @@ class Main {
     ) = Dict(
         aliases = listOf(alias),
         tag = dictTag,
+        lang = "ca",
         wordUrl = { word -> diccionariCerca(cerca, word) },
         searchUrl = { query -> diccionariAutocomplete(autocompleteKey, query) },
         parse = { page, uri -> DiccionariParser.parse(page, uri, dictTag, nodeClass, bilingual) },
@@ -90,10 +93,11 @@ class Main {
         }
     )
 
-    private val dictionaries = listOf(
+    val dictionaries = listOf(
         Dict(
             aliases = listOf("dle"),
             tag = "DLE",
+            lang = "es",
             wordUrl = { word -> dleUrl(word) },
             searchUrl = { query -> "https://dle.rae.es/srv/keys?q=$query".toHttpUrlOrNull()!! },
             parse = { page, uri -> DleParser.parse(page, uri, "DLE") },
@@ -102,6 +106,7 @@ class Main {
         Dict(
             aliases = listOf("est"),
             tag = "EST",
+            lang = "es",
             wordUrl = { word -> estUrl(word) },
             searchUrl = { query -> "https://www.rae.es/diccionario-estudiante/srv/keys?q=$query".toHttpUrlOrNull()!! },
             parse = { page, uri -> EstParser.parse(page, uri, "EST") },
@@ -110,6 +115,7 @@ class Main {
         Dict(
             aliases = listOf("colspan", "col"),
             tag = "COLSPAN",
+            lang = "es",
             wordUrl = { word -> collinsUrl(word) },
             searchUrl = { query ->
                 "https://www.collinsdictionary.com/autocomplete/?q=$query&dictCode=spanish-english"
@@ -121,6 +127,7 @@ class Main {
         Dict(
             aliases = listOf("didac"),
             tag = "DIDAC",
+            lang = "ca",
             wordUrl = { word -> didacUrl(word) },
             searchUrl = { query -> didacAutocomplete(query) },
             parse = { page, uri -> DidacParser.parse(page, uri, "DIDAC") },
@@ -133,16 +140,11 @@ class Main {
         diccionariDict("ca-en", "CA-EN", "diccionari-catala-angles", "diccionari_ca_en", "diccionari-ca-en", true)
     )
 
-    private data class Dict(
-        val aliases: List<String>,
-        val tag: String,
-        val wordUrl: (String) -> HttpUrl,
-        val searchUrl: (String) -> HttpUrl,
-        val parse: (page: String, uri: HttpUrl) -> List<Word>,
-        val searchResults: (body: String) -> List<SearchResult>
-    )
-
     fun run(args: Array<String>): Int {
+        if (args.isNotEmpty() && args[0] == "repl") {
+            return runRepl(args.copyOfRange(1, args.size))
+        }
+
         var url: HttpUrl? = null
         var filePath: String? = null
         var outputPath: String? = null
@@ -253,6 +255,90 @@ class Main {
         } catch (e: Exception) {
             return error(e.message ?: e.toString())
         }
+    }
+
+    private fun runRepl(args: Array<String>): Int {
+        var device: String? = null
+        var singleCommand: String? = null
+
+        var i = 0
+        while (i < args.size) {
+            when (val arg = args[i]) {
+                "--device" -> {
+                    device = args.getOrNull(++i)
+                    if (device == null) return error("repl --device needs a device serial")
+                }
+                "--command" -> {
+                    singleCommand = args.getOrNull(++i)
+                    if (singleCommand == null) return error("repl --command needs a JSON command")
+                }
+                "-h", "--help" -> {
+                    replUsage()
+                    return 0
+                }
+                else -> return error("repl: unknown option '$arg'")
+            }
+            i++
+        }
+
+        val backend: AgentBackend = if (device != null) {
+            try {
+                DeviceAgentBackend(device).also { it.activate() }
+            } catch (e: Exception) {
+                return error("repl: cannot reach device $device: ${e.message ?: e}")
+            }
+        } else {
+            HeadlessAgentDriver(dictionaries)
+        }
+
+        return if (singleCommand != null) {
+            val result = try {
+                val command = AgentProtocol.gson.fromJson(singleCommand, AgentCommand::class.java)
+                if (command.op == AgentOps.QUIT) {
+                    AgentResult(ok = true, op = AgentOps.QUIT, message = "bye")
+                } else {
+                    backend.execute(command)
+                }
+            } catch (e: Exception) {
+                AgentResult.error(null, "protocol error: ${e.message ?: e}")
+            }
+            println(AgentProtocol.gson.toJson(result))
+            0
+        } else {
+            Repl(backend).run(System.`in`, System.out)
+        }
+    }
+
+    private fun replUsage() {
+        System.err.println(
+            """
+            nordict agent repl — a semantic command surface for AI agents
+
+            Reads one JSON command per line from stdin and writes exactly one
+            JSON result per command to stdout. Headless by default (searches and
+            parses pages with the shared parsers); --device drives the debug
+            build of the real app over adb reverse.
+
+            commands ({"op":"search","query":"frente"}, ...):
+              search   search the current dictionary, returning {mTitle,mSummary,uri} results
+              open     query absent ->: open the unique exact match of `query` from a search
+                       (no exact match errors; run search to pick). `uri` opens a URL directly.
+              openUri  open a word page URL, selecting the `__ref`-tagged homograph if present
+              nextPage move to the next homograph/sub-entry of the loaded page
+              back     leave the word view (headless: clear the loaded word)
+              setDict  tag = a dict alias or tag (dle/est/colspan/didac/gdlc/ca-es/ca-en)
+              setLang  lang = a language code (es/ca) — selects the first dict of that language
+              state    snapshot of {activity, dict, lang, query, word}
+              quit     close the session
+
+            options:
+              --device SERIAL    drive the app on a connected device (adb reverse on port 42837)
+              --command 'json'   run one command and print its one-line result, then exit
+              -h, --help         show this help
+
+            example: echo '{"op":"search","query":"frente"}' | ./gradlew :cli:run --args="repl"
+            """.trimIndent()
+        )
     }
 
     private data class Output(val json: String, val summary: String)

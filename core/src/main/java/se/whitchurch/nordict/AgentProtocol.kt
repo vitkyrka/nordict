@@ -1,0 +1,126 @@
+package se.whitchurch.nordict
+
+import com.google.gson.Gson
+import com.google.gson.GsonBuilder
+
+/**
+ * Wire protocol for the agent REPL: a small, stable set of semantic commands an
+ * AI agent can send to inspect and drive the app. One JSON schema is used by
+ * the headless desktop session (`:cli repl`) and by the on-device remote
+ * session (the debug-only agent server), so a command means the same thing in
+ * both worlds.
+ *
+ * Framing: one compact JSON object per line, no embedded newlines. The agent
+ * writes an [AgentCommand] and reads exactly one [AgentResult] per command, in
+ * order — on stdout in headless mode, over the same socket connection in
+ * device mode. All responses are JSON on the data channel; stderr/logs are
+ * reserved for diagnostics.
+ */
+object AgentProtocol {
+    /** Loopback port the debug app binds (host reaches it via `adb reverse`). */
+    const val PORT = 42837
+
+    val gson: Gson = GsonBuilder().disableHtmlEscaping().create()
+}
+
+/** Semantic operation names (the `op` field of an [AgentCommand]). */
+object AgentOps {
+    const val SEARCH = "search"
+    const val OPEN = "open"
+    const val OPEN_URI = "openUri"
+    const val NEXT_PAGE = "nextPage"
+    const val BACK = "back"
+    const val SET_DICT = "setDict"
+    const val SET_LANG = "setLang"
+    const val STATE = "state"
+    const val QUIT = "quit"
+}
+
+/**
+ * One agent command. `op` selects the operation; the remaining fields are the
+ * arguments for it (see [AgentOps]). Unknown/extra fields are ignored.
+ */
+data class AgentCommand(
+    val op: String,
+    val query: String? = null,
+    val uri: String? = null,
+    val title: String? = null,
+    val tag: String? = null,
+    val lang: String? = null
+) {
+    /** Returns the named argument or throws a clear protocol error. */
+    fun require(name: String, value: String?): String =
+        value ?: throw IllegalArgumentException("command '$op' requires an argument '$name'")
+}
+
+/**
+ * Exactly one of these is sent back per [AgentCommand]. `ok=false` commands
+ * carry an [error] message; `ok=true` commands carry the operation's payload
+ * (search [results], a loaded [word]) plus a [state] snapshot.
+ */
+data class AgentResult(
+    val ok: Boolean,
+    val op: String? = null,
+    val error: String? = null,
+    val message: String? = null,
+    val state: AgentState? = null,
+    val results: List<WordJson.SearchResultData>? = null,
+    val word: WordResult? = null
+) {
+    companion object {
+        fun error(op: String?, error: String): AgentResult =
+            AgentResult(ok = false, op = op, error = error)
+    }
+}
+
+/** A structured snapshot of what the agent is looking at. */
+data class AgentState(
+    val activity: String,
+    val dict: String,
+    val lang: String,
+    val query: String? = null,
+    val word: WordResult? = null
+)
+
+/** One entry of a multi-entry (homograph) page, in page order. */
+data class HomonymData(
+    val mTitle: String,
+    val ref: String,
+    val dictionary: String = ""
+)
+
+/** A loaded word: the golden word JSON plus the homonym navigation row. */
+data class WordResult(
+    val word: WordJson.WordData,
+    val homonyms: List<HomonymData>,
+    val selected: Int
+)
+
+/**
+ * The homonym (page-entry) list for a loaded word, in page order. JSON-rendered
+ * dictionaries (EST/DLE/COLSPAN) snapshot every entry in `mHomonymEntries`;
+ * legacy dictionaries report just the word itself.
+ */
+fun homonymListOf(word: Word): List<HomonymData> =
+    if (word.mHomonymEntries.isNotEmpty()) {
+        word.mHomonymEntries.map { HomonymData(it.mTitle, it.ref, it.dictionary) }
+    } else {
+        listOf(HomonymData(word.mTitle, word.xrefs.firstOrNull() ?: "", word.dictionary))
+    }
+
+/**
+ * A [WordResult] describing [word] as shown among a whole page of entries
+ * (the homograph set). `selected` is the index of [word] within the homonym
+ * list; when [word] is not among them it falls back to index 0.
+ */
+fun wordResultOf(word: Word, pageWords: List<Word> = emptyList()): WordResult {
+    val homonyms: List<HomonymData> =
+        if (pageWords.isNotEmpty()) {
+            pageWords.map { HomonymData(it.mTitle, it.xrefs.firstOrNull() ?: "", it.dictionary) }
+        } else {
+            homonymListOf(word)
+        }
+    val ref = word.xrefs.firstOrNull() ?: ""
+    val selected = homonyms.indexOfFirst { it.ref == ref && it.mTitle == word.mTitle }
+    return WordResult(word.toWordData(), homonyms, if (selected >= 0) selected else 0)
+}

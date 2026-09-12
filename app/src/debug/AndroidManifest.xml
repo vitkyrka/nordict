@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Debug-only Application: registers the activity tracker and binds the
+         local agent server (see se.whitchurch.nordict.debug.DebugApp). -->
+    <application android:name=".debug.DebugApp" />
+</manifest>

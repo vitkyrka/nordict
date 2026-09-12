@@ -215,13 +215,43 @@ class Ordboken private constructor(
                 return@setOnCheckedChangeListener
             }
             val index = button.tag as Int
-            currentIndex = index
-            currentDictionary = dictionaries[index]
-            currentFlag = flags[index]
-            saveDictIndex(currentDictionary.lang, index)
+            setCurrentDictionary(index)
             activity.findViewById<ImageView>(R.id.dictFlag)?.setImageResource(flags[index])
-            onDictChanged?.invoke()
         }
+    }
+
+    /**
+     * Selects the dictionary at [index], persisting the selection for its
+     * language and invoking [onDictChanged]. Shared by the dictionary-row
+     * listener and the agent driver so both switch through one path.
+     */
+    fun setCurrentDictionary(index: Int) {
+        if (index !in dictionaries.indices) return
+        currentIndex = index
+        currentDictionary = dictionaries[index]
+        currentFlag = flags[index]
+        saveDictIndex(currentDictionary.lang, index)
+        onDictChanged?.invoke()
+    }
+
+    /** Selects the dictionary registered under [tag]; true if known. */
+    fun setCurrentDictionary(tag: String): Boolean {
+        val index = dictionaries.indexOfFirst { it.tag.equals(tag, ignoreCase = true) }
+        if (index < 0) return false
+        setCurrentDictionary(index)
+        return true
+    }
+
+    /**
+     * Selects the dictionary for [lang] the way the language row does: the
+     * remember selection for that language, else its first dictionary.
+     */
+    fun setLanguage(lang: String): Boolean {
+        val indices = dictionaries.indices.filter { dictionaries[it].lang == lang }
+        if (indices.isEmpty()) return false
+        val stored = storedDictIndex(lang)
+        setCurrentDictionary(if (stored in indices) stored else indices.first())
+        return true
     }
 
     private fun buildDictionaryRow(activity: AppCompatActivity, group: RadioGroup, lang: String) {

@@ -152,6 +152,46 @@ JSON goes to stdout (summary on stderr; nonzero exit on failure). Pipe the
 output to the JS renderer for a browser preview:
 `cd app/src/test/js && npm run render -- /tmp/frente.json`.
 
+### Agent REPL (headless + on-device driving)
+
+The debug build ships a loopback agent server (`app/src/debug/.../AgentServer`,
+`AgentProtocol.PORT = 42837`) bound to `127.0.0.1` on the device; the CLI's
+`repl` subcommand drives it. Each input line is one JSON `AgentCommand`
+(`{"op": "search"|"open"|"openUri"|"nextPage"|"back"|"setDict"|"setLang"|"state"|"quit",
+"query"?, "uri"?, "tag"?, "lang"?}`); each produces exactly one JSON
+`AgentResult` (`ok`, `error`, optional `state`/`word`), in order, over a
+persistent session until EOF or `quit`. `"word"` carries the loaded word's
+`mTitle`, `uri`, `xrefs` and a per-entry `selected` index. Ops run against the
+app's live `Ordboken` + `WordActivity` and are exercised by
+`AppDriverTest` (Robolectric, word-view ops device-only; `startActivity`
+activities are not auto-created under Robolectric) and the on-device E2E.
+
+```sh
+./gradlew :app:assembleDebug
+adb -s <serial> install -r app/build/outputs/apk/debug/app-debug.apk
+adb -s <serial> forward tcp:42837 tcp:42837        # device loopback -> host (NOT adb reverse!)
+./gradlew :cli:installDist
+printf '{"op":"search","query":"frente"}\n{"op":"open","query":"frente"}\n{"op":"state"}\n{"op":"quit"}\n' \
+  | cli/build/install/cli/bin/cli repl --device <serial>     # run via installDist bin (gradle :cli:run doesn't forward stdin)
+```
+
+The backend starts `.MainActivity` (`am start`) so the driver has a clean task
+root; `--device` retries the connection a few times to absorb cold-start
+races. `setDict`/`setLang` clear the cross-link hook and switch in place, so
+the agent stays on the current word view while the next `search`/`open` uses
+the new dictionary (they deliberately do *not* finish the word view: a real
+back on the device lets the activity beneath restore the last word and reopen
+a `WordActivity`). `nextPage` walks the homonym entries of the current word;
+it strips any existing `__ref` from the loaded word's `uri` before adding the
+next one, or the dictionary would resolve the first `__ref` param again. Each
+`open`/`nextPage` pushes a fresh `WordActivity` onto the stack, so `back` pops
+to the *previous* word view (reporting "closed the word view") and only lands
+on the main screen ("left the word view") when the task root is `MainActivity`.
+`AppDriver` `requireActivity()` returns the top resumed activity from a LIFO
+`ActivityTracker` (a last-resumed pointer would read null right after the
+destroy of a finished activity, since destroy callbacks run after the activity
+below has already resumed).
+
 ### Kotlin unit tests (Robolectric)
 
 ```sh
@@ -218,7 +258,9 @@ adb -s <serial> install -r app/build/outputs/apk/debug/app-debug.apk
 adb -s <serial> shell monkey -p se.whitchurch.nordict -c android.intent.category.LAUNCHER 1   # launch
 ```
 
-Package / launch activity is `se.whitchurch.nordict` / `.MainActivity`. A
+The launcher activity is `se.whitchurch.nordict` / `.HistoryActivity` (it
+restores the last view — `Where.MAIN` or `Where.WORD`); the `repl --device`
+backend instead `am start`s `.MainActivity` as a clean task root. A
 physical phone typically shows up over adb-over-TLS
 (e.g. `adb-RFCY10MKMMD-...._adb-tls-connect._tcp` series).
 
