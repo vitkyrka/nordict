@@ -83,9 +83,10 @@ const template = (word) => `
             ${word.etymology ? `<div class="etymology">${word.etymology}</div>` : ''}
         </header>
         ${word.definitions && word.definitions.length > 0 ? `
-            <ol class="definitions${word.dictionary ? ' bilingual' : ''}">
+            <ol class="definitions${word.dictionary ? ' bilingual' : ''}${word.definitions.some(def => def.senseNumber) ? ' sense-numbered' : ''}">
                 ${word.definitions.map(def => `
                     <li>
+                        ${def.senseNumber ? `<span class="sense-number">${def.senseNumber}</span> ` : ''}
                         ${def.pos ? `<span class="pos">${def.pos}</span> ` : ''}
                         ${def.register ? `<span class="register">${def.register}</span> ` : ''}
                         ${def.domain ? `<span class="domain">${def.domain}</span> ` : ''}
@@ -114,6 +115,7 @@ const template = (word) => `
                 <ul class="idiom-list">
                     ${word.idioms.map(idiom => `
                         <li>
+                            ${idiom.senseNumber ? `<span class="sense-number">${idiom.senseNumber}</span> ` : ''}
                             <b class="idiom-name">${idiom.idiom}</b>:
                             ${idiom.register ? `<span class="register">${idiom.register}</span> ` : ''}
                             ${idiom.domain ? `<span class="domain">${idiom.domain}</span> ` : ''}

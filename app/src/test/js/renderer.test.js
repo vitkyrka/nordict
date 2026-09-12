@@ -491,6 +491,61 @@ test('omits pronunciation element when absent', () => {
     expect($('.pronunciation').length).toBe(0);
 });
 
+test('renders sense numbers on definitions and idioms', () => {
+    const word = {
+        mTitle: 'cap',
+        definitions: [
+            {
+                senseNumber: '3.1',
+                glosses: [
+                    { definition: 'Persona que ocupa un lloc de preferència.', grammar: 'masculí i femení', gender: '', examples: [] }
+                ]
+            },
+            {
+                senseNumber: '1.1',
+                glosses: [
+                    { definition: 'Part superior del cos.', grammar: 'masculí', gender: 'masculino', examples: [] }
+                ]
+            }
+        ],
+        idioms: [
+            {
+                senseNumber: '1.4',
+                idiom: 'abaixar el cap',
+                glosses: [
+                    { definition: 'Cedir al voler d’altri.', grammar: '', gender: '', examples: [] }
+                ]
+            }
+        ]
+    };
+
+    renderWord(word);
+
+    expect($('ol.definitions').hasClass('sense-numbered')).toBe(true);
+    expect($('ol.definitions li .sense-number').map((_, el) => $(el).text()).get())
+        .toEqual(['3.1', '1.1']);
+    expect($('.idiom-list li .sense-number').text()).toBe('1.4');
+});
+
+test('omits sense numbers and auto-number class when absent', () => {
+    const word = {
+        mTitle: 'frente',
+        definitions: [
+            {
+                glosses: [
+                    { definition: 'Parte superior de la cara.', grammar: 'nombre femenino', gender: '', examples: [] }
+                ]
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('ol.definitions').hasClass('sense-numbered')).toBe(false);
+    expect($('.sense-number').length).toBe(0);
+});
+
 test('renders antonyms on definitions', () => {
     const word = {
         mTitle: 'frente',

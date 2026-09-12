@@ -238,6 +238,19 @@ ul.idiom-list {
     list-style-position: inside;
 }
 
+/* Definitions that carry their original page numbering (senseNumber, e.g.
+ * diccionari.cat "1.1", "3.1") render it explicitly and suppress the <ol>'s
+ * own auto-numbers. */
+ol.definitions.sense-numbered {
+    list-style-type: none;
+}
+
+span.sense-number {
+    color: var(--grammar-color);
+    font-weight: bold;
+    font-variant-numeric: tabular-nums;
+}
+
 /* span.definition renders rich HTML (bilingual Collins); display:contents
  * lets block children like div.sense and div.cit render properly. */
 span.definition {
