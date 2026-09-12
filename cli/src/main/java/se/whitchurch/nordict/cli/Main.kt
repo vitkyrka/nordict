@@ -7,18 +7,21 @@ import okhttp3.Request
 import se.whitchurch.nordict.CollinsParser
 import se.whitchurch.nordict.DleParser
 import se.whitchurch.nordict.EstParser
+import se.whitchurch.nordict.SearchResult
 import se.whitchurch.nordict.Word
 import se.whitchurch.nordict.WordJson
 import java.io.File
 import kotlin.system.exitProcess
 
 /**
- * Desktop CLI that fetches or reads dictionary pages and dumps the shared JSON
- * schema (the same golden JSON the app's WebView renderer consumes).
+ * Desktop CLI that fetches or reads dictionary pages/searches and dumps the
+ * shared JSON schemas (the same golden JSON the app's WebView renderer and the
+ * search listings consume).
  *
  * Every registered dictionary shares one parser shape — `parse(page, uri, tag)`
- * — and one output schema (`WordJson`), so a parser fix/feature benefits the
- * app, these tests, and this CLI at once.
+ * — and one output schema (`WordJson`), plus one per-dictionary search-response
+ * parser (`DleParser.parseSearch`/`EstParser.parseSearch`/`CollinsParser.parseSearch`)
+ * so a parser fix/feature benefits the app, these tests, and this CLI at once.
  */
 fun main(args: Array<String>) {
     exitProcess(Main().run(args))
@@ -26,27 +29,42 @@ fun main(args: Array<String>) {
 
 class Main {
 
+    private fun dleUrl(word: String): HttpUrl = "https://dle.rae.es/$word".toHttpUrlOrNull()!!
+
+    private fun estUrl(word: String): HttpUrl =
+        "https://www.rae.es/diccionario-estudiante/$word".toHttpUrlOrNull()!!
+
+    private fun collinsUrl(word: String): HttpUrl =
+        "https://www.collinsdictionary.com/dictionary/spanish-english/${word.replace(" ", "-").lowercase()}"
+            .toHttpUrlOrNull()!!
+
     private val dictionaries = listOf(
         Dict(
             aliases = listOf("dle"),
             tag = "DLE",
-            wordUrl = { word -> "https://dle.rae.es/$word".toHttpUrlOrNull()!! },
-            parse = { page, uri -> DleParser.parse(page, uri, "DLE") }
+            wordUrl = { word -> dleUrl(word) },
+            searchUrl = { query -> "https://dle.rae.es/srv/keys?q=$query".toHttpUrlOrNull()!! },
+            parse = { page, uri -> DleParser.parse(page, uri, "DLE") },
+            searchResults = { body -> DleParser.parseSearch(body) { word -> dleUrl(word) } }
         ),
         Dict(
             aliases = listOf("est"),
             tag = "EST",
-            wordUrl = { word -> "https://www.rae.es/diccionario-estudiante/$word".toHttpUrlOrNull()!! },
-            parse = { page, uri -> EstParser.parse(page, uri, "EST") }
+            wordUrl = { word -> estUrl(word) },
+            searchUrl = { query -> "https://www.rae.es/diccionario-estudiante/srv/keys?q=$query".toHttpUrlOrNull()!! },
+            parse = { page, uri -> EstParser.parse(page, uri, "EST") },
+            searchResults = { body -> EstParser.parseSearch(body) { word -> estUrl(word) } }
         ),
         Dict(
             aliases = listOf("colspan", "col"),
             tag = "COLSPAN",
-            wordUrl = { word ->
-                "https://www.collinsdictionary.com/dictionary/spanish-english/${word.replace(" ", "-").lowercase()}"
+            wordUrl = { word -> collinsUrl(word) },
+            searchUrl = { query ->
+                "https://www.collinsdictionary.com/autocomplete/?q=$query&dictCode=spanish-english"
                     .toHttpUrlOrNull()!!
             },
-            parse = { page, uri -> CollinsParser.parse(page, uri, "COLSPAN", "spanish-english") }
+            parse = { page, uri -> CollinsParser.parse(page, uri, "COLSPAN", "spanish-english") },
+            searchResults = { body -> CollinsParser.parseSearch(body) { title -> collinsUrl(title) } }
         )
     )
 
@@ -54,7 +72,9 @@ class Main {
         val aliases: List<String>,
         val tag: String,
         val wordUrl: (String) -> HttpUrl,
-        val parse: (page: String, uri: HttpUrl) -> List<Word>
+        val searchUrl: (String) -> HttpUrl,
+        val parse: (page: String, uri: HttpUrl) -> List<Word>,
+        val searchResults: (body: String) -> List<SearchResult>
     )
 
     fun run(args: Array<String>): Int {
@@ -62,6 +82,7 @@ class Main {
         var filePath: String? = null
         var outputPath: String? = null
         var dict: Dict = dictionaries.first()
+        var search = false
         val positional = mutableListOf<String>()
 
         var i = 0
@@ -83,6 +104,7 @@ class Main {
                     filePath = args.getOrNull(++i)
                     if (filePath == null) return error("--file needs a path like ../testdata/dle/frente.html")
                 }
+                "--search" -> search = true
                 "-o", "--output" -> {
                     outputPath = args.getOrNull(++i)
                     if (outputPath == null) return error("$arg needs a path")
@@ -110,48 +132,65 @@ class Main {
             }
         }
 
-        if (positional.size > 1) return error("expected exactly one word or URL, got: ${positional.joinToString(" ")}")
-        if (url != null && positional.isNotEmpty()) return error("give either a positional word/URL or --url, not both")
+        if (positional.size > 1) return error("expected exactly one word or query, got: ${positional.joinToString(" ")}")
+        if (url != null && positional.isNotEmpty()) return error("give either a positional word/query or --url, not both")
         val word = positional.firstOrNull()
 
         if (filePath == null && url == null && word == null) {
-            return error("usage: nordict [<dict>] <word> | [--dict <dict>] --url <url> | [--dict <dict>] --file <page.html> [-o out.json]")
+            return error(
+                "usage: nordict [<dict>] <word> | [<dict>] <query> --search | " +
+                    "[--dict <dict>] --url <url> | [--dict <dict>] --file <page.html|search.json> | -o out.json"
+            )
         }
 
         try {
-            val (page, uri) = if (filePath != null) {
-                val target = url ?: dict.wordUrl(word ?: fallbackWord(filePath))
-                pageFromFile(filePath, target)
+            // Words and search both resolve (url | ?? ) to a single target; the
+            // body source is --file, --url, or a live fetch of that target.
+            val target = when {
+                url != null -> url
+                search -> dict.searchUrl(word ?: fallbackWord(filePath!!))
+                else -> dict.wordUrl(word ?: fallbackWord(filePath!!))
+            }
+            val body = if (filePath != null) pageFromFile(filePath, target).first else fetch(target)
+
+            val output = if (search) {
+                val results = dict.searchResults(body)
+                if (results.isEmpty()) {
+                    System.err.println("no search results from $target (${dict.tag})")
+                    return 1
+                }
+                Output(
+                    json = WordJson.searchJson(results),
+                    summary = "${results.size} result(s) from $target (${dict.tag})"
+                )
             } else {
-                val target = url ?: dict.wordUrl(word!!)
-                fetch(target) to target
+                val words = dict.parse(body, target)
+                if (words.isEmpty()) {
+                    System.err.println("no words parsed from $target (${dict.tag})")
+                    return 1
+                }
+                Output(
+                    json = WordJson.toJson(words),
+                    summary = "parsed ${words.size} word(s), " +
+                        "${words.sumOf { it.definitions.size }} definition(s), " +
+                        "${words.sumOf { it.idioms.size }} idiom(s) from $target (${dict.tag})"
+                )
             }
 
-            val words = dict.parse(page, uri)
-            if (words.isEmpty()) {
-                System.err.println("no words parsed from $uri")
-                return 1
-            }
-
-            val json = WordJson.toJson(words)
             if (outputPath != null) {
-                File(outputPath).writeText(json)
+                File(outputPath).writeText(output.json)
                 System.err.println("wrote $outputPath")
             } else {
-                print(json)
-            }
-            if (outputPath == null) {
-                System.err.println(
-                    "parsed ${words.size} word(s), " +
-                        "${words.sumOf { it.definitions.size }} definition(s), " +
-                        "${words.sumOf { it.idioms.size }} idiom(s) from $uri (${dict.tag})"
-                )
+                print(output.json)
+                System.err.println(output.summary)
             }
             return 0
         } catch (e: Exception) {
             return error(e.message ?: e.toString())
         }
     }
+
+    private data class Output(val json: String, val summary: String)
 
     private fun aliasesString(): String = dictionaries.joinToString(", ") { it.aliases.joinToString("/") + " (" + it.tag + ")" }
 
@@ -188,19 +227,24 @@ class Main {
               ${aliasesString()}
 
             usage:
-              <word>                  fetch the default dictionary (DLE) and dump JSON
-              <dict> <word>           fetch a specific dictionary, e.g. "est frente"
-                                      or "colspan frente" (spaces become hyphens)
-              --url <url>             parse any dictionary page URL (homographs, deep links)
-              --file <page.html>      parse a local HTML page (no network)
+              <word>                   fetch the default dictionary (DLE) and dump JSON
+              <dict> <word>            fetch a specific dictionary, e.g. "est frente"
+                                       or "colspan frente" (spaces become hyphens)
+              <dict> <query> --search  dump search-result JSON, e.g. "est frente --search"
+                                       or "colspan cagar --search"
+              --url <url>              parse a word or --search endpoint URL
+              --file <page.html|search.json>
+                                       parse a local word page or --search response (no network)
 
             options:
-              --dict <name>           dictionary to use (default: ${dictionaries.first().aliases.first()})
-              -o, --output <path>     write JSON to a file (default: stdout)
-              -h, --help              show this help
+              --dict <name>            dictionary to use (default: ${dictionaries.first().aliases.first()})
+              --search                 fetch search results for the query instead of a word page
+              -o, --output <path>      write JSON to a file (default: stdout)
+              -h, --help               show this help
 
-            The JSON is the shared golden schema (see testdata/{dle,est,colspan}/*.json);
+            The word JSON is the shared golden schema (see testdata/{dle,est,colspan}/*.json);
             pipe it to 'app/src/test/js/cli.js' for a browser preview of the rendered entry.
+            Search result JSON is an array of {mTitle, mSummary, uri}.
             """.trimIndent()
         )
     }

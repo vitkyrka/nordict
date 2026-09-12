@@ -299,4 +299,29 @@ class CollinsParserTest {
 
         assertGolden(words, "ley")
     }
+
+    @Test
+    fun testParseSearch() {
+        val body = File("../testdata/colspan-search.json").readText()
+
+        val results = CollinsParser.parseSearch(body) { title ->
+            httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/${title.replace(" ", "-").lowercase()}")
+        }
+
+        assertThat(results.map { it.mTitle })
+            .containsExactly("cagar", "cagarse", "cagar(se)", "efectivo en caja").inOrder()
+        assertThat(results[0].uri.toString())
+            .isEqualTo("https://www.collinsdictionary.com/dictionary/spanish-english/cagar")
+        assertThat(results[3].uri.toString())
+            .isEqualTo("https://www.collinsdictionary.com/dictionary/spanish-english/efectivo-en-caja")
+    }
+
+    @Test
+    fun testParseSearchToleratesNonArrayBodies() {
+        val results = CollinsParser.parseSearch("[1, 2]") { title ->
+            httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/$title")
+        }
+
+        assertThat(results).isEmpty()
+    }
 }

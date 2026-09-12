@@ -4,8 +4,6 @@ import android.net.Uri
 import android.util.Log
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONArray
-import org.json.JSONException
 
 class DleDictionary(client: OkHttpClient, private val baseUrl: String = "https://dle.rae.es") : Dictionary(client) {
     override val tag: String = "DLE"
@@ -13,7 +11,7 @@ class DleDictionary(client: OkHttpClient, private val baseUrl: String = "https:/
     override val lang: String = "es"
     override fun init() = Unit
 
-    private fun publicApiRequest(requestUrl: String): JSONArray {
+    private fun fetchBody(requestUrl: String): String {
         val request = Request.Builder().url(requestUrl)
             .addHeader("Accept", "application/json")
             .build()
@@ -21,34 +19,22 @@ class DleDictionary(client: OkHttpClient, private val baseUrl: String = "https:/
 
         if (!response.isSuccessful) {
             Log.e(NAME, "Unexpected response: " + response.code)
-            return JSONArray()
+            return ""
         }
 
-        return JSONArray(response.body?.string())
+        return response.body?.string() ?: ""
     }
 
     override fun search(query: String): List<SearchResult> {
-        val results = ArrayList<SearchResult>()
-        val uriBuilder =
-            Uri.parse("$baseUrl/srv/keys").buildUpon()
-
+        val uriBuilder = Uri.parse("$baseUrl/srv/keys").buildUpon()
         uriBuilder.appendQueryParameter("q", query)
 
-        try {
-            val items = publicApiRequest(uriBuilder.build().toString())
+        val body = fetchBody(uriBuilder.build().toString())
+        if (body.isEmpty()) return emptyList()
 
-            for (i in 0 until items.length()) {
-                // Tag strip for eg. ballet
-                val item = items.getString(i).split("|").first()
-                    .replace("<[^>]+?>".toRegex(), "")
-
-                val uri = Uri.parse("$baseUrl/${item}")
-                results.add(SearchResult(item, uri.toHttpUrl()))
-            }
-        } catch (_: JSONException) {
+        return DleParser.parseSearch(body) { item ->
+            Uri.parse("$baseUrl/${item}").toHttpUrl()
         }
-
-        return results
     }
 
     override fun fullSearch(query: String): List<SearchResult> = search(query)

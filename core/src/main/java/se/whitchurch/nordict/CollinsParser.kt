@@ -1,5 +1,6 @@
 package se.whitchurch.nordict
 
+import com.google.gson.JsonParser
 import okhttp3.HttpUrl
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
@@ -13,6 +14,28 @@ class CollinsParser {
         private const val MAIN_LABEL_ES = "Collins Spanish-English"
         private const val EASY_LABEL_FR = "Collins Easy Learning"
         private const val MAIN_LABEL_FR = "Collins French-English"
+
+        /**
+         * Collins `/autocomplete/` search responses: a JSON array of
+         * `{"title": "..."}` objects. The slug for the target word page is
+         * built by [uriOf] (lower-cased, spaces as hyphens) — Collins-specific,
+         * so no other dictionary shares this decoder.
+         */
+        fun parseSearch(body: String, uriOf: (title: String) -> HttpUrl): List<SearchResult> {
+            val results = ArrayList<SearchResult>()
+            try {
+                val array = JsonParser.parseString(body)
+                if (!array.isJsonArray) return results
+                array.asJsonArray.forEach { element ->
+                    if (!element.isJsonObject) return@forEach
+                    val title = element.asJsonObject["title"]?.takeIf { it.isJsonPrimitive }?.asString
+                        ?: return@forEach
+                    if (title.isNotEmpty()) results.add(SearchResult(title, uriOf(title)))
+                }
+            } catch (_: Exception) {
+            }
+            return results
+        }
 
         fun parse(page: String, uri: HttpUrl, tag: String, dictCode: String, baseUrl: String = "https://www.collinsdictionary.com"): List<Word> {
             val words: ArrayList<Word> = ArrayList()

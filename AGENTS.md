@@ -26,7 +26,8 @@ Android app keeps `android.net.Uri` at the UI boundary and converts to
 ```
 core/src/                               Shared PURE-JVM parser core (no Android)
   main/java/...            Word, SearchResult, DleParser, EstParser, CollinsParser,
-                           WordJson (golden-schema JSON mapping), Genders, Pos
+                           KeyItemSearchResults, WordJson (golden-schema JSON
+                           mapping), Genders, Pos
   test/java/...            DleParserTest, EstParserTest, CollinsParserTest
                            (plain JUnit, no Robolectric), Goldens
 cli/src/main/...                        Desktop CLI (application) using :core
@@ -58,7 +59,11 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
   `okhttp3.HttpUrl`, and dict `tag`, and return `List<Word>`. They use Jsoup and
   clone the fragments they keep in `Word.element`. DLE, EST, and Collins all
   live in `:core` with `HttpUrl`-typed uris (the remaining app-side parsers
-  still take `android.net.Uri`).
+  still take `android.net.Uri`). Each also exposes a `parseSearch(body, uriOf)`
+  that decodes that dictionary's search-endpoint JSON into `List<SearchResult>`
+  (the RAE pair share the `KeyItemSearchResults` `/srv/keys` decoder); the
+  app-side `<Name>Dictionary.search()` and the CLI both call it so there is one
+  shared mapping (the app only builds the endpoint URL and the result `uri`).
 - **`core/.../Word.kt`** — the model serialized to JSON. Lives in the shared
   `:core` module; `uri`/`baseUrl` are `okhttp3.HttpUrl` / plain `String` so the
   class runs on a desktop JVM. `Word.Definition` and
@@ -104,9 +109,8 @@ The DLE, EST, and Collins parsers and the golden JSON mapping live in `:core`
 (pure JVM — no Android, no Robolectric):
 
 ```sh
-./gradlew :core:test                          # DleParserTest/EstParserTest/CollinsParserTest golden tests
+./gradlew :core:test                          # DleParserTest/EstParserTest/CollinsParserTest
 ./gradlew :core:test --tests se.whitchurch.nordict.EstParserTest
-./gradlew :core:test --tests se.whitchurch.nordict.CollinsParserTest
 ```
 
 The `:cli` module runs the *same* parsers against arbitrary dictionary pages and
@@ -116,6 +120,9 @@ dumps the shared JSON schema (identical to `testdata/{dle,est,colspan}/*.json`):
 ./gradlew :cli:run --args="frente"                                  # default dict DLE: dle.rae.es/frente
 ./gradlew :cli:run --args="est frente"                              # RAE Diccionario del estudiante
 ./gradlew :cli:run --args="colspan frente"                          # Collins Spanish-English
+./gradlew :cli:run --args="frente --search"                         # search results (default DLE)
+./gradlew :cli:run --args="est frente --search"                     # search via a dictionary
+./gradlew :cli:run --args="--dict colspan --search --file ../testdata/colspan-search.json"  # offline search
 ./gradlew :cli:run --args="--dict est --file ../testdata/est/morir.html"   # offline, no network
 ./gradlew :cli:run --args="--url https://dle.rae.es/cagar"
 ./gradlew :cli:run --args="frente -o /tmp/frente.json"              # write to file
@@ -123,7 +130,15 @@ dumps the shared JSON schema (identical to `testdata/{dle,est,colspan}/*.json`):
 
 Positional first arg selects the dict (default `dle`; aliases: `est`,
 `colspan`/`col`); `--dict <name>` also works. Collins slugs turn spaces into
-hyphens (`colspan ley de la gravedad`). Note: collinsdictionary.com serves a
+hyphens (`colspan ley de la gravedad`). `--search` dumps search-result JSON (an
+array of `{mTitle, mSummary, uri}`) from the dictionary's autocomplete endpoint
+(DLE/EST `srv/keys`, Collins `autocomplete/`) instead of a word page; it
+composes with `--url`/`--file`/`-o`. Search responses are decoded by the same
+per-dictionary parsers the app uses — `DleParser.parseSearch`/`EstParser.parseSearch`
+(the RAE `/srv/keys` shape, via the shared `KeyItemSearchResults`) and
+`CollinsParser.parseSearch` (the `/autocomplete/` `{"title"}` shape) — so the
+app, the CLI, and the `*ParserTest.kt` suites lock one mapping against
+`testdata/{dle,est,colspan}-search.json`. Note: collinsdictionary.com serves a
 Cloudflare JS challenge to datacenter IPs, so live `colspan` fetches can 403
 from this machine — use `--file` against the fixtures instead (the parser
 itself is fully covered by tests).

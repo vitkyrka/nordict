@@ -4,8 +4,6 @@ import android.net.Uri
 import android.util.Log
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONArray
-import org.json.JSONException
 
 abstract class CollinsDictionary(
     client: OkHttpClient,
@@ -47,7 +45,7 @@ abstract class CollinsDictionary(
         return words[0]
     }
 
-    private fun publicApiRequest(requestUrl: String): JSONArray {
+    private fun fetchBody(requestUrl: String): String {
         val request = Request.Builder().url(requestUrl)
             .addHeader("Accept", "application/json")
             .build()
@@ -55,41 +53,29 @@ abstract class CollinsDictionary(
 
         if (!response.isSuccessful) {
             Log.e(NAME, "Unexpected response: " + response.code)
-            return JSONArray()
+            return ""
         }
 
-        return JSONArray(response.body?.string())
+        return response.body?.string() ?: ""
     }
 
     override fun search(query: String): List<SearchResult> {
-        val results = ArrayList<SearchResult>()
-        val uriBuilder =
-            Uri.parse("$baseUrl/autocomplete/").buildUpon()
-
+        val uriBuilder = Uri.parse("$baseUrl/autocomplete/").buildUpon()
         uriBuilder.appendQueryParameter("q", query)
         uriBuilder.appendQueryParameter("dictCode", dictCode)
 
-        try {
-            val items = publicApiRequest(uriBuilder.build().toString())
+        val body = fetchBody(uriBuilder.build().toString())
+        if (body.isEmpty()) return emptyList()
 
-            for (i in 0 until items.length()) {
-                val item = items.getJSONObject(i)
-                val title = item.getString("title")
-
-                // Multi-word headwords arrive as "efectivo en caja". Collins
-                // canonical slugs are lower-cased with spaces as hyphens
-                // ("efectivo-en-caja"); a raw space (or %20) URL 301-redirects
-                // to a nonexistent "efectivoencaja" page, which renders a
-                // spellcheck page with no parseable entry.
-                val slug = title.replace(" ", "-").lowercase()
-                val uri =
-                    Uri.parse("$baseUrl/dictionary/${dictCode}/${slug}")
-                results.add(SearchResult(title, uri.toHttpUrl()))
-            }
-        } catch (e: JSONException) {
+        return CollinsParser.parseSearch(body) { title ->
+            // Multi-word headwords arrive as "efectivo en caja". Collins
+            // canonical slugs are lower-cased with spaces as hyphens
+            // ("efectivo-en-caja"); a raw space (or %20) URL 301-redirects
+            // to a nonexistent "efectivoencaja" page, which renders a
+            // spellcheck page with no parseable entry.
+            val slug = title.replace(" ", "-").lowercase()
+            Uri.parse("$baseUrl/dictionary/${dictCode}/${slug}").toHttpUrl()
         }
-
-        return results
     }
 
     override fun fullSearch(query: String): List<SearchResult> = search(query)

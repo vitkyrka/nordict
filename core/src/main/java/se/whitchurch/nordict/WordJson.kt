@@ -67,6 +67,12 @@ object WordJson {
         val register: String = ""
     )
 
+    data class SearchResultData(
+        val mTitle: String,
+        val mSummary: String,
+        val uri: String
+    )
+
     fun Word.Gloss.toData(): GlossData {
         return GlossData(
             definition = definition,
@@ -78,6 +84,17 @@ object WordJson {
     }
 
     fun toJson(words: List<Word>): String = gson.toJson(words.map { it.toWordData() })
+
+    fun searchJson(results: List<SearchResult>): String = gson.toJson(results.map { it.toSearchResultData() })
+}
+
+/** Maps a parsed [SearchResult] onto the shared search-result JSON schema. */
+fun SearchResult.toSearchResultData(): WordJson.SearchResultData {
+    return WordJson.SearchResultData(
+        mTitle = mTitle,
+        mSummary = mSummary,
+        uri = uri.toString()
+    )
 }
 
 /** Maps a parsed [Word] onto the shared golden JSON schema. */

@@ -137,6 +137,39 @@ class DleParserTest {
     }
 
     @Test
+    fun testParseSearch() {
+        val body = File("../testdata/dle-search.json").readText()
+
+        val results = DleParser.parseSearch(body) { item ->
+            httpUrl("https://dle.rae.es/$item")
+        }
+
+        assertThat(results.map { it.mTitle }).containsExactly("frente", "frentero").inOrder()
+        assertThat(results[0].uri.toString()).isEqualTo("https://dle.rae.es/frente")
+        assertThat(results[1].uri.toString()).isEqualTo("https://dle.rae.es/frentero")
+    }
+
+    @Test
+    fun testParseSearchStripsDleKeyTags() {
+        val body = """["ballet|ballet<span class=\"z\">lit.</span>"]"""
+
+        val results = DleParser.parseSearch(body) { item ->
+            httpUrl("https://dle.rae.es/$item")
+        }
+
+        assertThat(results.single().mTitle).isEqualTo("ballet")
+    }
+
+    @Test
+    fun testParseSearchToleratesNonArrayBodies() {
+        val results = DleParser.parseSearch("{}") { item ->
+            httpUrl("https://dle.rae.es/$item")
+        }
+
+        assertThat(results).isEmpty()
+    }
+
+    @Test
     fun testParseDleOtro() {
         val htmlFile = File("../testdata/dle/otro.html")
         val page = htmlFile.readText()

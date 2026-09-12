@@ -349,4 +349,30 @@ class EstParserTest {
         assertThat(second.definitions[0].glosses[0].definition)
             .isEqualTo("Persona que ejerce el sacerdocio.")
     }
+
+    @Test
+    fun testParseSearch() {
+        val body = File("../testdata/est-search.json").readText()
+
+        val results = EstParser.parseSearch(body) { item ->
+            httpUrl("https://www.rae.es/diccionario-estudiante/$item")
+        }
+
+        assertThat(results).hasSize(10)
+        assertThat(results.first().mTitle).isEqualTo("frente")
+        assertThat(results.first().uri.toString())
+            .isEqualTo("https://www.rae.es/diccionario-estudiante/frente")
+        assertThat(results.last().mTitle).isEqualTo("en frente")
+        assertThat(results.last().uri.toString())
+            .isEqualTo("https://www.rae.es/diccionario-estudiante/en%20frente")
+    }
+
+    @Test
+    fun testParseSearchToleratesNonArrayBodies() {
+        val results = EstParser.parseSearch("not json") { item ->
+            httpUrl("https://www.rae.es/diccionario-estudiante/$item")
+        }
+
+        assertThat(results).isEmpty()
+    }
 }

@@ -6,6 +6,11 @@ import org.jsoup.nodes.Element
 
 class EstParser {
     companion object {
+
+        /** RAE `/srv/keys` search responses for EST (see [KeyItemSearchResults]). */
+        fun parseSearch(body: String, uriOf: (item: String) -> HttpUrl): List<SearchResult> =
+            KeyItemSearchResults.parse(body, uriOf)
+
         fun parse(page: String, uri: HttpUrl, tag: String, baseUrl: String = "https://www.rae.es/diccionario-estudiante/"): List<Word> {
             val words: ArrayList<Word> = ArrayList()
             var doc = Jsoup.parse(page)
