@@ -364,3 +364,11 @@ JUnit), `DiccionariIntegrationTest` (`app`, Robolectric + MockWebServer).
   output (`.gitignore` already covers `build/`, `.gradle/`, `local.properties`,
   `testdata/`). `testdata/` lives in a separate git repo to avoid distributing
   original dictionary pages with the app code.
+
+## Instructions
+
+When asked to implement something, in the todo steps always include these:
+
+- Deploy and verify on an emulator if running (android-cli / adb)
+- Commit 
+- Deploy (for manual verification by user) on any device if connected to android-cli / adb
