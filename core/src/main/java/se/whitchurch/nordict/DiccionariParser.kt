@@ -118,6 +118,8 @@ class DiccionariParser {
                 headword.rawHeadword = title
                 headword.xrefs.add((words.size + 1).toString())
 
+                headword.pronunciation = pronunciationOf(article)
+
                 val body = article.selectFirst(".field--name-body .div1")
                 if (body != null) {
                     val ol = body.selectFirst("ol.dict")
@@ -177,6 +179,21 @@ class DiccionariParser {
             return ""
         }
 
+        // The article-level accessory field carries the pronunciation on the
+        // bilingual CA-EN pages (`<span class="accessory_heading">Pronúncia:
+        // </span>káp`). Other releases use the accessory field for Homòfon /
+        // Etimologia / Partició sil·làbica markers, never a pronunciation.
+        private fun pronunciationOf(article: Element): String {
+            val accessory = article.selectFirst(".field--name-field-accessory") ?: return ""
+            val heading = accessory.select(".accessory_heading").firstOrNull {
+                it.text().trim().startsWith("Pronúncia")
+            } ?: return ""
+            val parent = heading.parent() ?: return ""
+            val clone = parent.clone()
+            clone.select(".accessory_heading").forEach { it.remove() }
+            return normalize(clone.text())
+        }
+
         // ---- <ol class="dict"> walker ----
 
         private fun parseOl(
@@ -185,19 +202,25 @@ class DiccionariParser {
             bilingual: Boolean,
             inheritedGrammar: String,
             inheritedRegister: String,
-            inheritedDomain: String
+            inheritedDomain: String,
+            sensePrefix: String = ""
         ) {
             var pendingGrammar = inheritedGrammar
             var pendingRegister = inheritedRegister
             var pendingDomain = inheritedDomain
+            var itemNumber = 0
             for (child in ol.children()) {
                 when {
                     child.hasClass("grammar") -> pendingGrammar = normalize(child.text())
                     child.hasClass("register") -> pendingRegister = normalize(child.text())
                     child.hasClass("dom") -> pendingDomain = normalize(child.text())
-                    child.tagName() == "li" -> parseLi(
-                        child, headword, bilingual, pendingGrammar, pendingRegister, pendingDomain
-                    )
+                    child.tagName() == "li" -> {
+                        itemNumber++
+                        parseLi(
+                            child, headword, bilingual, pendingGrammar, pendingRegister, pendingDomain,
+                            sensePrefix, itemNumber
+                        )
+                    }
                 }
             }
         }
@@ -208,8 +231,11 @@ class DiccionariParser {
             bilingual: Boolean,
             olGrammar: String,
             olRegister: String,
-            olDomain: String
+            olDomain: String,
+            sensePrefix: String = "",
+            itemNumber: Int = 0
         ) {
+            val senseNumber = if (sensePrefix.isEmpty()) "$itemNumber" else "$sensePrefix.$itemNumber"
             val clone = li.clone()
             stripAccessory(clone)
 
@@ -221,11 +247,11 @@ class DiccionariParser {
             val nested = clone.selectFirst("ol.dict")
             if (nested != null) {
                 if (opensWithBold(clone)) {
-                    parseLocutionWrapper(clone, headword, bilingual, grammar, register, domain)
+                    parseLocutionWrapper(clone, headword, bilingual, grammar, register, domain, senseNumber)
                 } else {
-                    parseOl(nested, headword, bilingual, grammar, register, domain)
+                    parseOl(nested, headword, bilingual, grammar, register, domain, senseNumber)
                     nested.remove()
-                    leftoverDefinition(clone, grammar, register, domain, headword)
+                    leftoverDefinition(clone, grammar, register, domain, headword, senseNumber)
                 }
                 return
             }
@@ -245,6 +271,7 @@ class DiccionariParser {
                 idiom.gender = genderOf(grammar)
                 idiom.register = register
                 idiom.domain = domain
+                idiom.senseNumber = senseNumber
                 idiom.glosses.add(Word.Gloss().apply {
                     this.definition = glossText
                     this.grammar = grammar
@@ -261,6 +288,7 @@ class DiccionariParser {
                 definition.gender = genderOf(grammar)
                 definition.register = register
                 definition.domain = domain
+                definition.senseNumber = senseNumber
                 definition.glosses.add(Word.Gloss().apply {
                     this.definition = glossText
                     this.grammar = grammar
@@ -279,7 +307,8 @@ class DiccionariParser {
             bilingual: Boolean,
             grammar: String,
             register: String,
-            domain: String
+            domain: String,
+            senseNumber: String
         ) {
             val bold = clone.children().firstOrNull { it.tagName() == "b" }!!
             val idiomName = normalize(bold.text())
@@ -321,6 +350,7 @@ class DiccionariParser {
             idiom.gender = genderOf(grammar)
             idiom.register = register
             idiom.domain = domain
+            idiom.senseNumber = senseNumber
             idiom.glosses.addAll(glosses)
             headword.idioms.add(idiom)
         }
@@ -333,7 +363,8 @@ class DiccionariParser {
             grammar: String,
             register: String,
             domain: String,
-            headword: Word
+            headword: Word,
+            senseNumber: String = ""
         ) {
             clone.children().filter { it.hasClass("grammar") }.forEach { it.remove() }
             clone.children().filter { it.hasClass("register") }.forEach { it.remove() }
@@ -346,6 +377,7 @@ class DiccionariParser {
             definition.gender = genderOf(grammar)
             definition.register = register
             definition.domain = domain
+            definition.senseNumber = senseNumber
             definition.glosses.add(Word.Gloss().apply {
                 this.definition = text
                 this.grammar = grammar

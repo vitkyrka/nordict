@@ -72,6 +72,7 @@ const template = (word) => `
         <header>
             ${word.dictionary ? `<div class="dictionary-label">${word.dictionary}</div>` : ''}
             <h1>${word.mTitle}</h1>
+            ${word.pronunciation ? `<div class="pronunciation"><a class="normalx">${word.pronunciation}</a></div>` : ''}
             ${word.conjugation || word.participle ? `
                 <div class="morphology">
                     ${word.conjugation ? `<span class="conjugation">conjug. <i>${word.conjugation}</i></span>` : ''}

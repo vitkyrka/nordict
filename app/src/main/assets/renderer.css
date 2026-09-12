@@ -167,6 +167,21 @@ div.etymology {
     font-style: italic;
 }
 
+/* Pronunciation (IPA transcription, e.g. diccionari.cat CA-EN "Pronúncia: káp") */
+
+div.pronunciation {
+    color: var(--muted-color);
+    font-size: 0.95em;
+    margin-bottom: 0.3em;
+}
+
+div.pronunciation a.normalx {
+    /* word.js auto-links every word it finds; the IPA transcription must not
+     * become a mangled /search/ link, so it lives inside an anchor the
+     * auto-linker skips. */
+    cursor: default;
+}
+
 /* Synonyms */
 
 div.synonyms {

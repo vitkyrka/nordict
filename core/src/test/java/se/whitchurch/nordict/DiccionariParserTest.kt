@@ -201,6 +201,7 @@ class DiccionariParserTest {
         assertThat(words).hasSize(1)
         val word = words[0]
         assertThat(word.mTitle).isEqualTo("taula")
+        assertThat(word.pronunciation).isEqualTo("táwlə")
         assertThat(word.definitions).hasSize(14)
         assertThat(word.idioms).hasSize(21)
 
@@ -225,6 +226,7 @@ class DiccionariParserTest {
 
         assertThat(words).hasSize(2)
         assertThat(words.map { it.mTitle }).containsExactly("cap", "cap-rossenc").inOrder()
+        assertThat(words.map { it.pronunciation }).containsExactly("káp", "kàbrusɛ́ŋ").inOrder()
         assertThat(words[0].mHomonymEntries).hasSize(2)
 
         assertGolden(words, "../testdata/ca-en/cap.json")

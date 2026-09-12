@@ -359,6 +359,7 @@ test('homonym entries render their own dictionary label and morphology', () => {
         conjugation: 'dormir',
         participle: 'muerto',
         etymology: 'Del lat. morī.',
+        pronunciation: 'moɾir',
         definitions: [
             { glosses: [{ definition: 'Llegar al término de la vida.', grammar: 'verbo intransitivo', gender: '', examples: [] }] }
         ],
@@ -371,6 +372,7 @@ test('homonym entries render their own dictionary label and morphology', () => {
     expect($('.dictionary-label').text()).toBe('DLEDLE');
     expect($('.etymology').length).toBe(2);
     expect($('.morphology').length).toBe(2);
+    expect($('.pronunciation').length).toBe(2);
 });
 
 test('renders conjugation and participle in header', () => {
@@ -449,6 +451,44 @@ test('omits etymology element when absent', () => {
     renderWord(word);
 
     expect($('.etymology').length).toBe(0);
+});
+
+test('renders pronunciation in header', () => {
+    const word = {
+        mTitle: 'taula',
+        pronunciation: 'táwlə',
+        definitions: [
+            {
+                glosses: [
+                    { definition: 'table.', grammar: 'femení', gender: 'femenino', examples: [] }
+                ]
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('h1').text()).toBe('taula');
+    expect($('.pronunciation').text()).toBe('táwlə');
+});
+
+test('omits pronunciation element when absent', () => {
+    const word = {
+        mTitle: 'frente',
+        definitions: [
+            {
+                glosses: [
+                    { definition: 'Parte superior de la cara.', grammar: 'nombre femenino', gender: '', examples: [] }
+                ]
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('.pronunciation').length).toBe(0);
 });
 
 test('renders antonyms on definitions', () => {

@@ -29,6 +29,7 @@ object WordJson {
         val conjugation: String = "",
         val participle: String = "",
         val etymology: String = "",
+        val pronunciation: String = "",
         val rawHeadword: String = "",
         val dictionary: String = "",
         val audio: List<String> = emptyList()
@@ -41,7 +42,8 @@ object WordJson {
         val plev: String = "",
         val register: String = "",
         val synonyms: List<SynonymData> = emptyList(),
-        val antonyms: List<String> = emptyList()
+        val antonyms: List<String> = emptyList(),
+        val senseNumber: String = ""
     )
 
     data class SynonymData(
@@ -64,7 +66,8 @@ object WordJson {
         val domain: String = "",
         val geo: String = "",
         val plev: String = "",
-        val register: String = ""
+        val register: String = "",
+        val senseNumber: String = ""
     )
 
     data class SearchResultData(
@@ -108,6 +111,7 @@ fun Word.toWordData(): WordJson.WordData {
             conjugation = conjugation,
             participle = participle,
             etymology = etymology,
+            pronunciation = pronunciation,
             rawHeadword = rawHeadword,
             dictionary = dictionary,
             audio = audio,
@@ -119,7 +123,8 @@ fun Word.toWordData(): WordJson.WordData {
                     plev = def.plev,
                     register = def.register,
                     synonyms = def.synonyms.map { WordJson.SynonymData(it.text, it.href, it.plev) },
-                    antonyms = def.antonyms
+                    antonyms = def.antonyms,
+                    senseNumber = def.senseNumber
                 )
             },
             idioms = idioms.map { idiom ->
@@ -129,7 +134,8 @@ fun Word.toWordData(): WordJson.WordData {
                     domain = idiom.domain,
                     geo = idiom.geo,
                     plev = idiom.plev,
-                    register = idiom.register
+                    register = idiom.register,
+                    senseNumber = idiom.senseNumber
                 )
             },
             xrefs = xrefs

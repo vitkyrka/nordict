@@ -115,6 +115,7 @@ class DidacParser {
         private fun parseOl(ol: Element, headword: Word) {
             var grammar = ""
             var idioms = false
+            var itemNumber = 0
             for (child in ol.children()) {
                 when {
                     child.hasClass("grammar") -> {
@@ -122,6 +123,7 @@ class DidacParser {
                         idioms = isIdiomGrammar(grammar)
                     }
                     child.tagName() == "li" -> {
+                        itemNumber++
                         // Idiom glosses drop a bolded fragment that opens the
                         // gloss (it duplicates the idiom name shown above), but
                         // keep mid-sentence bold so the running copy reads like
@@ -133,6 +135,7 @@ class DidacParser {
                             val idiom = Word.Idiom(name, li.text)
                             idiom.grammar = grammar
                             idiom.gender = genderOf(grammar)
+                            idiom.senseNumber = itemNumber.toString()
                             idiom.glosses.add(Word.Gloss().apply {
                                 this.definition = li.text
                                 this.grammar = grammar
@@ -144,6 +147,7 @@ class DidacParser {
                             val definition = Word.Definition(li.text, child.clone())
                             definition.grammar = grammar
                             definition.gender = genderOf(grammar)
+                            definition.senseNumber = itemNumber.toString()
                             definition.glosses.add(Word.Gloss().apply {
                                 this.definition = li.text
                                 this.grammar = grammar

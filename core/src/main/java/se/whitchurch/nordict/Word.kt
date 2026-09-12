@@ -19,6 +19,7 @@ class Word(
     var conjugation: String = ""
     var participle: String = ""
     var etymology: String = ""
+    var pronunciation: String = ""
 
     // The searchable headword, which may differ from the displayed `mTitle`
     // (e.g. DLE/EST show "otro, tra" but other dictionaries need "otro";
@@ -75,6 +76,7 @@ class Word(
         var geo: String = ""
         var plev: String = ""
         var register: String = ""
+        var senseNumber: String = ""
     }
 
     // One synonym (or antonym) in a definition footer. `href` carries the
@@ -107,6 +109,7 @@ class Word(
         var register: String = ""
         val synonyms: ArrayList<Synonym> = ArrayList()
         val antonyms: ArrayList<String> = ArrayList()
+        var senseNumber: String = ""
     }
 
     // A flattened, serializable snapshot of a Word for the combined homonym
@@ -123,6 +126,7 @@ class Word(
         val conjugation: String = "",
         val participle: String = "",
         val etymology: String = "",
+        val pronunciation: String = "",
         val definitions: ArrayList<Definition> = ArrayList(),
         val idioms: ArrayList<Idiom> = ArrayList(),
         val audio: ArrayList<String> = ArrayList()
@@ -211,6 +215,7 @@ class Word(
                 conjugation = word.conjugation,
                 participle = word.participle,
                 etymology = word.etymology,
+                pronunciation = word.pronunciation,
                 definitions = ArrayList(word.definitions),
                 idioms = ArrayList(word.idioms),
                 audio = ArrayList(word.audio)
