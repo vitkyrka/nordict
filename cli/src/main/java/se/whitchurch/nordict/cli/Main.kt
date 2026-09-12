@@ -5,6 +5,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import se.whitchurch.nordict.CollinsParser
+import se.whitchurch.nordict.DidacParser
 import se.whitchurch.nordict.DleParser
 import se.whitchurch.nordict.EstParser
 import se.whitchurch.nordict.SearchResult
@@ -38,6 +39,21 @@ class Main {
         "https://www.collinsdictionary.com/dictionary/spanish-english/${word.replace(" ", "-").lowercase()}"
             .toHttpUrlOrNull()!!
 
+    private fun didacUrl(word: String): HttpUrl =
+        "https://www.diccionari.cat/cerca/didac"
+            .toHttpUrlOrNull()!!
+            .newBuilder()
+            .addQueryParameter("search_api_fulltext_cust", word)
+            .addQueryParameter("show", "title")
+            .build()
+
+    private fun didacAutocomplete(query: String): HttpUrl =
+        "https://www.diccionari.cat/search_api_autocomplete/didac?display=page_1&&filter=search_api_fulltext_cust"
+            .toHttpUrlOrNull()!!
+            .newBuilder()
+            .addQueryParameter("q", query)
+            .build()
+
     private val dictionaries = listOf(
         Dict(
             aliases = listOf("dle"),
@@ -65,6 +81,16 @@ class Main {
             },
             parse = { page, uri -> CollinsParser.parse(page, uri, "COLSPAN", "spanish-english") },
             searchResults = { body -> CollinsParser.parseSearch(body) { title -> collinsUrl(title) } }
+        ),
+        Dict(
+            aliases = listOf("didac"),
+            tag = "DIDAC",
+            wordUrl = { word -> didacUrl(word) },
+            searchUrl = { query -> didacAutocomplete(query) },
+            parse = { page, uri -> DidacParser.parse(page, uri, "DIDAC") },
+            searchResults = { body ->
+                DidacParser.parseSearch(body) { path -> "https://www.diccionari.cat$path".toHttpUrlOrNull()!! }
+            }
         )
     )
 
@@ -235,6 +261,12 @@ class Main {
               --url <url>              parse a word or --search endpoint URL
               --file <page.html|search.json>
                                        parse a local word page or --search response (no network)
+
+            DIDAC maps a word to its search view (www.diccionari.cat/cerca/didac),
+            which embeds every matching homograph/locution inline:
+              didac cap                 all "cap" entries (cap1..cap4, cap-roig, ...)
+              didac cap --search        autocomplete suggestions
+              --url https://www.diccionari.cat/didac/cap1   single homograph page
 
             options:
               --dict <name>            dictionary to use (default: ${dictionaries.first().aliases.first()})

@@ -1,0 +1,54 @@
+<vector android:height="15dp" android:viewportHeight="15"
+    android:viewportWidth="21" android:width="21dp"
+    xmlns:aapt="http://schemas.android.com/aapt" xmlns:android="http://schemas.android.com/apk/res/android">
+    <path android:fillType="evenOdd" android:pathData="M0,0h21v15h-21z"
+        android:strokeColor="#00000000" android:strokeWidth="1">
+        <aapt:attr name="android:fillColor">
+            <gradient android:endX="10.5" android:endY="15"
+                android:startX="10.5" android:startY="0" android:type="linear">
+                <item android:color="#FFFFD133" android:offset="0"/>
+                <item android:color="#FFFFC500" android:offset="1"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:fillType="evenOdd" android:pathData="M0,1.667h21v1.667h-21z"
+        android:strokeColor="#00000000" android:strokeWidth="1">
+        <aapt:attr name="android:fillColor">
+            <gradient android:endX="10.5" android:endY="3.33"
+                android:startX="10.5" android:startY="1.67" android:type="linear">
+                <item android:color="#FFDD172C" android:offset="0"/>
+                <item android:color="#FFC60B1F" android:offset="1"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:fillType="evenOdd" android:pathData="M0,5h21v1.667h-21z"
+        android:strokeColor="#00000000" android:strokeWidth="1">
+        <aapt:attr name="android:fillColor">
+            <gradient android:endX="10.5" android:endY="6.67"
+                android:startX="10.5" android:startY="5" android:type="linear">
+                <item android:color="#FFDD172C" android:offset="0"/>
+                <item android:color="#FFC60B1F" android:offset="1"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:fillType="evenOdd" android:pathData="M0,8.333h21v1.667h-21z"
+        android:strokeColor="#00000000" android:strokeWidth="1">
+        <aapt:attr name="android:fillColor">
+            <gradient android:endX="10.5" android:endY="10"
+                android:startX="10.5" android:startY="8.33" android:type="linear">
+                <item android:color="#FFDD172C" android:offset="0"/>
+                <item android:color="#FFC60B1F" android:offset="1"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+    <path android:fillType="evenOdd" android:pathData="M0,11.667h21v1.667h-21z"
+        android:strokeColor="#00000000" android:strokeWidth="1">
+        <aapt:attr name="android:fillColor">
+            <gradient android:endX="10.5" android:endY="13.33"
+                android:startX="10.5" android:startY="11.67" android:type="linear">
+                <item android:color="#FFDD172C" android:offset="0"/>
+                <item android:color="#FFC60B1F" android:offset="1"/>
+            </gradient>
+        </aapt:attr>
+    </path>
+</vector>

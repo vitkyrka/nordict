@@ -8,18 +8,27 @@
 Usage:
     uv run tools/download.py est otro
     uv run tools/download.py COLSPAN otro
+    uv run tools/download.py didac cap
+    uv run tools/download.py didac cap1 --url   # single entry page
 
 Downloads https://www.rae.es/diccionario-estudiante/otro (EST),
-https://dle.rae.es/otro (DLE) or
-https://www.collinsdictionary.com/dictionary/spanish-english/otro (COLSPAN)
-and writes the raw page (the same HTML the app fetches via OkHttp) to
-testdata/<tag>/<word>.html.
+https://dle.rae.es/otro (DLE),
+https://www.collinsdictionary.com/dictionary/spanish-english/otro (COLSPAN) or
+https://www.diccionari.cat/cerca/didac?search_api_fulltext_cust=cap (DIDAC;
+the search view embeds every matching entry inline) and writes the raw page
+(the same HTML the app fetches via OkHttp) to testdata/<tag>/<word>.html.
 
-The RAE and Collins sites are fronted by Cloudflare, which challenges plain
-curl/urllib requests (TLS/HTTP fingerprint) but serves real content to a
-Chrome TLS stack. OkHttp on Android also gets through, because its Conscrypt
-(Google BoringSSL) stack presents the same Chrome-family ClientHello. curl_cffi
-baits the same fingerprint, so we impersonate Chrome for every dictionary.
+DIDAC has no "<base>/<word>" entry URL — headwords are served from the search
+view, and homographs get numbered entry URLs like /didac/cap1. Pass `--url`
+(plus the full entry URL, e.g. `--url https://www.diccionari.cat/didac/cap1`)
+to grab a single homograph entry instead.
+
+The RAE, Collins and diccionari.cat sites are fronted by Cloudflare, which
+challenges plain curl/urllib requests (TLS/HTTP fingerprint) but serves real
+content to a Chrome TLS stack. OkHttp on Android also gets through, because its
+Conscrypt (Google BoringSSL) stack presents the same Chrome-family ClientHello.
+curl_cffi baits the same fingerprint, so we impersonate Chrome for every
+dictionary.
 """
 
 import argparse
@@ -35,7 +44,19 @@ DICTIONARIES = {
     "EST": "https://www.rae.es/diccionario-estudiante",
     "DLE": "https://dle.rae.es",
     "COLSPAN": "https://www.collinsdictionary.com/dictionary/spanish-english",
+    "DIDAC": "https://www.diccionari.cat/cerca/didac",
 }
+
+# Dictionaries whose pages are NOT fetched as "<base>/<word>". DIDAC is special:
+# its search view (/cerca/didac?search_api_fulltext_cust=<word>) embeds every
+# matching entry inline, so a plain "word" maps to the search URL.
+SEARCH_STYLE = {"DIDAC"}
+
+
+def build_url(tag: str, word: str) -> str:
+    if tag in SEARCH_STYLE:
+        return f"{DICTIONARIES[tag]}?search_api_fulltext_cust={word}&show=title"
+    return f"{DICTIONARIES[tag]}/{word}"
 
 
 def fetch(url: str) -> str:
@@ -61,6 +82,11 @@ def main() -> int:
         ),
     )
     parser.add_argument("word", help="Word to download")
+    parser.add_argument(
+        "--url",
+        action="store_true",
+        help="treat `word` as a full URL (e.g. a DIDAC homograph page) instead of a headword",
+    )
     args = parser.parse_args()
 
     tag = args.dict.upper()
@@ -72,13 +98,18 @@ def main() -> int:
         return 1
 
     word = args.word.strip().lower()
-    base = DICTIONARIES[tag]
-    url = f"{base}/{word}"
+    url = args.word if args.url else build_url(tag, word)
     html = fetch(url)
 
+    if args.url:
+        from urllib.parse import urlparse
+        slug = urlparse(args.word).path.strip("/").rsplit("/", 1)[-1]
+        slug = slug.replace(":", "").replace("/", "_") or "entry"
+    else:
+        slug = word
     out_dir = TESTDATA / tag.lower()
     out_dir.mkdir(parents=True, exist_ok=True)
-    out_path = out_dir / f"{word}.html"
+    out_path = out_dir / f"{slug}.html"
     out_path.write_text(html, encoding="utf-8")
 
     print(f"Saved {len(html)} bytes -> {out_path}")

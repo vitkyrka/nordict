@@ -109,12 +109,13 @@ class Ordboken private constructor(
         val dle = DleDictionary(this.client)
         val est = EstDictionary(this.client)
         val colspan = CollinsSpanishEnglishDictionary(this.client)
+        val didac = DidacDictionary(this.client)
         val lingpt = LingueeDictionary(this.client)
         val infopedia = InfopediaDictionary(this.client)
         val wfr = FrWiktionary(this.client)
         val rob = LeRobertDictionary(this.client)
         val colfren = CollinsFrenchEnglishDictionary(this.client)
-        return arrayOf(so, ddo, sdo, dle, est, colspan, lingpt, infopedia, wfr, rob, colfren)
+        return arrayOf(so, ddo, sdo, dle, est, colspan, didac, lingpt, infopedia, wfr, rob, colfren)
     }
 
     fun getWord(uri: Uri): Word? {
