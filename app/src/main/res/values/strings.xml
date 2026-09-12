@@ -18,6 +18,7 @@
     <string name="add_bookmark">Lägg till bokmärke</string>
     <string name="remove_bookmark">Radera bokmärke</string>
     <string name="open_in_browser">Öppna i webbläsare</string>
+    <string name="menu_reset_zoom">Återställ zoom</string>
     <string name="delete">Ta bort</string>
     <string name="delete_all">Ta bort alla</string>
     <string name="title_activity_card">CardActivity</string>

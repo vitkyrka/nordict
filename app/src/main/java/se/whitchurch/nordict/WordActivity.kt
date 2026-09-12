@@ -663,6 +663,25 @@ class WordActivity : AppCompatActivity() {
             return true
         }
 
+        if (item.itemId == R.id.menu_reset_zoom) {
+            // setInitialScale() only affects the scale at page load and is a
+            // no-op on the loaded page, so rescale the live view instead.
+            val webView = mWebView
+            if (webView != null && webView.scale > 0f) {
+                webView.zoomBy(1f / webView.scale)
+            }
+            // Clear the remembered scale from wherever it may live so the next
+            // word opens at the default zoom.
+            mOrdboken?.mPrefs?.edit()?.putInt("scale", 0)?.apply()
+            getPreferences(Context.MODE_PRIVATE)?.let { pref ->
+                with(pref.edit()) {
+                    putInt("scale", 0)
+                    commit()
+                }
+            }
+            return true
+        }
+
         return super.onOptionsItemSelected(item)
     }
 }
