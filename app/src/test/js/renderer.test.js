@@ -491,7 +491,7 @@ test('omits pronunciation element when absent', () => {
     expect($('.pronunciation').length).toBe(0);
 });
 
-test('renders sense numbers on definitions and idioms', () => {
+test('renders sense numbers on definitions and interleaved idioms', () => {
     const word = {
         mTitle: 'cap',
         definitions: [
@@ -522,9 +522,12 @@ test('renders sense numbers on definitions and idioms', () => {
     renderWord(word);
 
     expect($('ol.definitions').hasClass('sense-numbered')).toBe(true);
+    // Numbered idioms are interleaved with the senses in page order in the
+    // single definitions list (as on the source page), not split out.
     expect($('ol.definitions li .sense-number').map((_, el) => $(el).text()).get())
-        .toEqual(['3.1', '1.1']);
-    expect($('.idiom-list li .sense-number').text()).toBe('1.4');
+        .toEqual(['1.1', '1.4', '3.1']);
+    expect($('ol.definitions li .idiom-name').text()).toBe('abaixar el cap');
+    expect($('.idiom-list').length).toBe(0);
 });
 
 test('omits sense numbers and auto-number class when absent', () => {

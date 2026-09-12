@@ -67,7 +67,73 @@ const renderCollinsPhrases = (phrases) => (phrases || []).length === 0 ? '' : `
     </ul>
 `;
 
-const template = (word) => `
+// Compare two number-bearing senses by their senseNumber ("1.4", "13").
+// Hierarchical page numbering is preserved numerically so cross-nested
+// locutions (idioms are interleaved with definitions on diccionari.cat
+// pages) come out in the same order the source page lists them.
+const senseKey = (s) => (s || '').split('.').map(n => parseInt(n, 10) || 0);
+const compareSenses = (a, b) => {
+    const ka = senseKey(a.senseNumber);
+    const kb = senseKey(b.senseNumber);
+    const len = Math.max(ka.length, kb.length);
+    for (let i = 0; i < len; i++) {
+        const d = (ka[i] || 0) - (kb[i] || 0);
+        if (d !== 0) return d;
+    }
+    return 0;
+};
+
+const renderDefinitionBlock = (def) => `
+    <li>
+        ${def.senseNumber ? `<span class="sense-number">${def.senseNumber}</span> ` : ''}
+        ${def.pos ? `<span class="pos">${def.pos}</span> ` : ''}
+        ${def.register ? `<span class="register">${def.register}</span> ` : ''}
+        ${def.domain ? `<span class="domain">${def.domain}</span> ` : ''}
+        ${def.geo ? `<span class="geo">${def.geo}</span> ` : ''}
+        ${def.plev ? `<span class="plev">${def.plev}</span> ` : ''}
+        ${renderGlosses(def.glosses)}
+        ${def.synonyms && def.synonyms.length > 0 ? `
+            <div class="synonyms">
+                <span class="synonyms-label">→ </span>${def.synonyms.map(renderSynonym).join(', ')}
+            </div>
+        ` : ''}
+        ${def.antonyms && def.antonyms.length > 0 ? `
+            <div class="antonyms">
+                <span class="antonyms-label">↛ </span>${def.antonyms.map(a => `<span class="antonym">${a}</span>`).join(', ')}
+            </div>
+        ` : ''}
+        ${renderCollinsIdioms(def.idioms)}
+        ${renderCollinsPhrases(def.phrases)}
+    </li>
+`;
+
+const renderIdiomBlock = (idiom) => `
+    <li>
+        ${idiom.senseNumber ? `<span class="sense-number">${idiom.senseNumber}</span> ` : ''}
+        <b class="idiom-name">${idiom.idiom}</b>:
+        ${idiom.register ? `<span class="register">${idiom.register}</span> ` : ''}
+        ${idiom.domain ? `<span class="domain">${idiom.domain}</span> ` : ''}
+        ${idiom.geo ? `<span class="geo">${idiom.geo}</span> ` : ''}
+        ${idiom.plev ? `<span class="plev">${idiom.plev}</span> ` : ''}
+        ${renderGlosses(idiom.glosses)}
+    </li>
+`;
+
+const template = (word) => {
+    const defs = word.definitions || [];
+    const idioms = word.idioms || [];
+
+    // diccionari.cat and DIDAC keep locutions interleaved with the senses in
+    // the source page (no separate "locuciones" section), so their idioms
+    // carry a senseNumber. Render them inline in the single numbered list,
+    // sorted back into page order. Legacy dictionaries (DLE/EST) have
+    // unnumbered idioms and keep the separate locutions section below.
+    const numberedIdioms = idioms.some(i => i.senseNumber);
+    const senses = numberedIdioms
+        ? [...defs, ...idioms].sort(compareSenses)
+        : defs;
+
+    return `
     <article>
         <header>
             ${word.dictionary ? `<div class="dictionary-label">${word.dictionary}</div>` : ''}
@@ -82,53 +148,22 @@ const template = (word) => `
             ` : ''}
             ${word.etymology ? `<div class="etymology">${word.etymology}</div>` : ''}
         </header>
-        ${word.definitions && word.definitions.length > 0 ? `
-            <ol class="definitions${word.dictionary ? ' bilingual' : ''}${word.definitions.some(def => def.senseNumber) ? ' sense-numbered' : ''}">
-                ${word.definitions.map(def => `
-                    <li>
-                        ${def.senseNumber ? `<span class="sense-number">${def.senseNumber}</span> ` : ''}
-                        ${def.pos ? `<span class="pos">${def.pos}</span> ` : ''}
-                        ${def.register ? `<span class="register">${def.register}</span> ` : ''}
-                        ${def.domain ? `<span class="domain">${def.domain}</span> ` : ''}
-                        ${def.geo ? `<span class="geo">${def.geo}</span> ` : ''}
-                        ${def.plev ? `<span class="plev">${def.plev}</span> ` : ''}
-                        ${renderGlosses(def.glosses)}
-                        ${def.synonyms && def.synonyms.length > 0 ? `
-                            <div class="synonyms">
-                                <span class="synonyms-label">→ </span>${def.synonyms.map(renderSynonym).join(', ')}
-                            </div>
-                        ` : ''}
-                        ${def.antonyms && def.antonyms.length > 0 ? `
-                            <div class="antonyms">
-                                <span class="antonyms-label">↛ </span>${def.antonyms.map(a => `<span class="antonym">${a}</span>`).join(', ')}
-                            </div>
-                        ` : ''}
-                        ${renderCollinsIdioms(def.idioms)}
-                        ${renderCollinsPhrases(def.phrases)}
-                    </li>
-                `).join('')}
+        ${senses.length > 0 ? `
+            <ol class="definitions${word.dictionary ? ' bilingual' : ''}${senses.some(s => s.senseNumber) ? ' sense-numbered' : ''}">
+                ${senses.map(s => s.idiom ? renderIdiomBlock(s) : renderDefinitionBlock(s)).join('')}
             </ol>
         ` : ''}
-        ${word.idioms && word.idioms.length > 0 ? `
+        ${!numberedIdioms && idioms.length > 0 ? `
             <section class="idioms">
                 <h3>Locuciones</h3>
                 <ul class="idiom-list">
-                    ${word.idioms.map(idiom => `
-                        <li>
-                            ${idiom.senseNumber ? `<span class="sense-number">${idiom.senseNumber}</span> ` : ''}
-                            <b class="idiom-name">${idiom.idiom}</b>:
-                            ${idiom.register ? `<span class="register">${idiom.register}</span> ` : ''}
-                            ${idiom.domain ? `<span class="domain">${idiom.domain}</span> ` : ''}
-                            ${idiom.geo ? `<span class="geo">${idiom.geo}</span> ` : ''}
-                            ${idiom.plev ? `<span class="plev">${idiom.plev}</span> ` : ''}
-                            ${renderGlosses(idiom.glosses)}
-                        </li>
-                    `).join('')}
+                    ${idioms.map(renderIdiomBlock).join('')}
                 </ul>
             </section>
         ` : ''}
     </article>
 `;
+};
 
 // ---- Homonym page ----
 //
