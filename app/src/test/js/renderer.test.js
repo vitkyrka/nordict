@@ -39,6 +39,52 @@ test('renders basic word information', () => {
     expect($('.idiom-name').text()).toBe('al frente');
 });
 
+test('renders simple markup inside definition text', () => {
+    const word = {
+        mTitle: 'cap',
+        definitions: [
+            {
+                glosses: [
+                    {
+                        definition: 'El <b>cap d\'any</b> és el primer dia de l\'any.',
+                        grammar: 'nom masculí',
+                        gender: '',
+                        examples: []
+                    },
+                    {
+                        definition: 'En gramàtica, ... <i>Jo canto</i> és primera persona.',
+                        grammar: 'nom femení',
+                        gender: '',
+                        examples: []
+                    }
+                ]
+            }
+        ],
+        idioms: [
+            {
+                idiom: 'fa cap',
+                glosses: [
+                    {
+                        definition: 'Una persona o un camí <b>fa cap</b> a un lloc quan hi arriba o hi porta.',
+                        grammar: 'frase feta',
+                        gender: '',
+                        examples: []
+                    }
+                ]
+            }
+        ]
+    };
+
+    renderWord(word);
+
+    expect($('.definitions li .gloss:eq(0) .definition b').text()).toBe("cap d'any");
+    expect($('.definitions li .gloss:eq(1) .definition i').text()).toBe('Jo canto');
+    expect($('.idiom-list li .definition b').text()).toBe('fa cap');
+    // Plain-text read still yields the running copy with the markup inline.
+    expect($('.definitions li .gloss:eq(0) .definition').text())
+        .toBe("El cap d'any és el primer dia de l'any.");
+});
+
 test('renders domain with distinctive element', () => {
     const word = {
         mTitle: 'frente',

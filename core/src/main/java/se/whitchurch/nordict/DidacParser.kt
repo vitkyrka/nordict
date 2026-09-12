@@ -4,6 +4,7 @@ import com.google.gson.JsonParser
 import okhttp3.HttpUrl
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
+import org.jsoup.nodes.TextNode
 
 /**
  * Parser for the DIDAC dictionary (www.diccionari.cat/didac, "Diccionari
@@ -121,14 +122,19 @@ class DidacParser {
                         idioms = isIdiomGrammar(grammar)
                     }
                     child.tagName() == "li" -> {
-                        val li = liText(child)
+                        // Idiom glosses drop a bolded fragment that opens the
+                        // gloss (it duplicates the idiom name shown above), but
+                        // keep mid-sentence bold so the running copy reads like
+                        // the source (e.g. "Una persona o un camí <b>fa cap</b>
+                        // a un lloc...").
+                        val li = liText(child, dropLeadingBold = idioms)
                         if (idioms) {
                             val name = (child.selectFirst("b")?.text() ?: li.text).trim()
                             val idiom = Word.Idiom(name, li.text)
                             idiom.grammar = grammar
                             idiom.gender = genderOf(grammar)
                             idiom.glosses.add(Word.Gloss().apply {
-                                this.definition = li.textNoBold
+                                this.definition = li.text
                                 this.grammar = grammar
                                 this.gender = idiom.gender
                                 examples.addAll(li.examples)
@@ -182,7 +188,7 @@ class DidacParser {
                 }
             }
 
-            var text = normalize(textEl.text())
+            var text = markup(textEl)
             // Chained grammar spans (e.g. "determinant <i>i</i> pronom
             // indefinits") leave a bare connector text node ("i") at the start
             // of the gloss once the spans are removed; drop it when there were
@@ -203,11 +209,11 @@ class DidacParser {
         }
 
         // Text of an ol.dict <li> with the example <i> blocks (see [isExample])
-// stripped out. `textNoBold` additionally removes the bolded idiom-fragment
-// (<b>fa cap</b>) so the idiom gloss reads naturally next to its name.
-        private data class LiText(val text: String, val textNoBold: String, val examples: List<String>)
+        // stripped out. `text` keeps the source's simple inline markup (<b>,
+        // <i>) so the renderer can show bold/italics like the original page.
+        private data class LiText(val text: String, val examples: List<String>)
 
-        private fun liText(li: Element): LiText {
+        private fun liText(li: Element, dropLeadingBold: Boolean = false): LiText {
             val textEl = li.clone()
             val examples = ArrayList<String>()
             for (i in textEl.select("i")) {
@@ -220,14 +226,27 @@ class DidacParser {
             if (first != null && first.tagName() == "span" && first.text().isBlank()) {
                 first.remove()
             }
-            var text = normalize(textEl.text())
-            var textNoBold = text
             val bold = textEl.selectFirst("b")
-            if (bold != null) {
+            if (bold != null && dropLeadingBold && opensGloss(bold)) {
                 bold.remove()
-                textNoBold = normalize(textEl.text())
             }
-            return LiText(text, textNoBold, examples)
+            return LiText(markup(textEl), examples)
+        }
+
+        // Whether the <b> opens the gloss: only blank text nodes (or void
+        // <br>s) precede it in its parent. Used to drop an idiom's bolded
+        // name when it duplicates the idiom name shown above.
+        private fun opensGloss(bold: Element): Boolean {
+            val parent = bold.parent() ?: return false
+            for (node in parent.childNodes()) {
+                if (node === bold) return true
+                when (node) {
+                    is TextNode -> if (!node.isBlank) return false
+                    is Element -> if (node.tagName() != "br") return false
+                    else -> {}
+                }
+            }
+            return false
         }
 
         // DIDAC marks usage examples with <i>, but <i> is also inline emphasis
@@ -237,12 +256,43 @@ class DidacParser {
         private fun isExample(i: Element): Boolean {
             val text = i.text()
             if (text.isBlank()) return false
-            val atEnd = i.parent()?.children()?.lastOrNull() === i
-            return atEnd ||
+            return atGlossEnd(i) ||
                 text.length >= 40 ||
                 text.contains(". ") || text.contains("? ") ||
                 text.contains("! ") || text.contains("; ")
         }
+
+        // The <i> is the last meaningful content of its parent: everything that
+        // follows it, if anything, is blank whitespace or void <br>s. (Checks
+        // text nodes too, so an <i> followed by trailing copy like " és tercera
+        // persona." is not mistaken for an example.)
+        private fun atGlossEnd(i: Element): Boolean {
+            val parent = i.parent() ?: return true
+            val siblings = parent.childNodes()
+            for (j in siblings.indexOf(i) + 1 until siblings.size) {
+                when (val node = siblings[j]) {
+                    is TextNode -> if (!node.isBlank) return false
+                    is Element -> if (node.tagName() != "br") return false
+                    else -> return false
+                }
+            }
+            return true
+        }
+
+        // Serialize an element as simple HTML: keep <b>/<i>/<sup> inline
+        // markup, unwrap everything else to its text, collapse whitespace.
+        private fun markup(element: Element): String {
+            val clone = element.clone()
+            for (el in clone.getAllElements()) {
+                if (el === clone) continue
+                if (el.tagName() != "b" && el.tagName() != "i" && el.tagName() != "sup") {
+                    el.unwrap()
+                }
+            }
+            return normalizeHtml(clone.html())
+        }
+
+        private fun normalizeHtml(html: String): String = html.replace(Regex("\\s+"), " ").trim()
 
         private fun isIdiomGrammar(grammar: String): Boolean =
             grammar.contains("frase feta") || grammar.contains("locució")

@@ -51,16 +51,24 @@ class DidacParserTest {
         assertThat(def4.glosses[0].examples).hasSize(1)
         assertThat(def4.glosses[0].examples[0]).contains("Has begut massa")
 
-        // Sub-locutions inside regular definitions keep their bolded text.
+        // Sub-locutions inside regular definitions keep their bolded text,
+        // e.g. "cap d'any" and "cap de setmana".
         val def5 = word.definitions[4]
-        assertThat(def5.glosses[0].definition).contains("El cap d'any és el primer dia de l'any")
+        assertThat(def5.glosses[0].definition)
+            .isEqualTo("El <b>cap d'any</b> és el primer dia de l'any.")
+        val def6 = word.definitions[5]
+        assertThat(def6.glosses[0].definition)
+            .isEqualTo(
+                "El <b>cap de setmana</b> és el dissabte i el diumenge. Si no es treballa, es pot descansar, passejar, llegir o fer esport."
+            )
 
         // "frase feta" items are idioms whose name is the bolded fragment.
+        // Mid-sentence bold ("fa cap") stays in the running copy.
         val idiom = word.idioms[0]
         assertThat(idiom.idiom).isEqualTo("fa cap")
         assertThat(idiom.grammar).isEqualTo("frase feta")
         assertThat(idiom.glosses[0].definition).isEqualTo(
-            "Una persona o un camí a un lloc quan hi arriba o hi porta."
+            "Una persona o un camí <b>fa cap</b> a un lloc quan hi arriba o hi porta."
         )
         assertThat(idiom.glosses[0].examples).containsExactly("T'esperarem dins del bar; ja hi faràs cap.")
 
@@ -97,7 +105,9 @@ class DidacParserTest {
         assertThat(words[0].mHomonymEntries).hasSize(9)
         assertThat(words[0].mHomographs).hasSize(9)
 
-        // cap4's "locució que fa d'adverbi" (cap al tard) is an idiom.
+        // cap4's "locució que fa d'adverbi" (cap al tard) is an idiom. Its
+        // bolded phrase opens the gloss, so it is dropped (it duplicates the
+        // idiom name shown above) while mid-sentence bold is kept.
         val cap4 = words[3]
         assertThat(cap4.definitions).hasSize(3)
         assertThat(cap4.definitions[0].grammar).isEqualTo("preposició")
@@ -105,12 +115,13 @@ class DidacParserTest {
         assertThat(cap4.idioms[0].idiom).isEqualTo("cap al tard")
         assertThat(cap4.idioms[0].glosses[0].definition).isEqualTo("és després de post el sol.")
 
-        // Flat entries ("nom masculí" + a single running gloss).
+        // Flat entries ("nom masculí" + a single running gloss). The plural
+        // note's <i> is emphasis and stays italic in the copy.
         val capRoig = words[4]
         assertThat(capRoig.definitions).hasSize(1)
         assertThat(capRoig.definitions[0].grammar).isEqualTo("nom masculí")
         assertThat(capRoig.definitions[0].glosses[0].definition)
-            .isEqualTo("[Plural: també cap-rojos] escórpora.")
+            .isEqualTo("[Plural: també <i>cap-rojos</i>] escórpora.")
 
         // Flat locutions keep their definition and grammar.
         val alCapDe = words[5]
@@ -120,6 +131,45 @@ class DidacParserTest {
         assertThat(alCapDe.definitions[0].glosses[0].examples).hasSize(1)
 
         assertGolden(words, "../testdata/didac/cap.json")
+    }
+
+    @Test
+    fun testParsePersona() {
+        val htmlFile = File("../testdata/didac/persona.html")
+        val page = htmlFile.readText()
+        val uri = httpUrl("https://www.diccionari.cat/didac/persona")
+        val words = DidacParser.parse(page, uri, "DIDAC")
+
+        assertThat(words).hasSize(1)
+        val word = words[0]
+        assertThat(word.mTitle).isEqualTo("persona")
+
+        // Def 1: the long closing <i> sentence is an example.
+        val def1 = word.definitions[0]
+        assertThat(def1.glosses[0].definition).contains("Una persona és un ésser humà")
+        assertThat(def1.glosses[0].examples).hasSize(1)
+        assertThat(def1.glosses[0].examples[0]).contains("Hi ha vint persones a la sala")
+
+        // Def 2: short mid-sentence <i> ("Jo canto", "Tu cantes", "Ella canta")
+        // is emphasis, not examples: it must stay in the copy and in italics.
+        val def2 = word.definitions[1]
+        assertThat(def2.glosses[0].definition).isEqualTo(
+            "En gramàtica, la persona d'un verb o d'un pronom pot ser primera, si es refereix a qui " +
+                "parla; segona, si es refereix a qui escolta; i tercera, si es refereix a la persona de qui " +
+                "es parla. <i>Jo canto</i> és primera persona. <i>Tu cantes</i> és segona persona. " +
+                "<i>Ella canta</i> és tercera persona."
+        )
+        assertThat(def2.glosses[0].examples).isEmpty()
+
+        // "locució que fa d'adverbi" idiom: mid-sentence bold stays in the copy.
+        val idiom = word.idioms[0]
+        assertThat(idiom.idiom).isEqualTo("en persona")
+        assertThat(idiom.glosses[0].definition).isEqualTo(
+            "Si fem una cosa <b>en persona</b> ho fem nosaltres mateixos, i no a través d'un altre."
+        )
+        assertThat(idiom.glosses[0].examples).hasSize(1)
+
+        assertGolden(words, "../testdata/didac/persona.json")
     }
 
     @Test
