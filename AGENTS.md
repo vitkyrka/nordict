@@ -120,6 +120,9 @@ dumps the shared JSON schema (identical to `testdata/{dle,est,colspan}/*.json`):
 ./gradlew :cli:run --args="frente"                                  # default dict DLE: dle.rae.es/frente
 ./gradlew :cli:run --args="est frente"                              # RAE Diccionario del estudiante
 ./gradlew :cli:run --args="colspan frente"                          # Collins Spanish-English
+./gradlew :cli:run --args="gdlc cap"                                # GDLC (diccionari.cat, monolingual Catalan)
+./gradlew :cli:run --args="ca-es taula"                             # català-castellà (diccionari.cat)
+./gradlew :cli:run --args="ca-en taula --search"                    # català-anglès autocomplete
 ./gradlew :cli:run --args="frente --search"                         # search results (default DLE)
 ./gradlew :cli:run --args="est frente --search"                     # search via a dictionary
 ./gradlew :cli:run --args="--dict colspan --search --file ../testdata/colspan-search.json"  # offline search
@@ -129,19 +132,21 @@ dumps the shared JSON schema (identical to `testdata/{dle,est,colspan}/*.json`):
 ```
 
 Positional first arg selects the dict (default `dle`; aliases: `est`,
-`colspan`/`col`); `--dict <name>` also works. Collins slugs turn spaces into
-hyphens (`colspan ley de la gravedad`). `--search` dumps search-result JSON (an
-array of `{mTitle, mSummary, uri}`) from the dictionary's autocomplete endpoint
-(DLE/EST `srv/keys`, Collins `autocomplete/`) instead of a word page; it
+`colspan`/`col`, `gdlc`, `ca-es`, `ca-en`); `--dict <name>` also works. Collins
+slugs turn spaces into hyphens (`colspan ley de la gravedad`). `--search` dumps
+search-result JSON (an array of `{mTitle, mSummary, uri}`) from the dictionary's
+autocomplete endpoint (DLE/EST `srv/keys`, Collins `autocomplete/`,
+diccionari.cat `search_api_autocomplete/…`) instead of a word page; it
 composes with `--url`/`--file`/`-o`. Search responses are decoded by the same
 per-dictionary parsers the app uses — `DleParser.parseSearch`/`EstParser.parseSearch`
-(the RAE `/srv/keys` shape, via the shared `KeyItemSearchResults`) and
-`CollinsParser.parseSearch` (the `/autocomplete/` `{"title"}` shape) — so the
-app, the CLI, and the `*ParserTest.kt` suites lock one mapping against
-`testdata/{dle,est,colspan}-search.json`. Note: collinsdictionary.com serves a
-Cloudflare JS challenge to datacenter IPs, so live `colspan` fetches can 403
-from this machine — use `--file` against the fixtures instead (the parser
-itself is fully covered by tests).
+(the RAE `/srv/keys` shape, via the shared `KeyItemSearchResults`),
+`CollinsParser.parseSearch` (the `/autocomplete/` `{"title"}` shape), and
+`DiccionariParser.parseSearch` (the diccionari.cat `{value,url,label}` shape) —
+so the app, the CLI, and the `*ParserTest.kt` suites lock one mapping against
+`testdata/{dle,est,colspan,gdlc,ca-es,ca-en}-search.json`. Note:
+collinsdictionary.com serves a Cloudflare JS challenge to datacenter IPs, so
+live `colspan` fetches can 403 from this machine — use `--file` against the
+fixtures instead (the parser itself is fully covered by tests).
 
 JSON goes to stdout (summary on stderr; nonzero exit on failure). Pipe the
 output to the JS renderer for a browser preview:
@@ -277,6 +282,47 @@ full deep-link back to the RAE article (from the `data-id` attribute,
 `https://dle.rae.es/?id=<id>`), and `plev` is populated from
 `abbr.sin_alert` (NOT the parent `<span title="...">`), so only "malsonante"
 markers appear — "uso coloquial" / "usado en América" are dropped.
+
+## diccionari.cat family (DIDAC, GDLC, CA-ES, CA-EN)
+
+Four dictionaries share the Enciclopedia Catalana platform. DIDAC has its own
+parser (`DidacParser`); the other three releases — the monolingual GDLC
+(`node--type-diccionari-gdlc`) and the bilingual català-castellà (`-ca-es`) /
+català-anglès (`-ca-en`) — share `DiccionariParser.parse(page, uri, tag,
+nodeClass, bilingual)`.
+
+- `- DiccionariDictionary` (app) instantiates one config per release: the
+  autocomplete key (`diccionari_gdlc`, note ca-es is `diccionari_ca_es_` with a
+  trailing underscore, `diccionari_ca_en`) and the `/cerca/<view>` search-path
+  name (`gran-diccionari-de-la-llengua-catalana`, `diccionari-catala-castella`,
+  `diccionari-catala-angles`). The CLI registers the same three via
+  `diccionariDict(…)` (`gdlc`, `ca-es`, `ca-en`).
+- The search view (`fullSearch`) embeds every matching entry inline, so a word
+  fetch is the `/cerca/…` page; each `<article>` carries its own `about` URL
+  (e.g. `/GDLC/cap1`, `/catala-castella/taula`) that becomes the word's `uri`.
+- Titles come from the article `h2.node__title` (which encodes XML markers
+  `<title type="display">…</title><lbl type="homograph">1</lbl>` as literal
+  text) or, on a single-entry page, the page `<h1>` (sans `sup.homograph`).
+- Definitions/idioms live in `<ol class="dict">`; a `<li>` opening with `<b>`
+  is a locution (`Word.Idiom`), otherwise a `Word.Definition`. A locution whose
+  senses sit in a nested `<ol>` becomes one idiom with as many glosses.
+  `.grammar`, `.register` and `.dom` markers label the `<li>`s that follow
+  them, including through wrapper `<li>` sense groups (domain/register inherit
+  when an item has none). Grammar holds full Catalan labels ("masculí",
+  "femení plural", "locució adverbial"); `genderOf` maps them to
+  `Genders.MASCULINE`/`FEMININE` ("femenino"/"masculino") and returns `""` when
+  both or neither are present.
+- Monolingual GDLC extracts sentence-length `<i>` blocks as usage examples. The
+  bilingual pair attaches an `<i>` usage example to the target-language
+  translation that follows it ("<i>Tenir cap</i>, tener cabeza."), while short
+  `<i>` markers (`m`, `f`, `sing`) and parenthesized `(o …)` variant connectors
+  stay inline.
+- Search results (autocomplete) decode the `{value,url,label}` label shape via
+  `DiccionariParser.parseSearch`.
+
+Fixtures: `testdata/{gdlc,ca-es,ca-en}/*.{html,json}` (word pages + goldens) and
+`{gdlc,ca-es,ca-en}-search.json`. Tests: `DiccionariParserTest` (`:core`, plain
+JUnit), `DiccionariIntegrationTest` (`app`, Robolectric + MockWebServer).
 
 ## Conventions / gotchas
 

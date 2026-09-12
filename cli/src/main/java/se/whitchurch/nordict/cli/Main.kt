@@ -5,6 +5,7 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import se.whitchurch.nordict.CollinsParser
+import se.whitchurch.nordict.DiccionariParser
 import se.whitchurch.nordict.DidacParser
 import se.whitchurch.nordict.DleParser
 import se.whitchurch.nordict.EstParser
@@ -54,6 +55,41 @@ class Main {
             .addQueryParameter("q", query)
             .build()
 
+    private fun diccionariCerca(cerca: String, word: String): HttpUrl =
+        "https://www.diccionari.cat/cerca/$cerca"
+            .toHttpUrlOrNull()!!
+            .newBuilder()
+            .addQueryParameter("search_api_fulltext_cust", word)
+            .addQueryParameter("show", "title")
+            .build()
+
+    private fun diccionariAutocomplete(key: String, query: String): HttpUrl =
+        "https://www.diccionari.cat/search_api_autocomplete/$key?display=page_1&&filter=search_api_fulltext_cust"
+            .toHttpUrlOrNull()!!
+            .newBuilder()
+            .addQueryParameter("q", query)
+            .build()
+
+    // One GDLC/CA-ES/CA-EN release: the cerca view name, the autocomplete
+    // block key, the Drupal node class, and the bilingual flag all differ.
+    private fun diccionariDict(
+        alias: String,
+        dictTag: String,
+        cerca: String,
+        autocompleteKey: String,
+        nodeClass: String,
+        bilingual: Boolean
+    ) = Dict(
+        aliases = listOf(alias),
+        tag = dictTag,
+        wordUrl = { word -> diccionariCerca(cerca, word) },
+        searchUrl = { query -> diccionariAutocomplete(autocompleteKey, query) },
+        parse = { page, uri -> DiccionariParser.parse(page, uri, dictTag, nodeClass, bilingual) },
+        searchResults = { body ->
+            DiccionariParser.parseSearch(body) { path -> "https://www.diccionari.cat$path".toHttpUrlOrNull()!! }
+        }
+    )
+
     private val dictionaries = listOf(
         Dict(
             aliases = listOf("dle"),
@@ -91,7 +127,10 @@ class Main {
             searchResults = { body ->
                 DidacParser.parseSearch(body) { path -> "https://www.diccionari.cat$path".toHttpUrlOrNull()!! }
             }
-        )
+        ),
+        diccionariDict("gdlc", "GDLC", "gran-diccionari-de-la-llengua-catalana", "diccionari_gdlc", "diccionari-gdlc", false),
+        diccionariDict("ca-es", "CA-ES", "diccionari-catala-castella", "diccionari_ca_es_", "diccionari-ca-es", true),
+        diccionariDict("ca-en", "CA-EN", "diccionari-catala-angles", "diccionari_ca_en", "diccionari-ca-en", true)
     )
 
     private data class Dict(

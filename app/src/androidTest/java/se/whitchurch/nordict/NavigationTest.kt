@@ -121,6 +121,7 @@ class NavigationTest {
     private companion object {
         val allTags = arrayOf(
             "SO", "SDO", "DDO", "DLE", "EST", "COLSPAN",
+            "DIDAC", "GDLC", "CA-ES", "CA-EN",
             "LINGPT", "INFOPEDIA", "WFR", "ROB", "COLFREN"
         )
     }
