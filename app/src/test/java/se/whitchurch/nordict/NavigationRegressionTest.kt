@@ -276,6 +276,43 @@ class NavigationRegressionTest {
     }
 
     @Test
+    fun quickSwitchBackWhileTheTargetWordIsStillLoadingReloadsTheWord() {
+        awaitNav()
+
+        // Open the EST word "frente".
+        est.enqueue(MockResponse().setBody(estFrente()))
+        openWord(est, "/frente")
+        assertThat(ordboken().currentWord?.dict).isEqualTo("EST")
+
+        // Switch to DLE. The cross-link search is fast, but the DLE word page
+        // is deliberately delayed so the pushed word destination stays in its
+        // loading state — the window a quick second switch falls into.
+        dle.enqueue(MockResponse().setBody("""["frente|frente"]"""))
+        dle.enqueue(
+            MockResponse().setBody(dleFrente()).setBodyDelay(1500, TimeUnit.MILLISECONDS)
+        )
+        onMain { ordboken().setCurrentDictionary("dle") }
+
+        awaitCondition(message = "DLE word destination is up but still loading") {
+            val vm = topWordViewModel()
+            vm != null && vm.mWord == null
+        }
+
+        // Quick switch back to EST while that destination's word has not loaded
+        // yet. The loading destination's cross-link hook must defer this switch
+        // and apply it once the word lands (it used to be dropped, leaving the
+        // DLE word on screen under an EST selection).
+        est.enqueue(MockResponse().setBody("""["frente|frente"]"""))
+        est.enqueue(MockResponse().setBody(estFrente()))
+        onMain { ordboken().setCurrentDictionary("est") }
+
+        awaitCondition(timeoutMs = 10_000, message = "word reloads in EST after the quick switch") {
+            val w = ordboken().currentWord
+            w != null && w.dict == "EST" && w.uri.toString() == est.url("/frente").toString()
+        }
+    }
+
+    @Test
     fun backWhileSearchIsOpenOnlyCollapsesTheSearchOverlay() {
         awaitNav()
 

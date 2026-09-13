@@ -117,6 +117,19 @@ class WordViewModel(
     // (which have no fetch in flight) get their own balanced increment.
     private var fetchPending = false
 
+    // True while a dictionary switch is waiting for this word to finish
+    // fetching. A quick same-language switch can land on a destination whose
+    // word is still loading (the cross-link hook of the previous switch pushed
+    // it), and maybeSwitchDict() bails on a null word; the switch is retried
+    // from fetchWord() once the word — and its real search headword — arrives.
+    private var pendingDictSwitch = false
+
+    // Generation number + in-flight search for the cross-dictionary switch: a
+    // rapid second switch supersedes (cancels) the first so the older search
+    // cannot land late and push a word for a dictionary the user already left.
+    private var switchDictGeneration = 0
+    private var switchDictJob: kotlinx.coroutines.Job? = null
+
     private val player: ExoPlayer by lazy {
         ExoPlayer.Builder(getApplication()).build()
     }
@@ -159,6 +172,10 @@ class WordViewModel(
             pageFinished = false
             webViewVisible = false
             historySave()
+            // A dictionary switch that landed while this word was being fetched
+            // (see maybeSwitchDict) is retried now that the word — and its
+            // search headword — is available.
+            if (pendingDictSwitch) maybeSwitchDict()
             // The idling resource stays busy until onPageFinished decrements it.
         }
     }
@@ -342,27 +359,55 @@ class WordViewModel(
 
     /** Cross-dictionary jump when a dictionary row is switched on a word view. */
     fun maybeSwitchDict() {
-        val word = mWord ?: return
-
+        val word = mWord
         val newDict = ordboken.currentDictionary
+        if (word == null) {
+            // A quick second switch can land while this destination's word is
+            // still being fetched; remember it and retry once the word (and
+            // its real search headword) is available.
+            pendingDictSwitch = true
+            return
+        }
+
         val wordDict = ordboken.dictMap[word.dict] ?: return
 
         // A language switch rebuilds the dictionary row and selects that
         // language's default dictionary; don't cross-search languages.
         if (newDict.lang != wordDict.lang) return
 
+        pendingDictSwitch = false
+
+        // Snapshot the requested dictionary at tap time and give this switch a
+        // generation number: the search below must target the dictionary the
+        // user tapped, not whichever happens to be selected when the search
+        // runs, and a rapid second switch supersedes the first so the older
+        // search cannot land late and push the wrong dictionary's word.
+        val requestedTag = newDict.tag
+        val generation = ++switchDictGeneration
+        switchDictJob?.cancel()
         loadResource.increment()
-        viewModelScope.launch {
-            val exact = withContext(Dispatchers.IO) {
-                val results = ordboken.currentDictionary.search(word.searchHeadword)
-                ExactMatch.resolve(word.searchHeadword, results) ?: SearchResult(word.searchHeadword)
+        switchDictJob = viewModelScope.launch {
+            try {
+                val exact = withContext(Dispatchers.IO) {
+                    val results =
+                        ordboken.dictMap[requestedTag]?.search(word.searchHeadword)
+                            ?: return@withContext SearchResult(word.searchHeadword)
+                    ExactMatch.resolve(word.searchHeadword, results)
+                        ?: SearchResult(word.searchHeadword)
+                }
+                // A newer switch took over, or the user switched the target
+                // dictionary while we were searching; the newer caller will
+                // navigate, so this stale result must not.
+                if (generation != switchDictGeneration) return@launch
+                if (ordboken.currentDictionary.tag != requestedTag) return@launch
+                if (exact.uri.host == "fake") {
+                    onFillSearch?.invoke(exact.mTitle)
+                } else {
+                    onOpenUri?.invoke(exact.uri.toAndroidUri(), exact.mTitle)
+                }
+            } finally {
+                loadResource.decrement()
             }
-            if (exact.uri.host == "fake") {
-                onFillSearch?.invoke(exact.mTitle)
-            } else {
-                onOpenUri?.invoke(exact.uri.toAndroidUri(), exact.mTitle)
-            }
-            loadResource.decrement()
         }
     }
 
