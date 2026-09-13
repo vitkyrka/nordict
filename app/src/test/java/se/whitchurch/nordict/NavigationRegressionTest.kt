@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.webkit.WebView
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -292,5 +293,88 @@ class NavigationRegressionTest {
         composeRule.onNodeWithText(app!!.getString(R.string.no_results)).assertDoesNotExist()
         assertThat(composeRule.activity.navController?.currentDestination?.route)
             .isEqualTo("home")
+    }
+
+    // ---------- Zoom persistence (regression: the Compose conversion moved the
+    // WebView zoom save from onPause to composition dispose, where the WebView
+    // is already destroyed, so zooming, pausing and closing the app lost the
+    // zoom) ----------
+
+    /** Pretends the shown page is zoomed: the ViewModel's save reads
+     * `WebView.getScale()` at the next pause, but Robolectric's WebView gets
+     * a bogus value from its provider proxy, so hand it a scale we control. */
+    private fun zoomTo(vm: WordViewModel, scale: Float) {
+        onMain {
+            vm.webView = object : WebView(composeRule.activity) {
+                override fun getScale(): Float = scale
+            }
+            vm.webViewVisible = true
+        }
+    }
+
+    @Test
+    fun zoomPersistsOnPauseAndAppCloseDoesNotClobberIt() {
+        awaitNav()
+        est.enqueue(MockResponse().setBody(estFrente()))
+        openWord(est, "/frente")
+        val vm = topWordViewModel()!!
+
+        // The user pinch-zooms the shown word to 150%.
+        zoomTo(vm, 1.5f)
+
+        // Backgrounding the app must persist the zoom…
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
+        awaitCondition(message = "zoom persisted on pause") {
+            ordboken().mPrefs.getInt("scale", 0) == 150
+        }
+
+        // …and closing the app (destroying the task) must not clobber it: the
+        // disposed WordScreen must not re-save a default scale from a WebView
+        // that has already been destroyed.
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.DESTROYED)
+        assertThat(ordboken().mPrefs.getInt("scale", 0)).isEqualTo(150)
+    }
+
+    @Test
+    fun backFromAWordPersistsTheZoom() {
+        awaitNav()
+        est.enqueue(MockResponse().setBody(estFrente()))
+        openWord(est, "/frente")
+        val vm = topWordViewModel()!!
+
+        zoomTo(vm, 1.6f)
+
+        // Popping the word with back while the app stays foregrounded is an
+        // onPause for the destination in the single-activity app (the old
+        // WordActivity finished on back and saved in its onPause).
+        onMain { composeRule.activity.navController?.popBackStack() }
+        awaitCondition(message = "zoom persisted on back") {
+            ordboken().mPrefs.getInt("scale", 0) == 160
+        }
+        assertThat(composeRule.activity.navController?.currentDestination?.route)
+            .isEqualTo("home")
+    }
+
+    @Test
+    fun resetZoomKeepsTheClearedScaleOnPause() {
+        awaitNav()
+        est.enqueue(MockResponse().setBody(estFrente()))
+        openWord(est, "/frente")
+        val vm = topWordViewModel()!!
+
+        zoomTo(vm, 1.5f)
+
+        // "Reset zoom" clears the saved scale immediately…
+        onMain { vm.resetZoom() }
+        assertThat(ordboken().mPrefs.getInt("scale", -1)).isEqualTo(0)
+
+        // …and the next pause must not re-save the still-zoomed page's value,
+        // or the next open would apply the zoom the user just reset.
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
+        awaitCondition(message = "reset zoom survives pause") {
+            ordboken().mPrefs.getInt("scale", -1) == 0
+        }
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.DESTROYED)
+        assertThat(ordboken().mPrefs.getInt("scale", -1)).isEqualTo(0)
     }
 }

@@ -533,7 +533,16 @@ fun WordScreen(
                     ordboken.currentWord = vm.mWord
                     ordboken.onDictChanged = { vm.maybeSwitchDict() }
                 }
-                Lifecycle.Event.ON_PAUSE -> ordboken.onDictChanged = null
+                Lifecycle.Event.ON_PAUSE -> {
+                    ordboken.onDictChanged = null
+                    // Persist the WebView zoom on pause (backgrounding OR
+                    // leaving the word, e.g. back or closing the app), like
+                    // the old WordActivity.onPause. Saving on composition
+                    // disposal is too late: the ViewModel's onCleared has
+                    // already destroyed the WebView by then, so getScale()
+                    // would return the default and overwrite the user's zoom.
+                    vm.onLeave()
+                }
                 else -> Unit
             }
         }
@@ -541,7 +550,6 @@ fun WordScreen(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             ordboken.onDictChanged = null
-            vm.onLeave()
         }
     }
 
