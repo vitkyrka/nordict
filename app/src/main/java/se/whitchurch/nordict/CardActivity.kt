@@ -5,56 +5,423 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
-import android.graphics.Color
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.os.AsyncTask
 import android.os.Bundle
 import android.util.Base64
-import android.view.View
-import android.view.ViewGroup
-import android.widget.*
-import androidx.appcompat.app.AppCompatActivity
-import androidx.cardview.widget.CardView
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.ichi2.anki.api.AddContentApi
 import okhttp3.Request
-import se.whitchurch.nordict.databinding.ActivityCardBinding
+import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
 
-
-class CardActivity : AppCompatActivity() {
+class CardActivity : androidx.appcompat.app.AppCompatActivity() {
     private lateinit var ordboken: Ordboken
-    private var word: Word? = null
+    private var mWord: Word? by mutableStateOf(null)
     private lateinit var anki: Anki
-    private var imagesMap = HashMap<String, ArrayList<String>>()
+    private val imagesMap = mutableStateMapOf<String, List<String>>()
     private var currentDefinition: Word.Definition? = null
-    private var currentCard: CardView? = null
-    private var mAudio = ArrayList<String>()
-    private var mDictImages = ArrayList<String>()
-    private var selectedDefinitions = ArrayList<Word.Definition>()
-    private var defToCard = HashMap<Word.Definition, View>()
+    private var mAudio: List<String> by mutableStateOf(emptyList())
+    private var mDictImages: ArrayList<String> = ArrayList()
+    private val selectedDefinitions = mutableStateListOf<Word.Definition>()
     private var saveDeckName = true
     private var mLeftCards = 0
+    private var deckName: String by mutableStateOf("")
+    private var hiddenDefs by mutableStateOf(setOf<Word.Definition>())
+    private var hiddenIdioms by mutableStateOf(setOf<Word.Idiom>())
 
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
 
-    private lateinit var binding: ActivityCardBinding
+        if (ContextCompat.checkSelfPermission(
+                this,
+                AddContentApi.READ_WRITE_PERMISSION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            if (ActivityCompat.shouldShowRequestPermissionRationale(
+                    this,
+                    AddContentApi.READ_WRITE_PERMISSION
+                )
+            ) {
+                // Show an explanation to the user asynchronously -- don't block
+            } else {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(AddContentApi.READ_WRITE_PERMISSION),
+                    1
+                )
+            }
+        }
 
+        anki = Anki(this)
 
-    private fun createCardView(title: String, examples: List<String>): CardView {
-        val card = layoutInflater.inflate(R.layout.card, binding.cardHolder, false)
+        deckName =
+            getPreferences(Context.MODE_PRIVATE)?.getString("deckName", "Nordict") ?: "Nordict"
 
-        val cardTitle = card.findViewById<TextView>(R.id.cardTitle)
-        val cardExample = card.findViewById<TextView>(R.id.cardExample)
-        cardTitle.text = title
+        intent?.getStringExtra("deckName")?.let {
+            saveDeckName = false
+            deckName = it
+        }
 
+        title = deckName
 
-        val examplesText = if (examples.isNotEmpty()) "• " else ""
-        cardExample.text = examplesText + examples.joinToString(separator = "\n• ")
+        ordboken = Ordboken.getInstance(this)
+        ordboken.images = ArrayList()
+        val word = ordboken.currentWord ?: run {
+            finish()
+            return
+        }
 
-        mLeftCards += 1
+        setContent {
+            MaterialTheme {
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    CardScreen()
+                }
+            }
+        }
 
-        return card as CardView
+        WordAudioTask().execute(word)
+    }
+
+    @Composable
+    fun CardScreen() {
+        val word = mWord
+        val deck = deckName
+        val audio = mAudio
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { finish() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
+                    Text(deck, fontWeight = FontWeight.Medium, modifier = Modifier.padding(start = 8.dp))
+                }
+            }
+
+            OutlinedTextField(
+                value = deck,
+                onValueChange = { deckName = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(10.dp),
+                singleLine = true,
+                label = { Text("Deck") }
+            )
+
+            if (word == null) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    LoadingIndicator()
+                }
+                return
+            }
+
+            val defCards = word.definitions.filterNot { it in hiddenDefs }
+            val idiomCards = word.idioms.filterNot { it in hiddenIdioms }
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(10.dp)
+            ) {
+                items(defCards) { definition ->
+                    DefinitionCard(
+                        word = word,
+                        definition = definition,
+                        audio = audio,
+                        onCreate = { hideDefinitions ->
+                            hiddenDefs = hiddenDefs + hideDefinitions
+                            selectedDefinitions.removeAll(hideDefinitions.toSet())
+                        }
+                    )
+                }
+                items(idiomCards) { idiom ->
+                    IdiomCard(
+                        word = word,
+                        idiom = idiom,
+                        onCreate = { hiddenIdioms = hiddenIdioms + idiom }
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun DefinitionCard(
+        word: Word,
+        definition: Word.Definition,
+        audio: List<String>,
+        onCreate: (List<Word.Definition>) -> Unit
+    ) {
+        val title = definition.title ?: word.mTitle
+        val extraExamples = remember { mutableStateListOf<String>() }
+        val audioIdx = remember { mutableIntStateOf(0) }
+        val merged = remember { mutableStateOf(false) }
+        val images = imagesMap[definition.definition].orEmpty()
+
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 5.dp),
+            shape = RoundedCornerShape(2.dp),
+            colors = if (merged.value && selectedDefinitions.contains(definition)) {
+                CardDefaults.cardColors(containerColor = Color.Yellow)
+            } else {
+                CardDefaults.cardColors()
+            }
+        ) {
+            Column(modifier = Modifier.padding(10.dp)) {
+                Text(
+                    text = "$title: ${definition.definition}",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                val examplesText = definition.examples + extraExamples
+                if (examplesText.isNotEmpty()) {
+                    Text(
+                        text = "• " + examplesText.joinToString(separator = "\n• "),
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+
+                if (images.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier
+                            .horizontalScroll(rememberScrollState())
+                            .padding(top = 6.dp)
+                    ) {
+                        images.forEach { dataUrl ->
+                            val bmp = remember(dataUrl) { decodeImageDataUrl(dataUrl) }
+                            if (bmp != null) {
+                                Image(
+                                    bitmap = bmp.asImageBitmap(),
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .width(96.dp)
+                                        .height(72.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = merged.value,
+                        onCheckedChange = { checked ->
+                            merged.value = checked
+                            if (checked) {
+                                if (!selectedDefinitions.contains(definition)) {
+                                    selectedDefinitions.add(definition)
+                                }
+                            } else {
+                                selectedDefinitions.remove(definition)
+                            }
+                        }
+                    )
+                    Text("Merge")
+
+                    if (audio.size > 1) {
+                        AudioIndexPicker(
+                            audio = audio,
+                            audioIdx = audioIdx
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    TextButton(onClick = {
+                        val effectiveDefs =
+                            if (selectedDefinitions.isEmpty()) listOf(definition)
+                            else selectedDefinitions.toList()
+                        val imagesForCard = imagesMap[definition.definition].orEmpty()
+                        var cardExamples = ArrayList<String>()
+                        effectiveDefs.forEach {
+                            cardExamples.addAll(it.examples)
+                        }
+                        cardExamples.addAll(extraExamples)
+                        if (cardExamples.isEmpty()) {
+                            cardExamples = arrayListOf(title)
+                        }
+                        createCard(
+                            word.getPage(effectiveDefs, ordboken.currentCss),
+                            cardExamples,
+                            imagesForCard,
+                            audio.elementAtOrElse(audioIdx.intValue) { _ -> "" }
+                        )
+                        onCreate(effectiveDefs)
+                    }) {
+                        Icon(painterResource(R.drawable.ic_done), contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Create")
+                    }
+
+                    TextButton(onClick = {
+                        Intent(this@CardActivity, ImagePicker::class.java).also {
+                            it.putExtra(Intent.EXTRA_TEXT, title)
+                            it.putExtra("dictionaryImages", mDictImages)
+                            currentDefinition = definition
+                            ordboken.images = ArrayList()
+                            startActivityForResult(it, IMAGE_PICKER_REQUEST)
+                        }
+                    }) {
+                        Icon(painterResource(R.drawable.ic_add_image), contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
+
+                    TextButton(onClick = {
+                        Intent(this@CardActivity, CameraActivity::class.java).also {
+                            it.putExtra(Intent.EXTRA_TEXT, title)
+                            currentDefinition = definition
+                            ordboken.images = ArrayList()
+                            startActivityForResult(it, CAMERA_REQUEST)
+                        }
+                    }) {
+                        Icon(painterResource(R.drawable.ic_add_camera), contentDescription = null, modifier = Modifier.size(16.dp))
+                    }
+
+                    TextButton(onClick = {
+                        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val item = clipboard.primaryClip?.getItemAt(0)
+                        val pasteData = item?.text
+
+                        if (pasteData != null) {
+                            extraExamples.add(pasteData.toString())
+                        }
+                    }) {
+                        Text("Clipboard")
+                    }
+
+                    TextButton(onClick = {
+                        imagesMap[definition.definition] = emptyList()
+                        extraExamples.clear()
+                    }) {
+                        Icon(painterResource(R.drawable.ic_clear), contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Clear")
+                    }
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun AudioIndexPicker(
+        audio: List<String>,
+        audioIdx: MutableIntState
+    ) {
+        var expanded by remember { mutableStateOf(false) }
+
+        Box {
+            OutlinedButton(onClick = { expanded = true }) {
+                Text((audioIdx.intValue + 1).toString())
+            }
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                (1..audio.size).forEach { n ->
+                    DropdownMenuItem(
+                        text = { Text(n.toString()) },
+                        onClick = {
+                            audioIdx.intValue = n - 1
+                            expanded = false
+                            mWord?.audio?.let { audioUrls ->
+                                playAudio(audioUrls[n - 1])
+                            }
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    fun IdiomCard(
+        word: Word,
+        idiom: Word.Idiom,
+        onCreate: () -> Unit
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 5.dp),
+            shape = RoundedCornerShape(2.dp)
+        ) {
+            Column(modifier = Modifier.padding(10.dp)) {
+                Text(
+                    text = "${idiom.idiom}: ${idiom.definition}",
+                    fontWeight = FontWeight.Bold,
+                    color = Color.Black
+                )
+                if (idiom.examples.isNotEmpty()) {
+                    Text(
+                        text = "• " + idiom.examples.joinToString(separator = "\n• "),
+                        fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+                Row(modifier = Modifier.padding(top = 4.dp)) {
+                    TextButton(onClick = {
+                        val text = """<strong>${idiom.idiom}</strong><p>${idiom.definition}"""
+                        val examples =
+                            if (idiom.examples.isEmpty()) arrayListOf(idiom.idiom)
+                            else idiom.examples
+                        createCard(text, examples, ArrayList(), "")
+                        onCreate()
+                    }) {
+                        Icon(painterResource(R.drawable.ic_done), contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Create")
+                    }
+                }
+            }
+        }
+    }
+
+    private fun decodeImageDataUrl(dataUrl: String): android.graphics.Bitmap? {
+        return try {
+            val base64 = dataUrl.split(",")[1]
+            val decoded = Base64.decode(base64, Base64.DEFAULT)
+            BitmapFactory.decodeByteArray(decoded, 0, decoded.size)
+        } catch (e: Exception) {
+            null
+        }
     }
 
     private fun createCard(
@@ -63,12 +430,12 @@ class CardActivity : AppCompatActivity() {
         images: List<String>,
         audio: String
     ) {
-        val deckName = findViewById<EditText>(R.id.deckName).text.toString()
-        val id = anki.createCard(deckName, text, examples, images, audio)
+        val deck = deckName
+        val id = anki.createCard(deck, text, examples, images, audio)
 
-        Toast.makeText(
-            this, if (id == null) "Fail" else "Card added to $deckName",
-            Toast.LENGTH_SHORT
+        android.widget.Toast.makeText(
+            this, if (id == null) "Fail" else "Card added to $deck",
+            android.widget.Toast.LENGTH_SHORT
         ).show()
 
         if (id != null) {
@@ -78,7 +445,7 @@ class CardActivity : AppCompatActivity() {
         if (saveDeckName) {
             getPreferences(Context.MODE_PRIVATE)?.let { pref ->
                 with(pref.edit()) {
-                    putString("deckName", deckName)
+                    putString("deckName", deck)
                     commit()
                 }
             }
@@ -97,7 +464,7 @@ class CardActivity : AppCompatActivity() {
             mediaPlayer.setDataSource(url)
         } catch (e: Exception) {
             setProgressBarIndeterminateVisibility(false)
-            Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
+            android.widget.Toast.makeText(applicationContext, R.string.error_audio, android.widget.Toast.LENGTH_SHORT)
                 .show()
             return
         }
@@ -109,7 +476,7 @@ class CardActivity : AppCompatActivity() {
 
         mediaPlayer.setOnErrorListener { mp, what, extra ->
             setProgressBarIndeterminateVisibility(false)
-            Toast.makeText(applicationContext, R.string.error_audio, Toast.LENGTH_SHORT)
+            android.widget.Toast.makeText(applicationContext, R.string.error_audio, android.widget.Toast.LENGTH_SHORT)
                 .show()
             false
         }
@@ -117,273 +484,8 @@ class CardActivity : AppCompatActivity() {
         mediaPlayer.prepareAsync()
     }
 
-    private fun loadWord(word: Word) {
-        this.word = word
-
-        for (definition in word.definitions) {
-            val title = definition.title ?: word.mTitle
-            val card = createCardView("${title}: ${definition.definition}", definition.examples)
-            val createButton = card.findViewById<Button>(R.id.card_create_button)
-            val extraExamples = ArrayList<String>()
-
-            createButton.setOnClickListener {
-                val images = imagesMap[definition.definition] ?: ArrayList()
-                var examples = ArrayList<String>()
-
-                val audioIdx = if (mAudio.size > 1) {
-                    card.findViewById<Spinner>(R.id.card_audio_index).selectedItem.toString()
-                        .toInt() - 1
-                } else {
-                    0
-                }
-
-                if (selectedDefinitions.isEmpty()) {
-                    selectedDefinitions.add(definition)
-                }
-
-                selectedDefinitions.forEach {
-                    examples.addAll(it.examples)
-                }
-
-                examples.addAll(extraExamples)
-
-                if (examples.isEmpty()) {
-                    examples = arrayListOf(title)
-                }
-
-                createCard(word.getPage(selectedDefinitions, ordboken.currentCss),
-                    examples, images, mAudio.elementAtOrElse(audioIdx) { _ -> "" })
-                card.visibility = View.GONE
-                selectedDefinitions.forEach { defToCard[it]?.visibility = View.GONE }
-                selectedDefinitions.clear()
-            }
-
-            if (mAudio.size > 1) {
-                card.findViewById<Spinner>(R.id.card_audio_index).apply {
-                    ArrayAdapter(
-                        context,
-                        android.R.layout.simple_spinner_item,
-                        (1..mAudio.size).toList()
-                    ).also { adapter ->
-                        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-                        this.adapter = adapter
-                    }
-
-                    visibility = View.VISIBLE
-                    setSelection(0, false)
-                    onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
-                        override fun onItemSelected(
-                            parent: AdapterView<*>?,
-                            view: View?,
-                            position: Int,
-                            id: Long
-                        ) {
-                            playAudio(word.audio[position])
-                        }
-
-                        override fun onNothingSelected(parent: AdapterView<*>?) {
-                        }
-                    }
-                }
-            }
-
-            card.findViewById<Button>(R.id.card_images_button).apply {
-                setOnClickListener {
-                    Intent(this@CardActivity, ImagePicker::class.java).also {
-                        it.putExtra(Intent.EXTRA_TEXT, title)
-                        it.putExtra("dictionaryImages", mDictImages)
-                        currentDefinition = definition
-                        currentCard = card
-                        ordboken.images = ArrayList()
-                        startActivityForResult(it, IMAGE_PICKER_REQUEST)
-                    }
-                }
-                visibility = View.VISIBLE
-            }
-
-            card.findViewById<Button>(R.id.card_clipboard_button).apply {
-                setOnClickListener {
-                    val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    val item = clipboard.primaryClip?.getItemAt(0)
-                    val pasteData = item?.text
-
-                    if (pasteData != null) {
-                        val cardExample = card.findViewById<TextView>(R.id.cardExample)
-
-                        cardExample.text = cardExample.text.toString() + "\n• " + pasteData
-                        extraExamples.add(pasteData.toString())
-                    }
-                }
-                visibility = View.VISIBLE
-            }
-
-            card.findViewById<Button>(R.id.card_photo_button).apply {
-                setOnClickListener {
-                    Intent(this@CardActivity, CameraActivity::class.java).also {
-                        it.putExtra(Intent.EXTRA_TEXT, title)
-                        currentDefinition = definition
-                        currentCard = card
-                        ordboken.images = ArrayList()
-                        startActivityForResult(it, CAMERA_REQUEST)
-                    }
-                }
-                visibility = View.VISIBLE
-            }
-
-            card.findViewById<Button>(R.id.card_clear_button).apply {
-                setOnClickListener {
-                    Intent(this@CardActivity, ImagePicker::class.java).also {
-                        val empty = arrayListOf<String>()
-
-                        imagesMap[definition.definition] = empty
-                        extraExamples.clear()
-
-                        val cardExample = card.findViewById<TextView>(R.id.cardExample)
-                        val examplesText = if (definition.examples.isNotEmpty()) "• " else ""
-                        cardExample.text = examplesText + definition.examples.joinToString(separator = "\n• ")
-
-                        showImages(card.findViewById<LinearLayout>(R.id.card_images), empty)
-                    }
-                }
-                visibility = View.VISIBLE
-            }
-
-            card.findViewById<CheckBox>(R.id.card_merge).apply {
-                setOnCheckedChangeListener { _, checked ->
-                    if (checked) {
-                        card.setBackgroundColor(Color.YELLOW)
-                        selectedDefinitions.add(definition)
-                    } else {
-                        card.setBackgroundColor(Color.WHITE)
-                        selectedDefinitions.remove(definition)
-                    }
-                }
-            }
-
-            defToCard[definition] = card
-            binding.cardHolder.addView(card)
-        }
-
-        for (idiom in word.idioms) {
-            val card = createCardView("${idiom.idiom}: ${idiom.definition}", idiom.examples)
-            val createButton = card.findViewById<Button>(R.id.card_create_button)
-
-            createButton.setOnClickListener {
-                val text = """<strong>${idiom.idiom}</strong><p>${idiom.definition}"""
-                var examples = idiom.examples
-
-                if (examples.isEmpty()) {
-                    examples = arrayListOf(idiom.idiom)
-                }
-
-                createCard(text, examples, ArrayList(), "")
-                card.visibility = View.GONE
-            }
-
-            binding.cardHolder.addView(card)
-        }
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        binding = ActivityCardBinding.inflate(layoutInflater)
-        val view = binding.root
-        setContentView(view)
-        setSupportActionBar(binding.toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(true)
-
-        if (ContextCompat.checkSelfPermission(
-                this,
-                AddContentApi.READ_WRITE_PERMISSION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-
-            // Permission is not granted
-            // Should we show an explanation?
-            if (ActivityCompat.shouldShowRequestPermissionRationale(
-                    this,
-                    AddContentApi.READ_WRITE_PERMISSION
-                )
-            ) {
-                // Show an explanation to the user *asynchronously* -- don't block
-                // this thread waiting for the user's response! After the user
-                // sees the explanation, try again to request the permission.
-            } else {
-                // No explanation needed; request the permission
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(AddContentApi.READ_WRITE_PERMISSION),
-                    1
-                )
-
-                // MY_PERMISSIONS_REQUEST_READ_CONTACTS is an
-                // app-defined int constant. The callback method gets the
-                // result of the request.
-            }
-        } else {
-            // Permission has already been granted
-        }
-
-        anki = Anki(this)
-
-        var deckName =
-            getPreferences(Context.MODE_PRIVATE)?.getString("deckName", "Nordict") ?: "Nordict"
-
-        intent?.getStringExtra("deckName")?.let {
-            saveDeckName = false
-            deckName = it
-        }
-
-        findViewById<EditText>(R.id.deckName).setText(deckName)
-        title = deckName
-
-        ordboken = Ordboken.getInstance(this)
-        ordboken.images = ArrayList()
-        val word = ordboken.currentWord ?: run {
-            finish()
-            return
-        }
-
-        WordAudioTask().execute(word)
-    }
-
-    fun showImages(view: ViewGroup, images: ArrayList<String>) {
-        view.removeAllViews()
-
-        for (dataUrl in images) {
-            val base64 = dataUrl.split(",")[1]
-            val decoded = Base64.decode(base64, Base64.DEFAULT)
-
-            val bytes = BitmapFactory.decodeByteArray(decoded, 0, decoded.size)
-
-            val imageView = ImageView(this)
-            imageView.setImageBitmap(bytes)
-
-            view.addView(imageView)
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        when (requestCode) {
-            IMAGE_PICKER_REQUEST, CAMERA_REQUEST -> {
-                currentDefinition?.let {
-                    imagesMap.putIfAbsent(it.definition, ArrayList())
-                    imagesMap[it.definition]?.addAll(ordboken.images)
-
-                    currentCard?.apply {
-                        val imagesHolder = findViewById<LinearLayout>(R.id.card_images)
-                        showImages(imagesHolder, imagesMap[it.definition]!!)
-                    }
-                }
-            }
-        }
-
-    }
-
     fun urlsToData(urls: ArrayList<String>): ArrayList<String> {
-        var data = ArrayList<String>()
+        val data = ArrayList<String>()
 
         urls.forEach {
             val request = Request.Builder().url(it)
@@ -416,9 +518,23 @@ class CardActivity : AppCompatActivity() {
         }
 
         override fun onPostExecute(result: Triple<Word, ArrayList<String>, ArrayList<String>>) {
-            mAudio.addAll(result.second)
-            mDictImages.addAll(result.third)
-            loadWord(result.first)
+            mAudio = result.second
+            mDictImages = result.third
+            mWord = result.first
+            mLeftCards = (mWord!!.definitions.size + mWord!!.idioms.size)
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        when (requestCode) {
+            IMAGE_PICKER_REQUEST, CAMERA_REQUEST -> {
+                currentDefinition?.let {
+                    val existing = imagesMap[it.definition].orEmpty().toMutableList()
+                    existing.addAll(ordboken.images)
+                    imagesMap[it.definition] = existing
+                }
+            }
         }
     }
 

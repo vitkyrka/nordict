@@ -21,10 +21,12 @@
         <activity android:name="com.canhub.cropper.CropImageActivity" />
         <activity
             android:name=".CameraActivity"
-            android:exported="true" />
+            android:exported="true"
+            android:theme="@style/AppTheme.NoActionBar" />
         <activity
             android:name=".ImagePicker"
-            android:exported="true" />
+            android:exported="true"
+            android:theme="@style/AppTheme.NoActionBar" />
         <activity
             android:name=".CardActivity"
             android:exported="true"
@@ -40,7 +42,8 @@
             android:name=".MainActivity"
             android:label="@string/app_name"
             android:launchMode="singleTop"
-            android:parentActivityName=".HistoryActivity">
+            android:parentActivityName=".HistoryActivity"
+            android:theme="@style/AppTheme.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.SEARCH" />
             </intent-filter>
@@ -53,12 +56,14 @@
             android:name=".WordActivity"
             android:exported="true"
             android:label="@string/app_name"
-            android:parentActivityName=".HistoryActivity" />
+            android:parentActivityName=".HistoryActivity"
+            android:theme="@style/AppTheme.NoActionBar" />
         <activity
             android:exported="true"
             android:name=".HistoryActivity"
             android:label="@string/app_name"
             android:launchMode="singleTop"
+            android:theme="@style/AppTheme.NoActionBar"
             android:windowSoftInputMode="stateAlwaysHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

@@ -6,9 +6,18 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.webkit.*
-import android.widget.Button
-import android.widget.EditText
+import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import org.json.JSONArray
 import org.json.JSONException
 import java.util.*
@@ -17,136 +26,179 @@ internal const val GSTATIC_SERVER = "https://encrypted-tbn0.gstatic.com/"
 
 class ImagePicker : AppCompatActivity() {
     private lateinit var ordboken: Ordboken
-    private lateinit var webView: WebView
-    private lateinit var searchText: EditText
+    private var selected = ArrayList<String>()
+    internal var timer: Timer = Timer()
     private var imagePickerJs: String? = null
-    private val selected = ArrayList<String>()
-    private var timer = Timer()
-
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_image_picker)
-
-        val intentWord = intent?.getStringExtra(Intent.EXTRA_TEXT)
-        val word = intentWord ?: "spritsa"
-
-        val dictImages = ArrayList<String>()
-        intent?.getStringArrayListExtra("dictionaryImages")?.let {
-            dictImages.addAll(it)
-        }
-
         ordboken = Ordboken.getInstance(this)
 
-        findViewById<Button>(R.id.ok_button).setOnClickListener {
-            ordboken.images = selected
-            setResult(Activity.RESULT_OK)
-            finish()
-        }
+        val initialWord = intent?.getStringExtra(Intent.EXTRA_TEXT) ?: "spritsa"
+        val dictImages = intent?.getStringArrayListExtra("dictionaryImages") ?: arrayListOf()
 
-        webView = findViewById(R.id.webView)
-        webView.webChromeClient = object : WebChromeClient() {
-            override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
-                Log.d("Webview", consoleMessage!!.message())
-                return true
-            }
-        }
-        val settings = webView.settings.apply {
-            builtInZoomControls = true
-            displayZoomControls = false
-            javaScriptEnabled = true
-
-            // We replace the src urls in imagepicker.js::init(), so don't load
-            // images twice.
-            blockNetworkImage = true
-        }
-
-        webView.setInitialScale(100)
-        val arg = dictImages.joinToString(",") { it -> "\"$it\"" }
-
-        webView.webViewClient = object : WebViewClient() {
-            override fun onPageFinished(view: WebView, url: String) {
-                Log.i("webview onPageFinished", url)
-                if (url == GSTATIC_SERVER) {
-                    settings.blockNetworkImage = false
-                } else {
-                    // onPageFinished gets called multiple times
-                    timer.cancel()
-                    timer = Timer()
-                    timer.schedule(object : TimerTask() {
-                        override fun run() {
-                            runOnUiThread(Runnable {
-                                view.loadUrl("javascript:" + getImagePickerJs() + "getPickerHtml($arg);")
-                            })
+        setContent {
+            MaterialTheme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    ImagePickerScreen(
+                        initialWord = initialWord,
+                        dictImages = dictImages,
+                        onOk = {
+                            ordboken.images = selected
+                            setResult(Activity.RESULT_OK)
+                            finish()
                         }
-                    }, 1000)
+                    )
                 }
             }
         }
-
-        webView.addJavascriptInterface(WcmJsObject(), "wcm")
-
-        searchText = findViewById<EditText>(R.id.search_text).apply {
-            setText(word)
-        }
-
-        val lang = ordboken.currentDictionary.lang
-
-        findViewById<Button>(R.id.search_button).apply {
-            setOnClickListener {
-                val q = searchText.text.toString()
-                webView.loadUrl("https://www.google.$lang/search?tbm=isch&q=" + Uri.encode(q))
-
-            }
-        }
-
-        webView.loadUrl("https://www.google.$lang/search?tbm=isch&q=" + Uri.encode(word))
     }
 
-    private inner class WcmJsObject {
+    @Composable
+    fun ImagePickerScreen(
+        initialWord: String,
+        dictImages: ArrayList<String>,
+        onOk: () -> Unit
+    ) {
+        var query by remember { mutableStateOf(initialWord) }
+        val lang = ordboken.currentDictionary.lang
+        val arg = dictImages.joinToString(",") { "\"$it\"" }
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    label = { Text("Search") },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Button(onClick = {
+                    ImagePickerWebViewHolder.current?.loadUrl(
+                        "https://www.google.$lang/search?tbm=isch&q=" + Uri.encode(query)
+                    )
+                }) {
+                    Icon(Icons.Default.Search, contentDescription = null)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Search")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            ImagePickerWebView(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                lang = lang,
+                arg = arg,
+                initialWord = initialWord
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(onClick = onOk, modifier = Modifier.align(Alignment.End)) {
+                Text("OK")
+            }
+        }
+    }
+
+    internal inner class WcmJsObject {
         @JavascriptInterface
         fun pushSelected(json: String) {
-            runOnUiThread(Runnable {
-                val array: JSONArray
+            runOnUiThread {
                 try {
-                    array = JSONArray(json)
-
+                    val array = JSONArray(json)
                     selected.clear()
-
                     for (i in 0 until array.length()) {
                         selected.add(array.getString(i))
                     }
                 } catch (e: JSONException) {
                     e.printStackTrace()
                 }
-            })
+            }
         }
 
         @JavascriptInterface
         fun pushPickerHtml(html: String) {
-            runOnUiThread(Runnable {
-                webView.loadDataWithBaseURL(
-                    GSTATIC_SERVER,
-                    html + "<script>" + getImagePickerJs() + "</script>",
-                    "text/html", "UTF-8", null
-                )
-            })
+            // Not needed - handled by onPageFinished
         }
     }
 
-    private fun getImagePickerJs(): String {
+    internal fun getImagePickerJs(): String {
         imagePickerJs?.let { return it }
-
         val js = try {
-            val am = assets
-            val `is` = am.open("imagepicker.js")
-            Utils.inputStreamToString(`is`)
+            val input = assets.open("imagepicker.js")
+            Utils.inputStreamToString(input)
         } catch (e: java.io.IOException) {
             "document.body.innerHtml='Error';"
         }
-
         imagePickerJs = js
-
         return js
     }
+}
+
+object ImagePickerWebViewHolder {
+    var current: WebView? = null
+}
+
+@Composable
+fun ImagePickerWebView(
+    modifier: Modifier = Modifier,
+    lang: String,
+    arg: String,
+    initialWord: String
+) {
+    val context = LocalContext.current
+    val activity = context as ImagePicker
+
+    AndroidView(
+        modifier = modifier,
+        factory = { ctx ->
+            WebView(ctx).apply {
+                ImagePickerWebViewHolder.current = this
+
+                webChromeClient = object : WebChromeClient() {
+                    override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                        Log.d("Webview", consoleMessage!!.message())
+                        return true
+                    }
+                }
+                settings.apply {
+                    builtInZoomControls = true
+                    displayZoomControls = false
+                    javaScriptEnabled = true
+                    blockNetworkImage = true
+                }
+                setInitialScale(100)
+                webViewClient = object : WebViewClient() {
+                    override fun onPageFinished(view: WebView, url: String) {
+                        Log.i("webview onPageFinished", url)
+                        if (url == GSTATIC_SERVER) {
+                            settings.blockNetworkImage = false
+                        } else {
+                            activity.timer.cancel()
+                            activity.timer = Timer()
+                            activity.timer.schedule(object : TimerTask() {
+                                override fun run() {
+                                    activity.runOnUiThread {
+                                        view.loadUrl("javascript:" + activity.getImagePickerJs() + "getPickerHtml($arg);")
+                                    }
+                                }
+                            }, 1000)
+                        }
+                    }
+                }
+                addJavascriptInterface(activity.WcmJsObject(), "wcm")
+                loadUrl("https://www.google.$lang/search?tbm=isch&q=" + Uri.encode(initialWord))
+            }
+        }
+    )
 }

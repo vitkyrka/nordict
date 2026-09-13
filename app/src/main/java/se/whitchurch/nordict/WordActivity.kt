@@ -1,30 +1,50 @@
 package se.whitchurch.nordict
 
 import android.annotation.SuppressLint
+import android.app.SearchManager
 import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
 import android.database.sqlite.SQLiteDatabase
-import android.graphics.Typeface
-import android.media.AudioAttributes
 import android.media.AudioManager
-import android.media.MediaPlayer
 import android.net.Uri
 import android.os.AsyncTask
 import android.os.Bundle
 import android.util.JsonReader
 import android.util.Log
-import android.view.Menu
-import android.view.MenuItem
 import android.view.View
-import android.view.ViewGroup
 import android.view.Window
 import android.webkit.*
-import android.widget.*
-import androidx.appcompat.app.ActionBar
-import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.widget.SearchView
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.ZoomIn
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.test.espresso.idling.CountingIdlingResource
 import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebSettingsCompat.FORCE_DARK_OFF
@@ -32,7 +52,6 @@ import androidx.webkit.WebSettingsCompat.FORCE_DARK_ON
 import androidx.webkit.WebViewFeature
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
-import com.google.android.material.bottomappbar.BottomAppBar
 import com.google.gson.Gson
 import se.whitchurch.nordict.OrdbokenContract.FavoritesEntry
 import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
@@ -41,26 +60,31 @@ import java.net.URLDecoder
 import java.util.*
 
 
-class WordActivity : AppCompatActivity() {
+sealed interface WordUiStatus {
+    object Loading : WordUiStatus
+    object Hidden : WordUiStatus
+    data class Error(val textRes: Int) : WordUiStatus
+}
+
+class WordActivity : androidx.appcompat.app.AppCompatActivity() {
     internal val loadResource: CountingIdlingResource = CountingIdlingResource("search")
     private var mWebView: WebView? = null
-    private var mScrollView: LockableNestedScrollView? = null
-    private var mBottomBar: BottomAppBar? = null
     private var mOrdboken: Ordboken? = null
-    private var mWord: Word? = null
     private var mUrl: Uri? = null
-    private var mProgressBar: ProgressBar? = null
-    private var mStatusText: TextView? = null
-    private var mStatusLayout: LinearLayout? = null
-    private var mRetryButton: Button? = null
-    private var mSearchView: SearchView? = null
-    private var mStarred: Boolean = false
     private var mGotStarred: Boolean = false
     private var mPageFinished: Boolean = false
-    private var autoPlay: Boolean = false
+    private var mResetZoomNextPause = false
     private var mFilterName: String? = null
     private var mWordList: WordList = WordList(position = -1)
-    private var mResetZoomNextPause = false
+
+    private var mWord: Word? by mutableStateOf(null)
+    private var mStarred: Boolean by mutableStateOf(false)
+    private var autoPlay: Boolean by mutableStateOf(false)
+    private var pinToViewport: Boolean by mutableStateOf(false)
+    private var webViewVisible: Boolean by mutableStateOf(false)
+    internal var queryText: String by mutableStateOf("")
+    private var uiStatus: WordUiStatus by mutableStateOf(WordUiStatus.Loading)
+    private val searchFocus = FocusRequester()
 
     @SuppressLint("AddJavascriptInterface")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -68,58 +92,39 @@ class WordActivity : AppCompatActivity() {
         mOrdboken = Ordboken.getInstance(this)
 
         requestWindowFeature(Window.FEATURE_INDETERMINATE_PROGRESS)
-        setContentView(R.layout.activity_word)
         volumeControlStream = AudioManager.STREAM_MUSIC
 
-        val actionBar = supportActionBar
-        actionBar!!.displayOptions = (ActionBar.DISPLAY_SHOW_CUSTOM or ActionBar.DISPLAY_SHOW_HOME
-                or ActionBar.DISPLAY_HOME_AS_UP)
-        actionBar.setCustomView(R.layout.actionbar)
-        actionBar.setDisplayHomeAsUpEnabled(true)
-
-        val bottomBar = findViewById<BottomAppBar>(R.id.bottom_app_bar)
-        mBottomBar = bottomBar
-        bottomBar.replaceMenu(R.menu.bottom_word)
-
         autoPlay = getPreferences(Context.MODE_PRIVATE)?.getBoolean("autoPlay", false) ?: false
-        bottomBar.menu.findItem(R.id.menu_autoplay).apply {
-            isChecked = autoPlay
-            setIcon(if (autoPlay) R.drawable.autoplay_on else R.drawable.autoplay_off)
-        }
 
-        bottomBar.setOnMenuItemClickListener {
-            when (it.itemId) {
-                R.id.menu_share -> {
-                    share()
-                    true
+        setContent {
+            MaterialTheme {
+                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                    WordScreen()
                 }
-                R.id.menu_play -> {
-                    mWord?.audio?.let { audio -> playAudio(audio) }
-                    true
-                }
-                R.id.menu_autoplay -> {
-                    it.isChecked = !it.isChecked
-                    autoPlay = it.isChecked
-                    it.setIcon(if (autoPlay) R.drawable.autoplay_on else R.drawable.autoplay_off)
-
-                    getPreferences(Context.MODE_PRIVATE)?.let { pref ->
-                        with(pref.edit()) {
-                            putBoolean("autoPlay", autoPlay)
-                            commit()
-                        }
-                    }
-                    true
-                }
-                else -> false
             }
         }
 
+        val intent = intent
+        val title = intent.getStringExtra("title")
+        if (title != null) {
+            setTitle(title)
+        }
 
-        val webView = findViewById<View>(R.id.webView) as WebView ?: return
+        val url = if (intent.data != null) {
+            intent.data!!
+        } else {
+            Uri.parse("https://svenska.se/so/?id=18788&ref=lnr176698")
+        }
+
+        mUrl = url
+        fetchWord()
+    }
+
+    private fun createWebView(context: Context): WebView {
+        val webView = WebView(context)
         mWebView = webView
-        mScrollView = findViewById(R.id.scroll_view)
-        mWebView!!.webChromeClient = WebChromeClient()
-        val settings = mWebView!!.settings.apply {
+        webView.webChromeClient = WebChromeClient()
+        val settings = webView.settings.apply {
             builtInZoomControls = true
             displayZoomControls = false
             javaScriptEnabled = true
@@ -142,8 +147,8 @@ class WordActivity : AppCompatActivity() {
             }
         }
 
-        mWebView!!.setInitialScale(mOrdboken!!.mPrefs.getInt("scale", 0))
-        mWebView!!.webViewClient = object : WebViewClient() {
+        webView.setInitialScale(mOrdboken!!.mPrefs.getInt("scale", 0))
+        webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
                 if (url.contains("/search/")) {
                     val word = url.substring(url.indexOf("ch/") + 3)
@@ -184,7 +189,8 @@ class WordActivity : AppCompatActivity() {
             override fun onPageFinished(view: WebView, url: String) {
                 if (!mPageFinished) {
                     webView.visibility = View.VISIBLE
-                    mStatusLayout!!.visibility = View.INVISIBLE
+                    webViewVisible = true
+                    uiStatus = WordUiStatus.Hidden
 
                     if (autoPlay) mWord?.audio?.let { audio ->
                         playAudio(audio)
@@ -204,86 +210,223 @@ class WordActivity : AppCompatActivity() {
                 StarToggleTask().execute()
             }
         }
-        mWebView!!.addJavascriptInterface(OrdbokenJsObject(), "ordboken")
+        webView.addJavascriptInterface(OrdbokenJsObject(), "ordboken")
 
-        mStarred = false
-        mProgressBar = findViewById<View>(R.id.word_progress) as ProgressBar
-        mStatusText = findViewById<View>(R.id.word_status) as TextView
-        mStatusLayout = findViewById<View>(R.id.word_status_layout) as LinearLayout
-        mRetryButton = findViewById<View>(R.id.word_retry) as Button
+        return webView
+    }
 
-        val intent = intent
+    @Composable
+    fun WordScreen() {
+        val ordboken = mOrdboken!!
+        val word = mWord
 
-        val title = intent.getStringExtra("title")
-        if (title != null) {
-            setTitle(title)
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Top bar: back + search + word actions
+            Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 4.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = { finish() }) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                    }
+                    OutlinedTextField(
+                        value = queryText,
+                        onValueChange = { queryText = it },
+                        modifier = Modifier
+                            .weight(1f)
+                            .focusRequester(searchFocus),
+                        singleLine = true,
+                        placeholder = { Text(getString(R.string.search_hint)) },
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { submitSearch(queryText) })
+                    )
+                    IconButton(onClick = { submitSearch(queryText) }) {
+                        Icon(Icons.Default.Search, contentDescription = getString(R.string.menu_search))
+                    }
+                    IconButton(onClick = { StarToggleTask().execute() }) {
+                        Icon(
+                            if (mStarred) Icons.Filled.Star else Icons.Filled.StarBorder,
+                            contentDescription = getString(
+                                if (mStarred) R.string.remove_bookmark else R.string.add_bookmark
+                            ),
+                            tint = if (mStarred) Color(0xFFFBC02D) else Color.Unspecified
+                        )
+                    }
+                    IconButton(onClick = {
+                        mWord?.uri?.let { url ->
+                            val browserIntent = Intent(Intent.ACTION_VIEW, url.toAndroidUri())
+                            startActivity(browserIntent)
+                        }
+                    }) {
+                        Icon(Icons.Filled.OpenInNew, contentDescription = getString(R.string.open_in_browser))
+                    }
+                    IconButton(onClick = {
+                        // The WebView zoom is only persisted through the saved
+                        // "scale" preference that setInitialScale() applies on
+                        // the next page load (there is no reliable API to read
+                        // or set the zoom of the currently displayed page).
+                        // Reset it to the default so the next word opens at
+                        // the default zoom.
+                        mResetZoomNextPause = true
+                        mOrdboken?.mPrefs?.edit()?.putInt("scale", 0)?.apply()
+                        getPreferences(Context.MODE_PRIVATE)?.let { pref ->
+                            with(pref.edit()) {
+                                putInt("scale", 0)
+                                commit()
+                            }
+                        }
+                    }) {
+                        Icon(Icons.Filled.ZoomIn, contentDescription = getString(R.string.menu_reset_zoom))
+                    }
+                }
+            }
+
+            DictionaryNav(ordboken = ordboken, modifier = Modifier.padding(horizontal = 8.dp))
+
+            HorizontalDivider()
+
+            // Content area
+            BoxWithConstraints(modifier = Modifier.weight(1f)) {
+                val maxH = maxHeight
+                val scrollState = rememberScrollState()
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(scrollState, enabled = !pinToViewport)
+                ) {
+                    // Legacy homograph strip (JSON dictionaries render their own).
+                    if (word != null && !word.renderAsJson && word.mHomographs.isNotEmpty()) {
+                        Column {
+                            word.mHomographs.forEach { homograph ->
+                                val isCurrent = homograph.uri == word.uri
+                                Text(
+                                    text = (if (isCurrent) "▶ " else "  ") + homograph.mSummary,
+                                    fontSize = 15.sp,
+                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            Ordboken.startWordActivity(
+                                                this@WordActivity,
+                                                "",
+                                                homograph.uri.toAndroidUri()
+                                            )
+                                        }
+                                        .padding(start = 20.dp, top = 10.dp, end = 0.dp, bottom = 10.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    AndroidView(
+                        factory = { ctx ->
+                            val webView = createWebView(ctx)
+                            // A fast word fetch (or a Robolectric test driving the
+                            // looper) can finish before the first composition
+                            // creates the WebView; load the pending word then.
+                            if (!mPageFinished && mWord != null) {
+                                loadWebView(mWord!!)
+                            }
+                            webView
+                        },
+                        modifier = if (pinToViewport) {
+                            Modifier
+                                .fillMaxWidth()
+                                .height(maxH)
+                        } else {
+                            Modifier.fillMaxWidth()
+                        }
+                    )
+                }
+
+                if (uiStatus !is WordUiStatus.Hidden) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            val s = uiStatus
+                            if (s is WordUiStatus.Loading) {
+                                LoadingIndicator(modifier = Modifier.padding(bottom = 16.dp))
+                                Text(getString(R.string.loading), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                            } else if (s is WordUiStatus.Error) {
+                                Text(
+                                    text = getString(s.textRes),
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                )
+                                Button(onClick = { fetchWord() }) {
+                                    Text(getString(R.string.tryagain))
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Bottom action bar
+            Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = {
+                        autoPlay = !autoPlay
+                        getPreferences(Context.MODE_PRIVATE)?.let { pref ->
+                            with(pref.edit()) {
+                                putBoolean("autoPlay", autoPlay)
+                                commit()
+                            }
+                        }
+                    }) {
+                        Icon(
+                            painterResource(if (autoPlay) R.drawable.autoplay_on else R.drawable.autoplay_off),
+                            contentDescription = null,
+                            tint = if (autoPlay) Color(0xFF4A90D9) else Color.Unspecified
+                        )
+                    }
+                    IconButton(onClick = { share() }) {
+                        Icon(
+                            painterResource(R.drawable.add_card),
+                            contentDescription = getString(R.string.menu_share)
+                        )
+                    }
+                    IconButton(onClick = {
+                        mWord?.audio?.let { audio -> playAudio(audio) }
+                    }) {
+                        Icon(
+                            painterResource(R.drawable.play),
+                            contentDescription = null
+                        )
+                    }
+                }
+            }
         }
-
-        val url = if (intent != null && intent.data != null) {
-            intent.data
-        } else {
-            Uri.parse("https://svenska.se/so/?id=18788&ref=lnr176698")
-        }
-
-        mUrl = url
-        fetchWord()
     }
 
     fun fetchWord(forceUrl: Boolean = false) {
-        mProgressBar!!.visibility = View.VISIBLE
-        mStatusText!!.setText(R.string.loading)
-        mRetryButton!!.visibility = View.GONE
+        uiStatus = WordUiStatus.Loading
         loadResource.increment()
 
         WordTask().execute(Triple(mUrl!!, mWordList, forceUrl))
     }
 
-    @SuppressLint("SetTextI18n")
-    private fun loadHomographs(word: Word) {
-        // JSON-rendered dictionaries (EST, DLE, Collins) draw all homonyms
-        // on a single page with in-page anchor navigation; skip the legacy
-        // OS-level strip for them.
-        if (word.renderAsJson) return
-
-        val linearLayout = findViewById<LinearLayout>(R.id.linear_layout)
-
-        linearLayout.removeAllViews()
-
-        if (word.mHomographs.size == 0) {
-            return
-        }
-
-        var pos = 0
-        for (homograph in word.mHomographs) {
-            val text = TextView(this)
-
-            text.setPadding(20, 10, 0, 10)
-            text.textSize = 15f
-
-            if (homograph.uri == word.uri) {
-                text.text = """▶ ${homograph.mSummary}"""
-                text.setTypeface(null, Typeface.BOLD)
-            } else {
-                text.text = """  ${homograph.mSummary}"""
-            }
-
-            text.setOnClickListener {
-                Ordboken.startWordActivity(this, "", homograph.uri.toAndroidUri())
-            }
-
-            linearLayout.addView(text, pos)
-            pos++
-        }
-    }
-
     private fun loadWebView(word: Word) {
+        if (mWebView == null) return
         if (word.renderAsJson) {
-            // JSON pages are taller than the screen inside the outer scroll
-            // view, which would swallow in-page #hom-N anchor navigation.
-            // Lock the outer view and size the WebView to the viewport so the
-            // WebView scrolls internally and anchors land on their headings.
-            mScrollView?.scrollLocked = true
-            pinWebViewToViewport()
+            // JSON pages are taller than the screen; pin the WebView to the
+            // viewport so it scrolls internally and #hom-N anchors land on
+            // their headings.
+            pinToViewport = true
 
             val gson = Gson()
             val json = gson.toJson(word)
@@ -303,9 +446,8 @@ class WordActivity : AppCompatActivity() {
         }
 
         // Legacy dictionaries render original HTML that the outer scroll view
-        // scrolls, so undo the JSON-page viewport pinning.
-        mScrollView?.scrollLocked = false
-        unpinWebView()
+        // scrolls, so let the WebView size to its content again.
+        pinToViewport = false
 
         val text = word.getPage()
         val footer = ("<script src='file:///android_asset/jquery.min.js'></script>"
@@ -322,41 +464,17 @@ class WordActivity : AppCompatActivity() {
         )
     }
 
-    private fun pinWebViewToViewport() {
-        mWebView?.post {
-            val webView = mWebView ?: return@post
-            val scrollView = mScrollView ?: return@post
-            val bottomBar = mBottomBar ?: return@post
-            // The bottom bar overlays the scroll view and never hides for JSON
-            // pages (the outer view is locked), so end the WebView viewport at
-            // the bar's top instead of letting it cover the last lines.
-            val lp = webView.layoutParams
-            lp.width = scrollView.width.coerceAtLeast(1)
-            lp.height = (bottomBar.top - scrollView.top).coerceAtLeast(1)
-            webView.layoutParams = lp
-        }
-    }
-
-    private fun unpinWebView() {
-        mWebView?.post {
-            val webView = mWebView ?: return@post
-            val lp = webView.layoutParams
-            if (lp.height != ViewGroup.LayoutParams.WRAP_CONTENT) {
-                lp.width = ViewGroup.LayoutParams.MATCH_PARENT
-                lp.height = ViewGroup.LayoutParams.WRAP_CONTENT
-                webView.layoutParams = lp
-            }
-        }
-    }
-
     private fun updateStar() {
-        val on = if (mStarred) 1 else 0
+        mStarred = mStarred
+    }
 
-        if (!mGotStarred || !mPageFinished) {
-            return
-        }
-
-        // mWebView.loadUrl("javascript:setStar(" + on.toString() + ")");
+    private fun submitSearch(query: String) {
+        if (query.isBlank()) return
+        val intent = Intent(Intent.ACTION_SEARCH)
+            .setClass(this, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            .putExtra(SearchManager.QUERY, query)
+        startActivity(intent)
     }
 
     private inner class SearchLinkTask : AsyncTask<String, Void, SearchResult>() {
@@ -418,19 +536,15 @@ class WordActivity : AppCompatActivity() {
     }
 
     private fun showSuggestions(query: String) {
-        val searchView = mSearchView ?: return
-        searchView.setQuery(query, false)
-        searchView.isIconified = false
-        searchView.requestFocusFromTouch()
+        queryText = query
+        searchFocus.requestFocus()
     }
 
     private inner class WordTask :
         AsyncTask<Triple<Uri, WordList, Boolean>, Void, Pair<Word?, WordList>>() {
         override fun doInBackground(vararg params: Triple<Uri, WordList, Boolean>): Pair<Word?, WordList> {
             val wordList = params[0].second
-            var word: Word? = null
-
-            word = mOrdboken!!.getWord(params[0].first)
+            val word: Word? = mOrdboken!!.getWord(params[0].first)
 
             return Pair(word, wordList)
         }
@@ -444,14 +558,11 @@ class WordActivity : AppCompatActivity() {
             mWordList = wordList
 
             if (word == null) {
-                mProgressBar!!.visibility = View.GONE
-                if (!mOrdboken!!.isOnline) {
-                    mStatusText!!.setText(R.string.error_offline)
+                uiStatus = if (!mOrdboken!!.isOnline) {
+                    WordUiStatus.Error(R.string.error_offline)
                 } else {
-                    mStatusText!!.setText(R.string.error_word)
+                    WordUiStatus.Error(R.string.error_word)
                 }
-
-                mRetryButton!!.visibility = View.VISIBLE
                 loadResource.decrement()
                 return
             }
@@ -459,16 +570,17 @@ class WordActivity : AppCompatActivity() {
             title = word.toString()
             Log.i("word", word.toString())
 
-            loadHomographs(word)
             loadWebView(word)
             title = word.mTitle
+            mPageFinished = false
+            webViewVisible = false
 
             StarUpdateTask().execute()
             HistorySaveTask().execute()
         }
     }
 
-    private fun playAudio(urls: ArrayList<String>) {
+    private fun playAudio(urls: java.util.ArrayList<String>) {
         if (urls.size == 0) {
             return
         }
@@ -480,7 +592,7 @@ class WordActivity : AppCompatActivity() {
     }
 
     private fun playAudio(url: String) {
-        playAudio(arrayListOf(url))
+        playAudio(java.util.ArrayList(listOf(url)))
     }
 
     private inner class HistorySaveTask : AsyncTask<Void, Void, Void>() {
@@ -525,7 +637,6 @@ class WordActivity : AppCompatActivity() {
             mStarred = starred!!
             mGotStarred = true
             updateStar()
-            invalidateOptionsMenu()
         }
     }
 
@@ -605,7 +716,6 @@ class WordActivity : AppCompatActivity() {
         super.onPause()
         overridePendingTransition(0, 0)
 
-        // mOrdboken!!.currentWord = null
         if (mWord != null) {
             mOrdboken!!.setLastView(Ordboken.Where.WORD, mWord!!.uri.toString())
         }
@@ -619,7 +729,7 @@ class WordActivity : AppCompatActivity() {
             // re-saving the still-zoomed page's scale, or the next open
             // would apply the large zoom again.
             mResetZoomNextPause = false
-        } else if (mWebView!!.visibility == View.VISIBLE) {
+        } else if (webViewVisible) {
             // getScale() is supposed to be deprecated, but its replacement
             // onScaleChanged() doesn't get called when zooming using pinch.
             val scale = (mWebView!!.scale * 100).toInt()
@@ -628,64 +738,5 @@ class WordActivity : AppCompatActivity() {
         }
 
         ed.commit()
-    }
-
-    override fun onPrepareOptionsMenu(menu: Menu): Boolean {
-        val star = menu.findItem(R.id.menu_star)
-
-        if (mStarred) {
-            star.setIcon(R.drawable.ic_action_important)
-            star.title = getString(R.string.remove_bookmark)
-        } else {
-            star.setIcon(R.drawable.ic_action_not_important)
-            star.title = getString(R.string.add_bookmark)
-        }
-
-        return super.onPrepareOptionsMenu(menu)
-    }
-
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.main, menu)
-        menuInflater.inflate(R.menu.word, menu)
-
-        mSearchView = mOrdboken!!.initSearchView(this, menu, null, false)
-        return true
-    }
-
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (mOrdboken!!.onOptionsItemSelected(this, item)) {
-            return true
-        }
-
-        if (item.itemId == R.id.menu_star) {
-            StarToggleTask().execute()
-        }
-
-        if (item.itemId == R.id.menu_open_in_browser) {
-            mWord?.uri?.let { url ->
-                val browserIntent = Intent(Intent.ACTION_VIEW, url.toAndroidUri())
-                startActivity(browserIntent)
-            }
-            return true
-        }
-
-        if (item.itemId == R.id.menu_reset_zoom) {
-            // The WebView zoom is only persisted through the saved "scale"
-            // preference that setInitialScale() applies on the next page
-            // load (there is no reliable API to read or set the zoom of the
-            // currently displayed page). Reset it to the default so the next
-            // word opens at the default zoom.
-            mResetZoomNextPause = true
-            mOrdboken?.mPrefs?.edit()?.putInt("scale", 0)?.apply()
-            getPreferences(Context.MODE_PRIVATE)?.let { pref ->
-                with(pref.edit()) {
-                    putInt("scale", 0)
-                    commit()
-                }
-            }
-            return true
-        }
-
-        return super.onOptionsItemSelected(item)
     }
 }
