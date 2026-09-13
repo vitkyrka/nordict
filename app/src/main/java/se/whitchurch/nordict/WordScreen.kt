@@ -492,22 +492,30 @@ fun WordScreen(
     LaunchedEffect(word, vm.webView) { vm.maybeLoadWord() }
 
     // Restore Ordboken state + the cross-dictionary hook on resume, matching
-    // the old WordActivity.onResume/onPause duties.
+    // the old WordActivity.onResume/onPause duties. The hook is installed at
+    // composition so a dictionary tap during a destination transition (old
+    // dest paused, new dest not yet resumed) still reaches a live word view;
+    // it is reinstated on resume in case anything nulled it meanwhile, and
+    // only released on disposal while this destination still owns it.
     DisposableEffect(lifecycleOwner, ordboken) {
+        val myHook: () -> Unit = { vm.maybeSwitchDict() }
+        ordboken.onDictChanged = myHook
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> {
                     ordboken.currentWord = vm.mWord
-                    ordboken.onDictChanged = { vm.maybeSwitchDict() }
+                    ordboken.onDictChanged = myHook
                 }
                 Lifecycle.Event.ON_PAUSE -> {
-                    ordboken.onDictChanged = null
                     // Persist the WebView zoom on pause (backgrounding OR
                     // leaving the word, e.g. back or closing the app), like
                     // the old WordActivity.onPause. Saving on composition
                     // disposal is too late: the ViewModel's onCleared has
                     // already destroyed the WebView by then, so getScale()
                     // would return the default and overwrite the user's zoom.
+                    // The cross-link hook is intentionally NOT nulled here: a
+                    // dictionary tap during the transition to the next word
+                    // destination must still reach this (or the next) view.
                     vm.onLeave()
                 }
                 else -> Unit
@@ -516,7 +524,7 @@ fun WordScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
-            ordboken.onDictChanged = null
+            if (ordboken.onDictChanged === myHook) ordboken.onDictChanged = null
         }
     }
 

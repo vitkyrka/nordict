@@ -313,6 +313,34 @@ class NavigationRegressionTest {
     }
 
     @Test
+    fun dictionarySwitchWhileTheWordDestinationIsPausedIsNotDropped() {
+        awaitNav()
+
+        // Open the EST word "frente".
+        est.enqueue(MockResponse().setBody(estFrente()))
+        openWord(est, "/frente")
+        assertThat(ordboken().currentWord?.dict).isEqualTo("EST")
+
+        // Background the app: the word destination's lifecycle goes through
+        // ON_PAUSE, the same transition gap a cross-dictionary navigation uses
+        // on a real device (old dest paused, new dest not yet resumed). The
+        // cross-link hook must survive that pause, otherwise a dictionary tap
+        // in the gap is dropped and the word view keeps the previous dict.
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
+        dle.enqueue(MockResponse().setBody("""["frente|frente"]"""))
+        dle.enqueue(MockResponse().setBody(dleFrente()))
+        onMain { ordboken().setCurrentDictionary("dle") }
+
+        // Back in the foreground, the word must have reloaded in DLE — not
+        // stayed on the EST article under a DLE selection.
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        awaitCondition(timeoutMs = 10_000, message = "word reloads in DLE after the paused-window switch") {
+            val w = ordboken().currentWord
+            w != null && w.dict == "DLE" && w.uri.toString() == dle.url("/frente").toString()
+        }
+    }
+
+    @Test
     fun backWhileSearchIsOpenOnlyCollapsesTheSearchOverlay() {
         awaitNav()
 
