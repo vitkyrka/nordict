@@ -9,5 +9,5 @@ class CollinsSpanishEnglishDictionary(
     override val dictCode: String = "spanish-english"
     override val tag: String = "COLSPAN"
     override val lang: String = "es"
-    override val flag: Int = R.drawable.flag_es
+    override val flagCode: String = "es"
 }

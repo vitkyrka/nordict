@@ -1,7 +1,7 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
-import android.util.Log
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
@@ -11,29 +11,21 @@ abstract class CollinsDictionary(
 ) : Dictionary(client) {
     abstract val dictCode: String
 
-    override fun init() = Unit
-
-    override fun get(uri: Uri): Word? {
-        if (uri.host != Uri.parse(baseUrl).host) {
+    override fun get(uri: HttpUrl): Word? {
+        if (uri.host != baseUrl.toHttpUrlOrNull()!!.host) {
             return null;
         }
 
-        val ref = uri.getQueryParameter(REFPARAM)
+        val ref = uri.queryParameter(REFPARAM)
         val buildUri = if (ref != null) {
-            val builder = uri.buildUpon()
-            builder.clearQuery()
-            uri.queryParameterNames.forEach {
-                if (it != REFPARAM)
-                    builder.appendQueryParameter(it, uri.getQueryParameter(it))
-            }
-            builder.build()
+            uri.withoutRefParam()
         } else {
             uri
         }
 
         val page = fetch(buildUri.toString())
 
-        val words = CollinsParser.parse(page, buildUri.toHttpUrl(), tag, dictCode, baseUrl)
+        val words = CollinsParser.parse(page, buildUri, tag, dictCode, baseUrl)
         if (words.isEmpty()) return null
 
         if (ref != null) {
@@ -52,7 +44,7 @@ abstract class CollinsDictionary(
         val response = client.newCall(request).execute()
 
         if (!response.isSuccessful) {
-            Log.e(NAME, "Unexpected response: " + response.code)
+            log.severe("Unexpected response: " + response.code)
             return ""
         }
 
@@ -60,11 +52,13 @@ abstract class CollinsDictionary(
     }
 
     override fun search(query: String): List<SearchResult> {
-        val uriBuilder = Uri.parse("$baseUrl/autocomplete/").buildUpon()
-        uriBuilder.appendQueryParameter("q", query)
-        uriBuilder.appendQueryParameter("dictCode", dictCode)
+        val base = baseUrl.toHttpUrlOrNull()!!
+        val url = base.resolve("/autocomplete/")!!.newBuilder()!!
+            .addQueryParameter("q", query)
+            .addQueryParameter("dictCode", dictCode)
+            .build()
 
-        val body = fetchBody(uriBuilder.build().toString())
+        val body = fetchBody(url.toString())
         if (body.isEmpty()) return emptyList()
 
         return CollinsParser.parseSearch(body) { title ->
@@ -74,14 +68,17 @@ abstract class CollinsDictionary(
             // to a nonexistent "efectivoencaja" page, which renders a
             // spellcheck page with no parseable entry.
             val slug = title.replace(" ", "-").lowercase()
-            Uri.parse("$baseUrl/dictionary/${dictCode}/${slug}").toHttpUrl()
+            base.newBuilder()!!
+                .addPathSegment("dictionary")
+                .addPathSegment(dictCode)
+                .addPathSegment(slug)
+                .build()
         }
     }
 
     override fun fullSearch(query: String): List<SearchResult> = search(query)
 
     companion object {
-        const val NAME = "Collins"
         const val REFPARAM = "__ref"
     }
 }

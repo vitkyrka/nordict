@@ -9,5 +9,5 @@ class CollinsFrenchEnglishDictionary(
     override val dictCode: String = "french-english"
     override val tag: String = "COLFREN"
     override val lang: String = "fr"
-    override val flag: Int = R.drawable.flag_fr
+    override val flagCode: String = "fr"
 }

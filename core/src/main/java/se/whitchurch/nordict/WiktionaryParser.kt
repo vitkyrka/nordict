@@ -1,7 +1,6 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
-import android.util.Log
+import okhttp3.HttpUrl
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import kotlin.math.max
@@ -32,7 +31,7 @@ class WiktionaryParser {
             li.remove()
         }
 
-        fun parse(page: String, uri: Uri, tag: String, shortName: String): List<Word> {
+        fun parse(page: String, uri: HttpUrl, tag: String, shortName: String): List<Word> {
             val words: ArrayList<Word> = ArrayList()
             val doc = Jsoup.parse(page, "https://${shortName}.m.wiktionary.org")
 
@@ -69,7 +68,6 @@ class WiktionaryParser {
             preserve = true
             element.selectFirst("section")?.children()?.forEach {
                 it.selectFirst("span.mw-headline")?.let { headline ->
-                    Log.i("foo", headline.id())
                     if (headline.id().startsWith("Traductions")) {
                         it.remove()
                         preserve = false
@@ -204,13 +202,13 @@ class WiktionaryParser {
                 val newUri = if (first) {
                     uri
                 } else {
-                    uri.buildUpon().appendQueryParameter("__ref", ref).build()
+                    uri.withQueryParam("__ref", ref)
                 }
 
                 first = false
 
                 val headword = Word(
-                    tag, word, word, summary.toString(), cleanpage, newUri.toHttpUrl(),
+                    tag, word, word, summary.toString(), cleanpage, newUri,
                     "https://${shortName}.m.wiktionary.org/",
                     element,
                     doc.head().html() + "<body>",

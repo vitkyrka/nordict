@@ -1,14 +1,13 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
-import android.util.Log
+import okhttp3.HttpUrl
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 import kotlin.math.max
 
 class LeRobertParser {
     companion object {
-        fun parse(page: String, uri: Uri, tag: String): List<Word> {
+        fun parse(page: String, uri: HttpUrl, tag: String): List<Word> {
             val words: ArrayList<Word> = ArrayList()
             val doc = Jsoup.parse(page, "https://dictionnaire.lerobert.com/")
 
@@ -19,8 +18,6 @@ class LeRobertParser {
 
             main.selectFirst("div.ws-a")?.remove()
 
-            Log.i("foo", cleanpage);
-
             var first = true
             var ref = 0
             main.select("section.def")?.select("div.b")?.forEach lemma@{ lemma ->
@@ -29,13 +26,13 @@ class LeRobertParser {
                 val newUri = if (first) {
                     uri
                 } else {
-                    uri.buildUpon().appendQueryParameter("__ref", ref.toString()).build()
+                    uri.withQueryParam("__ref", ref.toString())
                 }
 
                 first = false
 
                 val headword = Word(
-                    tag, word, word, word.toString(), cleanpage, newUri.toHttpUrl(),
+                    tag, word, word, word.toString(), cleanpage, newUri,
                     "https://dictionnaire.lerobert.com/",
                     main,
                     doc.head().html() + "<body>",

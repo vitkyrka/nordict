@@ -25,13 +25,15 @@ Android app keeps `android.net.Uri` at the UI boundary and converts to
 
 ```
 core/src/                               Shared PURE-JVM parser core (no Android)
-  main/java/...            Word, SearchResult, DleParser, EstParser, CollinsParser,
-                           KeyItemSearchResults, WordJson (golden-schema JSON
-                           mapping), Genders, Pos
-  test/java/...            DleParserTest, EstParserTest, CollinsParserTest
-                           (plain JUnit, no Robolectric), Goldens
+  main/java/...            Word, SearchResult, Dictionary (abstract), all
+                           <Name>Dictionary.kt, <Name>Parser.kt, HttpUrlExt
+                           (URL helpers), Goldens, WordJson, Genders, Pos
+  test/java/...            DleParserTest, EstParserTest, CollinsParserTest, the
+                           moved *IntegrationTest suite (plain JUnit, no
+                           Robolectric), Goldens
 cli/src/main/...                        Desktop CLI (application) using :core
-app/src/main/java/...      Android-only Kotlin (dictionaries, activities, UI)
+app/src/main/java/...      Android-only Kotlin (Ordboken registry, activities,
+                           UI, Flags.kt — the flagCode → R.drawable mapping)
 app/src/main/assets/        WebView assets (HTML/JS/CSS/jquery)
 app/src/test/java/...      Robolectric unit + MockWebServer tests
 app/src/test/js/            Jest tests + CLI for the JS renderer
@@ -42,9 +44,20 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
 
 ## Core architecture
 
-- **`Dictionary.kt`** — interface for a dictionary (`tag`, `lang`,
-  `search(query)`, `get(uri)`). Concrete impls are named `<Name>Dictionary.kt`
-  (e.g. `EstDictionary`, `DleDictionary`, `DdoDictionary`).
+- **`Dictionary.kt`** — abstract base class for a dictionary in `:core`
+  (`tag`, `lang`, `flagCode` — a JVM-neutral `"se"`/`"dk"`/`"sedk"`/`"es"`/
+  `"ca"`/`"pt"`/`"fr"` key, NOT a `R.drawable`), `search(query)`,
+  `fullSearch(query)`, `get(uri: HttpUrl)`, a `java.util.logging.Logger` (`log`,
+  lazy — the `tag` override isn't initialized when the base constructor runs)
+  and `fetch(pageUrl)`. Concrete impls are named `<Name>Dictionary.kt` (e.g.
+  `EstDictionary`, `DleDictionary`, `DdoDictionary`) and all live in `:core`;
+  they take `okhttp3.OkHttpClient` and return/take `okhttp3.HttpUrl` so they
+  run on a desktop JVM. The Android app keeps `android.net.Uri` at the UI
+  boundary (see `HttpUrlBridge`) and maps `flagCode` → drawable via
+  `Flags.kt`/`Ordboken.get`. The DLE, EST, Collins (sp/en + fr/en),
+  diccionari.cat family, Linguee, Infopedia, Le Robert, and Wiktionary
+  dictionaries take an optional `baseUrl`; SO/DDO/SDO use the client and hard-
+  coded hosts. The word cache in `Ordboken` is keyed on `HttpUrl`.
 - **`Ordboken.kt`** — dictionary registry (`dictMap` keyed by `tag`), the app
   entry point for lookups (`getWord(uri)`, cached, probes every dictionary; and
   `search(query, count)`, cached per `currentIndex`), and the persisted
@@ -134,9 +147,18 @@ dumps the shared JSON schema (identical to `testdata/{dle,est,colspan}/*.json`):
 ./gradlew :cli:run --args="frente"                                  # default dict DLE: dle.rae.es/frente
 ./gradlew :cli:run --args="est frente"                              # RAE Diccionario del estudiante
 ./gradlew :cli:run --args="colspan frente"                          # Collins Spanish-English
+./gradlew :cli:run --args="colfren table"                           # Collins French-English
 ./gradlew :cli:run --args="gdlc cap"                                # GDLC (diccionari.cat, monolingual Catalan)
 ./gradlew :cli:run --args="ca-es taula"                             # català-castellà (diccionari.cat)
 ./gradlew :cli:run --args="ca-en taula --search"                    # català-anglès autocomplete
+./gradlew :cli:run --args="wfr table"                               # French Wiktionary
+./gradlew :cli:run --args="lingpt mesa"                             # Linguee pt-en
+./gradlew :cli:run --args="infopedia mesa"                          # Infopédia pt
+./gradlew :cli:run --args="rob table"                               # Le Robert fr
+./gradlew :cli:run --args="so hus"                                  # SO is search-first (no headword URL)
+./gradlew :cli:run --args="so hus --search"                         # ... so list entries, then --url <result>
+./gradlew :cli:run --args="sdo hus --search"                        # Svensk ordbok (search-first)
+./gradlew :cli:run --args="ddo hus --search"                        # Den Danske Ordbog (search-first)
 ./gradlew :cli:run --args="frente --search"                         # search results (default DLE)
 ./gradlew :cli:run --args="est frente --search"                     # search via a dictionary
 ./gradlew :cli:run --args="--dict colspan --search --file ../testdata/colspan-search.json"  # offline search
@@ -146,7 +168,12 @@ dumps the shared JSON schema (identical to `testdata/{dle,est,colspan}/*.json`):
 ```
 
 Positional first arg selects the dict (default `dle`; aliases: `est`,
-`colspan`/`col`, `gdlc`, `ca-es`, `ca-en`); `--dict <name>` also works. Collins
+`colspan`/`col`, `colfren`, `so`, `sdo`, `ddo`, `lingpt`, `infopedia`, `rob`,
+`wfr`, `gdlc`, `ca-es`, `ca-en`); `--dict <name>` also works. The search-first
+dictionaries (`so`, `sdo`, `ddo`, and `rob`) have no word URL from a headword,
+so a bare `<word>` errors with guidance: list entries with `--search` and open
+one with `--url <result>`, or `--file` a local page (supply `--url` as the
+parse base when the dict is search-first). Collins
 slugs turn spaces into hyphens (`colspan ley de la gravedad`). `--search` dumps
 search-result JSON (an array of `{mTitle, mSummary, uri}`) from the dictionary's
 autocomplete endpoint (DLE/EST `srv/keys`, Collins `autocomplete/`,
@@ -210,12 +237,16 @@ only lands on home ("left the word view") when popping the last word.
 destroy of a finished activity, since destroy callbacks run after the activity
 below has already resumed).
 
-### Kotlin unit tests (Robolectric)
+### Kotlin unit tests
+
+The parser and dictionary integration tests now all run in `:core` as plain
+JUnit against a MockWebServer (no Robolectric, no Android):
 
 ```sh
-./gradlew testDebugUnitTest                              # all
-./gradlew testDebugUnitTest --tests 'se.whitchurch.nordict.EstIntegrationTest'
-./gradlew testDebugUnitTest --tests 'se.whitchurch.nordict.DleIntegrationTest'
+./gradlew :core:test                                          # all core tests
+./gradlew :core:test --tests 'se.whitchurch.nordict.EstIntegrationTest'
+./gradlew :core:test --tests 'se.whitchurch.nordict.DleIntegrationTest'
+./gradlew testDebugUnitTest --tests 'se.whitchurch.nordict.AppDriverTest'   # app-side Robolectric tests
 ```
 
 The parser tests (`DleParserTest`, `EstParserTest`, `CollinsParserTest`) all
@@ -389,9 +420,11 @@ JUnit), `DiccionariIntegrationTest` (`app`, Robolectric + MockWebServer).
 - All Kotlin source is in one package, `se.whitchurch.nordict`, in both
   `main` and `test`.
 - Unit tests use Robolectric (`@RunWith(RobolectricTestRunner::class)`,
-  `@Config(sdk = [28])`) because Android classes (e.g. `Uri`) are involved.
-  The shared `:core` tests (e.g. `DleParserTest`, `EstParserTest`,
-  `CollinsParserTest`) are plain JUnit and run on a desktop JVM.
+  `@Config(sdk = [28])`) when Android classes (e.g. `Uri`) are involved.
+  The shared `:core` tests — `DleParserTest`, `EstParserTest`,
+  `CollinsParserTest`, `DiccionariParserTest`, and the moved
+  `{Est,Dle,Collins,Didac,Diccionari}IntegrationTest` suites (MockWebServer) —
+  are plain JUnit and run on a desktop JVM.
 - `Word` fields are read by `renderer.js` by exact JSON name; renaming fields
   in `Word.kt` requires updating the golden-schema data classes in
   `core/.../WordJson.kt`, the `testdata/{dle,est,colspan}/` fixtures, and

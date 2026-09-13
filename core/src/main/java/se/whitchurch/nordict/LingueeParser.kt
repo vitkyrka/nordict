@@ -1,11 +1,12 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.jsoup.Jsoup
 
 class LingueeParser {
     companion object {
-        fun parse(page: String, uri: Uri, tag: String): List<Word> {
+        fun parse(page: String, uri: HttpUrl, tag: String): List<Word> {
             val words: ArrayList<Word> = ArrayList()
             val doc = Jsoup.parse(page)
 
@@ -23,7 +24,7 @@ class LingueeParser {
                 val newUri = if (first) {
                     uri
                 } else {
-                    uri.buildUpon().appendQueryParameter("__ref", ref.toString()).build()
+                    uri.withQueryParam("__ref", ref.toString())
                 }
 
                 first = false
@@ -57,7 +58,7 @@ class LingueeParser {
                 summary.append(" $meanings")
 
                 val headword = Word(
-                    tag, word, word, summary.toString(), page, newUri.toHttpUrl(),
+                    tag, word, word, summary.toString(), page, newUri,
                     "https://www.linguee.pt/",
                     doc,
                     "",
@@ -97,17 +98,14 @@ class LingueeParser {
             return words
         }
 
-        fun parseSearch(page: String, uri: Uri): List<SearchResult> {
+        fun parseSearch(page: String, uri: HttpUrl): List<SearchResult> {
             val results = ArrayList<SearchResult>()
             val doc = Jsoup.parse(page, uri.toString())
 
             doc.select(".main_item").forEach {
-                results.add(
-                    SearchResult(
-                        it.text(),
-                        Uri.parse("https://www.linguee.pt" + it.attr("href")).toHttpUrl()
-                    )
-                )
+                ("https://www.linguee.pt" + it.attr("href")).toHttpUrlOrNull()?.let { url ->
+                    results.add(SearchResult(it.text(), url))
+                }
             }
 
             return results;

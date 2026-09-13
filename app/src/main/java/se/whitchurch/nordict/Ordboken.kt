@@ -13,6 +13,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import okhttp3.Cache
 import okhttp3.CacheControl
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import java.util.concurrent.TimeUnit
 
@@ -45,7 +46,7 @@ class Ordboken private constructor(
     private var flags: Array<Int>
     private var languages: Array<String> = emptyArray()
     private var languageFlags: Map<String, Int> = emptyMap()
-    private val mCache: LruCache<Uri, Word> = LruCache(25)
+    private val mCache: LruCache<HttpUrl, Word> = LruCache(25)
     private val mSearchResultCache: LruCache<Pair<String, Int>, List<SearchResult>> = LruCache(25)
 
     val isOnline: Boolean
@@ -93,8 +94,7 @@ class Ordboken private constructor(
         mConnMgr = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
         dictionaries = testDictionaries ?: defaultDictionaries()
-        dictionaries.forEach { it.init() }
-        flags = dictionaries.map { it.flag }.toTypedArray()
+        flags = dictionaries.map { flagResId(it.flagCode) }.toTypedArray()
         dictMap = dictionaries.associateBy { it.tag }
 
         val languageList = ArrayList<String>()
@@ -102,7 +102,7 @@ class Ordboken private constructor(
         for (dict in dictionaries) {
             if (dict.lang !in languageList) {
                 languageList.add(dict.lang)
-                languageFlagMap[dict.lang] = dict.flag
+                languageFlagMap[dict.lang] = flagResId(dict.flagCode)
             }
         }
         languages = languageList.toTypedArray()
@@ -133,12 +133,13 @@ class Ordboken private constructor(
     }
 
     fun getWord(uri: Uri): Word? {
-        val word = mCache.get(uri)
+        val httpUrl = uri.toHttpUrl()
+        val word = mCache.get(httpUrl)
         if (word != null) return word
 
         for (dict in dictionaries) {
-            dict.get(uri)?.let {
-                mCache.put(uri, it)
+            dict.get(httpUrl)?.let {
+                mCache.put(httpUrl, it)
                 return it
             }
         }

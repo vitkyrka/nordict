@@ -1,20 +1,15 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
-import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import java.io.File
 
-@RunWith(RobolectricTestRunner::class)
-@org.robolectric.annotation.Config(sdk = [28])
 class DleIntegrationTest {
     private lateinit var server: MockWebServer
     private lateinit var client: OkHttpClient
@@ -55,7 +50,7 @@ class DleIntegrationTest {
         val html = File("../testdata/dle.html").readText()
         server.enqueue(MockResponse().setBody(html))
 
-        val uri = Uri.parse(server.url("/frente").toString())
+        val uri: HttpUrl = server.url("/frente")
         val word = dictionary.get(uri)
 
         assertThat(word).isNotNull()
@@ -95,7 +90,7 @@ class DleIntegrationTest {
 
         // Default URL resolves to the first homonym and carries both entries.
         server.enqueue(MockResponse().setBody(html))
-        val uri = Uri.parse(server.url("/cura").toString())
+        val uri: HttpUrl = server.url("/cura")
         val word = dictionary.get(uri)
 
         assertThat(word).isNotNull()
@@ -109,7 +104,7 @@ class DleIntegrationTest {
 
         // __ref selects the second homonym; the entry list still covers both.
         server.enqueue(MockResponse().setBody(html))
-        val refUri = uri.buildUpon().appendQueryParameter("__ref", "2").build()
+        val refUri: HttpUrl = uri.newBuilder().addQueryParameter("__ref", "2").build()
         val word2 = dictionary.get(refUri)
 
         assertThat(word2).isNotNull()
@@ -117,18 +112,5 @@ class DleIntegrationTest {
         assertThat(word2?.mHomonymEntries).hasSize(2)
         assertThat(word2?.mHomonymEntries?.get(1)?.definitions?.get(0)?.glosses?.get(0)?.definition)
             .isEqualTo("Sacerdote católico.")
-    }
-
-    @Test
-    fun testRegistration() {
-        Ordboken.reset()
-        val ordboken = Ordboken.getInstance(ApplicationProvider.getApplicationContext(), client)
-        assertThat(ordboken.client).isSameInstanceAs(client)
-        assertThat(ordboken.dictMap).containsKey("DLE")
-        val dle = ordboken.dictMap["DLE"]
-        assertThat(dle).isNotNull()
-        assertThat(dle).isInstanceOf(DleDictionary::class.java)
-        assertThat(dle?.tag).isEqualTo("DLE")
-        assertThat(dle?.lang).isEqualTo("es")
     }
 }

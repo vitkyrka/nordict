@@ -1,19 +1,18 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
-import android.util.Log
+import com.google.gson.JsonArray
+import com.google.gson.JsonParser
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONArray
-import org.json.JSONException
 
 class SoDictionary(client: OkHttpClient) : Dictionary(client) {
     override val tag: String = "SO"
-    override val flag: Int = R.drawable.flag_se
+    override val flagCode: String = "se"
     override val lang: String = "se"
-    override fun init() = Unit
 
-    private fun searchApiRequest(requestUrl: String): JSONArray {
+    private fun searchApiRequest(requestUrl: String): JsonArray {
         val request = Request.Builder().url(requestUrl)
             // Server uses Referer to determine whether to link to so/ or tre/
             .addHeader("Referer", "https://svenska.se/so/")
@@ -21,33 +20,37 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
         val response = client.newCall(request).execute()
 
         if (!response.isSuccessful) {
-            Log.e("SO", "Unexpected response: " + response.code)
-            return JSONArray()
+            log.severe("Unexpected response: " + response.code)
+            return JsonArray()
         }
 
-        val body = response.body?.string() ?: return JSONArray()
+        val body = response.body?.string() ?: return JsonArray()
 
-        return JSONArray(body)
+        return try {
+            JsonParser.parseString(body).asJsonArray
+        } catch (e: Exception) {
+            JsonArray()
+        }
     }
 
     override fun search(query: String): List<SearchResult> {
-        val uriBuilder = Uri.parse("https://svenska.se/wp-admin/admin-ajax.php").buildUpon()
-
-        uriBuilder.appendQueryParameter("action", "tri_autocomplete")
-        uriBuilder.appendQueryParameter("term", query)
+        val url = HttpUrl.Builder()
+            .scheme("https")
+            .host("svenska.se")
+            .addPathSegments("wp-admin/admin-ajax.php")
+            .addQueryParameter("action", "tri_autocomplete")
+            .addQueryParameter("term", query)
+            .build()
 
         val results = ArrayList<SearchResult>()
 
-        try {
-            val words = searchApiRequest(uriBuilder.build().toString())
-
-            for (i in 0 until words.length()) {
-                val word = words.getJSONObject(i)
-                val label = word.getString("label")
-                val link = word.getString("link")
-                results.add(SearchResult(label, Uri.parse("https://svenska.se/$link").toHttpUrl()))
-            }
-        } catch (e: JSONException) {
+        val words = searchApiRequest(url.toString())
+        for (el in words) {
+            if (!el.isJsonObject) continue
+            val obj = el.asJsonObject
+            val label = obj.get("label")?.takeIf { it.isJsonPrimitive }?.asString ?: continue
+            val link = obj.get("link")?.takeIf { it.isJsonPrimitive }?.asString ?: continue
+            results.add(SearchResult(label, "https://svenska.se/$link".toHttpUrlOrNull() ?: continue))
         }
 
         return results
@@ -55,7 +58,7 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
 
     override fun fullSearch(query: String): List<SearchResult> = search(query)
 
-    override fun get(uri: Uri): Word? {
+    override fun get(uri: HttpUrl): Word? {
         if (uri.host != "svenska.se") {
             return null
         }
@@ -81,11 +84,11 @@ class SoDictionary(client: OkHttpClient) : Dictionary(client) {
             return get(urls[0])
         }
 
-        val ref = uri.getQueryParameter("ref") ?: return words[0]
+        val ref = uri.queryParameter("ref") ?: return words[0]
 
         val candidates = words.filter { ref in it.xrefs }
         if (candidates.isEmpty()) {
-            Log.i("nordict", "no candidates for xref")
+            log.fine("no candidates for xref")
             return words[0]
         }
 

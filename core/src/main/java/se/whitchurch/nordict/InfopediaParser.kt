@@ -1,12 +1,13 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.jsoup.Jsoup
 
 class InfopediaParser {
     companion object {
 
-        fun parse(page: String, uri: Uri, tag: String): List<Word> {
+        fun parse(page: String, uri: HttpUrl, tag: String): List<Word> {
             val words: ArrayList<Word> = ArrayList()
             val doc = Jsoup.parse(page)
 
@@ -35,7 +36,7 @@ class InfopediaParser {
                 val newUri = if (first) {
                     uri
                 } else {
-                    uri.buildUpon().appendQueryParameter("__ref", ref.toString()).build()
+                    uri.withQueryParam("__ref", ref.toString())
                 }
 
                 first = false
@@ -43,36 +44,8 @@ class InfopediaParser {
                 val word = lemma.selectFirst(".dolEntrinfoEntrada")?.text() ?: return@forEach
                 val summary = StringBuilder(word)
 
-//                val taglemma = lemma.selectFirst("span.tag_lemma") ?: return@forEach;
-//                val word = taglemma.select("a.dictLink").map { it.text() }.joinToString(" ")
-//                val summary = StringBuilder(word)
-//
-//                val type = lemma.selectFirst(".tag_wordtype")?.text() ?: ""
-//                if (type.isNotEmpty()) {
-//                    summary.append(" ($type)")
-//
-//                    if (type.contains("subst")) {
-//                        if (type.contains("plural")) {
-//                            lemma.addClass("plural")
-//                        } else {
-//                            lemma.addClass("singular")
-//                        }
-//                        if (type.contains("masculino")) {
-//                            lemma.addClass("masculine")
-//                        } else if (type.contains("feminino")) {
-//                            lemma.addClass("feminine")
-//                        }
-//                    }
-//                }
-//
-//                val meanings =
-//                    lemma.select("div.translation.featured span.tag_trans a.dictLink")
-//                        .joinToString("; ") { it.text() }
-//
-//                summary.append(" $meanings")
-
                 val headword = Word(
-                    tag, word, word, summary.toString(), page, newUri.toHttpUrl(),
+                    tag, word, word, summary.toString(), page, newUri,
                     "https://www.infopedia.pt/",
                     doc,
                     "",
@@ -86,21 +59,6 @@ class InfopediaParser {
                     headword.definitions.add(def)
                     el.remove()
                 }
-
-//
-//                lemma.select(".example .tag_s").forEach {
-//                    definition.examples.add(it.text())
-//                }
-//
-//                lemma.select("a.audio").forEach {
-//                    val id = it.attr("id")
-//
-//                    if (!id.startsWith("PT_PT")) {
-//                        return@forEach
-//                    }
-//
-//                    headword.audio.add("https://www.linguee.pt/mp3/$id.mp3")
-//                }
 
                 lemma.remove()
                 words.add(headword)
@@ -119,11 +77,13 @@ class InfopediaParser {
 
         fun parseSearch(page: String): List<SearchResult> {
             val doc = Jsoup.parse(page)
-            val base = Uri.parse("https://www.infopedia.pt/dicionarios/lingua-portuguesa/")
+            val base = "https://www.infopedia.pt/dicionarios/lingua-portuguesa/"
+                .toHttpUrlOrNull()!!
 
-            return doc.select("li").map {
+            return doc.select("li").mapNotNull {
                 val title = it.attr("title")
-                SearchResult(title, base.buildUpon().appendEncodedPath(title).build().toHttpUrl())
+                if (title.isEmpty()) null
+                else SearchResult(title, base.newBuilder()!!.addPathSegment(title).build())
             }
         }
     }

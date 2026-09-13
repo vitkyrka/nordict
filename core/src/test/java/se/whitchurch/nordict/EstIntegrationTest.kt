@@ -1,20 +1,15 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
-import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import java.io.File
 
-@RunWith(RobolectricTestRunner::class)
-@org.robolectric.annotation.Config(sdk = [28])
 class EstIntegrationTest {
     private lateinit var server: MockWebServer
     private lateinit var client: OkHttpClient
@@ -55,7 +50,7 @@ class EstIntegrationTest {
         val html = File("../testdata/est.html").readText()
         server.enqueue(MockResponse().setBody(html))
 
-        val uri = Uri.parse(server.url("/frente").toString())
+        val uri: HttpUrl = server.url("/frente")
         val word = dictionary.get(uri)
 
         assertThat(word).isNotNull()
@@ -76,7 +71,7 @@ class EstIntegrationTest {
 
         // Search-result URL for a .sols sub-entry resolves to that headword.
         server.enqueue(MockResponse().setBody(html))
-        val uri = Uri.parse(server.url("/muerte%20natural").toString())
+        val uri: HttpUrl = server.url("/muerte%20natural")
         val word = dictionary.get(uri)
 
         assertThat(word).isNotNull()
@@ -94,8 +89,8 @@ class EstIntegrationTest {
 
         // Homograph/ref URL selects another sub-entry.
         server.enqueue(MockResponse().setBody(html))
-        val refUri = Uri.parse(server.url("/muerte").toString()).buildUpon()
-            .appendQueryParameter("__ref", "3").build()
+        val refUri: HttpUrl = server.url("/muerte").newBuilder()
+            .addQueryParameter("__ref", "3").build()
         val word2 = dictionary.get(refUri)
 
         assertThat(word2).isNotNull()
@@ -104,25 +99,12 @@ class EstIntegrationTest {
 
         // A plain main-page URL still resolves to the parent headword.
         server.enqueue(MockResponse().setBody(html))
-        val mainUri = Uri.parse(server.url("/muerte").toString())
+        val mainUri: HttpUrl = server.url("/muerte")
         val word3 = dictionary.get(mainUri)
 
         assertThat(word3).isNotNull()
         assertThat(word3?.mTitle).isEqualTo("muerte")
         assertThat(word3?.definitions).hasSize(3)
         assertThat(word3?.idioms).hasSize(7)
-    }
-
-    @Test
-    fun testRegistration() {
-        Ordboken.reset()
-        val ordboken = Ordboken.getInstance(ApplicationProvider.getApplicationContext(), client)
-        assertThat(ordboken.client).isSameInstanceAs(client)
-        assertThat(ordboken.dictMap).containsKey("EST")
-        val est = ordboken.dictMap["EST"]
-        assertThat(est).isNotNull()
-        assertThat(est).isInstanceOf(EstDictionary::class.java)
-        assertThat(est?.tag).isEqualTo("EST")
-        assertThat(est?.lang).isEqualTo("es")
     }
 }

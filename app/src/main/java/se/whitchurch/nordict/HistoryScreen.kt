@@ -175,7 +175,7 @@ fun WordRowItem(
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val flag = ordboken.dictMap[row.dict]?.flag ?: R.drawable.flag_se
+        val flag = ordboken.dictMap[row.dict]?.flagCode?.let(::flagResId) ?: R.drawable.flag_se
         Image(
             painter = painterResource(flag),
             contentDescription = null,

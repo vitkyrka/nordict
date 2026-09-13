@@ -14,7 +14,7 @@ data class Dict(
     val aliases: List<String>,
     val tag: String,
     val lang: String,
-    val wordUrl: (String) -> HttpUrl,
+    val wordUrl: ((String) -> HttpUrl)?,
     val searchUrl: (String) -> HttpUrl,
     val parse: (page: String, uri: HttpUrl) -> List<Word>,
     val searchResults: (body: String) -> List<SearchResult>

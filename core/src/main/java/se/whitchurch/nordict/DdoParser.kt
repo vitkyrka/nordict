@@ -1,6 +1,6 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
+import okhttp3.HttpUrl
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
@@ -50,7 +50,7 @@ class DdoParser {
             }
         }
 
-        fun parse(page: String, uri: Uri, tag: String = "foo"): Word? {
+        fun parse(page: String, uri: HttpUrl, tag: String = "foo"): Word? {
             val doc = Jsoup.parse(page, "https://ordnet.dk/ddo/")
 
             val match = doc.selectFirst(".match") ?: return null
@@ -78,7 +78,7 @@ class DdoParser {
             }
 
             val headword = Word(
-                tag, word, word, summary.toString(), cleanpage, uri.toHttpUrl(),
+                tag, word, word, summary.toString(), cleanpage, uri,
                 "https://ordnet.dk/ddo/", element,
                 doc.head().html() + "<body>"
             )

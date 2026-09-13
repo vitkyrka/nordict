@@ -1,15 +1,14 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
-import android.util.Log
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
 class DidacDictionary(client: OkHttpClient, private val baseUrl: String = "https://www.diccionari.cat") : Dictionary(client) {
     override val tag: String = "DIDAC"
-    override val flag: Int = R.drawable.flag_ca
+    override val flagCode: String = "ca"
     override val lang: String = "ca"
-    override fun init() = Unit
 
     private fun fetchJson(requestUrl: String): String {
         val request = Request.Builder().url(requestUrl)
@@ -18,7 +17,7 @@ class DidacDictionary(client: OkHttpClient, private val baseUrl: String = "https
         val response = client.newCall(request).execute()
 
         if (!response.isSuccessful) {
-            Log.e(NAME, "Unexpected response: " + response.code)
+            log.severe("Unexpected response: " + response.code)
             return ""
         }
 
@@ -26,60 +25,58 @@ class DidacDictionary(client: OkHttpClient, private val baseUrl: String = "https
     }
 
     override fun search(query: String): List<SearchResult> {
-        val uriBuilder = Uri.parse("$baseUrl/search_api_autocomplete/didac")
-            .buildUpon()
-            .appendQueryParameter("display", "page_1")
-            .appendQueryParameter("filter", "search_api_fulltext_cust")
-            .appendQueryParameter("q", query)
+        val url = baseUrl.toHttpUrlOrNull()!!
+            .newBuilder()!!
+            .addPathSegments("search_api_autocomplete/didac")
+            .addQueryParameter("display", "page_1")
+            .addQueryParameter("filter", "search_api_fulltext_cust")
+            .addQueryParameter("q", query)
+            .build()
 
-        val body = fetchJson(uriBuilder.build().toString())
+        val body = fetchJson(url.toString())
         if (body.isEmpty()) return emptyList()
 
         // The autocomplete payload carries entry paths ("/didac/cap1") and
         // bare completion words ("rebutjar" from "rebutja"); both resolve
         // against the base site.
         return DidacParser.parseSearch(body) { path ->
-            Uri.parse("$baseUrl$path").toHttpUrl()
+            "$baseUrl$path".toHttpUrlOrNull()!!
         }
     }
 
     override fun fullSearch(query: String): List<SearchResult> {
         // DIDAC has no isolated word URL: the search view embeds every
         // matching entry inline, so a full search is a full word-page fetch.
-        val uriBuilder = Uri.parse("$baseUrl/cerca/didac")
-            .buildUpon()
-            .appendQueryParameter("search_api_fulltext_cust", query)
-            .appendQueryParameter("show", "title")
+        val pageUri = baseUrl.toHttpUrlOrNull()!!
+            .newBuilder()!!
+            .addPathSegments("cerca/didac")
+            .addQueryParameter("search_api_fulltext_cust", query)
+            .addQueryParameter("show", "title")
+            .build()
 
-        val pageUri = uriBuilder.build()
         val page = fetch(pageUri.toString())
         if (page.isEmpty()) return emptyList()
 
-        return DidacParser.parse(page, pageUri.toHttpUrl(), tag).map { word ->
+        return DidacParser.parse(page, pageUri, tag).map { word ->
             val summary = word.definitions.firstOrNull()?.glosses?.firstOrNull()?.definition
                 ?: ""
             SearchResult(word.mTitle, summary, word.uri)
         }
     }
 
-    override fun get(uri: Uri): Word? {
-        if (uri.host != Uri.parse(baseUrl).host) {
+    override fun get(uri: HttpUrl): Word? {
+        val base = baseUrl.toHttpUrlOrNull()!!
+        if (uri.host != base.host) {
             return null
         }
 
-        val builder = uri.buildUpon()
-        builder.clearQuery()
-        uri.queryParameterNames.forEach {
-            if (it != REFPARAM)
-                builder.appendQueryParameter(it, uri.getQueryParameter(it))
-        }
-        val newUri = builder.build()
+        val newUri = uri.withoutRefParam()
         val page = fetch(newUri.toString())
 
-        val words = DidacParser.parse(page, newUri.toHttpUrl(), tag)
+        val words = DidacParser.parse(page, newUri, tag)
         if (words.isEmpty()) return null
 
-        val ref = uri.getQueryParameter(REFPARAM)
+        val ref = uri.queryParameter(REFPARAM)
         if (ref != null) {
             val candidates = words.filter { ref in it.xrefs }
             if (candidates.isEmpty()) {
@@ -92,7 +89,7 @@ class DidacDictionary(client: OkHttpClient, private val baseUrl: String = "https
         // from the same page as its plain homographs "cap") or at a numbered
         // homograph ("cap1"). Resolve the requested headword from the URL
         // instead of always returning the first word.
-        val wanted = uri.lastPathSegment
+        val wanted = uri.pathSegments.lastOrNull()
         if (wanted != null) {
             val wantedSlug = wanted.replace(" ", "-").lowercase()
             words.firstOrNull {
@@ -107,7 +104,6 @@ class DidacDictionary(client: OkHttpClient, private val baseUrl: String = "https
     private fun slugify(title: String): String = title.trim().replace(" ", "-").lowercase()
 
     companion object {
-        const val NAME = "DIDAC"
         const val REFPARAM = "__ref"
     }
 }

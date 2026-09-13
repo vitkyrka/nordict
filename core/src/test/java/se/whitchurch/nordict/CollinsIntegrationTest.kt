@@ -1,19 +1,15 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
 import com.google.common.truth.Truth.assertThat
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import java.io.File
 
-@RunWith(RobolectricTestRunner::class)
-@org.robolectric.annotation.Config(sdk = [28])
 class CollinsIntegrationTest {
     private lateinit var server: MockWebServer
     private lateinit var client: OkHttpClient
@@ -62,7 +58,7 @@ class CollinsIntegrationTest {
         val html = File("../testdata/colspan/morir.html").readText()
         server.enqueue(MockResponse().setBody(html))
 
-        val uri = Uri.parse("$baseUrl/dictionary/spanish-english/morir")
+        val uri: HttpUrl = server.url("/dictionary/spanish-english/morir")
         val word = dictionary.get(uri)
 
         assertThat(word).isNotNull()
@@ -84,7 +80,7 @@ class CollinsIntegrationTest {
 
         // Default (no __ref) -> main dictionary headword.
         server.enqueue(MockResponse().setBody(html))
-        val mainUri = Uri.parse("$baseUrl/dictionary/spanish-english/frente")
+        val mainUri: HttpUrl = server.url("/dictionary/spanish-english/frente")
         val main = dictionary.get(mainUri)
         assertThat(main).isNotNull()
         assertThat(main?.mTitle).isEqualTo("frente")
@@ -96,8 +92,8 @@ class CollinsIntegrationTest {
 
         // __ref=1 -> the first easy-learning headword.
         server.enqueue(MockResponse().setBody(html))
-        val refUri = Uri.parse("$baseUrl/dictionary/spanish-english/frente").buildUpon()
-            .appendQueryParameter("__ref", "1").build()
+        val refUri: HttpUrl = server.url("/dictionary/spanish-english/frente").newBuilder()
+            .addQueryParameter("__ref", "1").build()
         val easy = dictionary.get(refUri)
         assertThat(easy).isNotNull()
         assertThat(easy?.mTitle).isEqualTo("la frente")
@@ -105,8 +101,8 @@ class CollinsIntegrationTest {
 
         // __ref=2 -> the second easy-learning headword.
         server.enqueue(MockResponse().setBody(html))
-        val refUri2 = Uri.parse("$baseUrl/dictionary/spanish-english/frente").buildUpon()
-            .appendQueryParameter("__ref", "2").build()
+        val refUri2: HttpUrl = server.url("/dictionary/spanish-english/frente").newBuilder()
+            .addQueryParameter("__ref", "2").build()
         val easy2 = dictionary.get(refUri2)
         assertThat(easy2).isNotNull()
         assertThat(easy2?.mTitle).isEqualTo("el frente")
@@ -119,7 +115,7 @@ class CollinsIntegrationTest {
 
         // Default view -> the cross-reference stub headword.
         server.enqueue(MockResponse().setBody(html))
-        val stubUri = Uri.parse("$baseUrl/dictionary/spanish-english/ley-de-la-gravedad")
+        val stubUri: HttpUrl = server.url("/dictionary/spanish-english/ley-de-la-gravedad")
         val stub = dictionary.get(stubUri)
         assertThat(stub).isNotNull()
         assertThat(stub?.mTitle).isEqualTo("ley de la gravedad")
@@ -129,8 +125,8 @@ class CollinsIntegrationTest {
 
         // __ref=2 -> the embedded full "ley" entry.
         server.enqueue(MockResponse().setBody(html))
-        val refUri = Uri.parse("$baseUrl/dictionary/spanish-english/ley-de-la-gravedad").buildUpon()
-            .appendQueryParameter("__ref", "2").build()
+        val refUri: HttpUrl = server.url("/dictionary/spanish-english/ley-de-la-gravedad").newBuilder()
+            .addQueryParameter("__ref", "2").build()
         val ley = dictionary.get(refUri)
         assertThat(ley).isNotNull()
         assertThat(ley?.mTitle).isEqualTo("ley")

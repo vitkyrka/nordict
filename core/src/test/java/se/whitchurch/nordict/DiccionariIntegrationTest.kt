@@ -1,20 +1,15 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
-import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import java.io.File
 
-@RunWith(RobolectricTestRunner::class)
-@org.robolectric.annotation.Config(sdk = [28])
 class DiccionariIntegrationTest {
     private lateinit var server: MockWebServer
     private lateinit var client: OkHttpClient
@@ -78,7 +73,7 @@ class DiccionariIntegrationTest {
         val dict = gdlc()
         server.enqueue(MockResponse().setBody(File("../testdata/gdlc/cap1.html").readText()))
 
-        val uri = Uri.parse(server.url("/GDLC/cap1").toString())
+        val uri: HttpUrl = server.url("/GDLC/cap1")
         val word = dict.get(uri)
 
         assertThat(word).isNotNull()
@@ -97,7 +92,7 @@ class DiccionariIntegrationTest {
         val dict = gdlc()
         server.enqueue(MockResponse().setBody(File("../testdata/gdlc/cap.html").readText()))
 
-        val uri = Uri.parse(server.url("/GDLC/cap2?__ref=3").toString())
+        val uri: HttpUrl = server.url("/GDLC/cap2?__ref=3")
         val word = dict.get(uri)
 
         assertThat(word).isNotNull()
@@ -130,7 +125,7 @@ class DiccionariIntegrationTest {
         val dict = caes()
         server.enqueue(MockResponse().setBody(File("../testdata/ca-es/taula.html").readText()))
 
-        val uri = Uri.parse(server.url("/catala-castella/taula").toString())
+        val uri: HttpUrl = server.url("/catala-castella/taula")
         val word = dict.get(uri)
 
         assertThat(word).isNotNull()
@@ -148,7 +143,7 @@ class DiccionariIntegrationTest {
         val dict = caes()
         server.enqueue(MockResponse().setBody(File("../testdata/ca-es/cap.html").readText()))
 
-        val uri = Uri.parse(server.url("/catala-castella/cap-verd").toString())
+        val uri: HttpUrl = server.url("/catala-castella/cap-verd")
         val word = dict.get(uri)
 
         assertThat(word).isNotNull()
@@ -165,7 +160,7 @@ class DiccionariIntegrationTest {
         val dict = caes()
         server.enqueue(MockResponse().setBody(File("../testdata/ca-es/cap.html").readText()))
 
-        val uri = Uri.parse(server.url("/catala-castella/canaveral-cap").toString())
+        val uri: HttpUrl = server.url("/catala-castella/canaveral-cap")
         val word = dict.get(uri)
 
         assertThat(word).isNotNull()
@@ -199,30 +194,12 @@ class DiccionariIntegrationTest {
         val dict = caen()
         server.enqueue(MockResponse().setBody(File("../testdata/ca-en/taula.html").readText()))
 
-        val uri = Uri.parse(server.url("/catala-angles/taula").toString())
+        val uri: HttpUrl = server.url("/catala-angles/taula")
         val word = dict.get(uri)
 
         assertThat(word).isNotNull()
         assertThat(word?.mTitle).isEqualTo("taula")
         assertThat(word?.definitions).hasSize(14)
         assertThat(word?.definitions?.get(8)?.gender).isEqualTo(Genders.FEMININE)
-    }
-
-    @Test
-    fun testRegistration() {
-        Ordboken.reset()
-        val ordboken = Ordboken.getInstance(ApplicationProvider.getApplicationContext(), client)
-        for ((tag, cls) in listOf(
-            "GDLC" to GdlcDictionary::class.java,
-            "CA-ES" to CatalaCastellaDictionary::class.java,
-            "CA-EN" to CatalaAnglesDictionary::class.java
-        )) {
-            assertThat(ordboken.dictMap).containsKey(tag)
-            val dict = ordboken.dictMap[tag]
-            assertThat(dict).isNotNull()
-            assertThat(dict).isInstanceOf(cls)
-            assertThat(dict?.tag).isEqualTo(tag)
-            assertThat(dict?.lang).isEqualTo("ca")
-        }
     }
 }

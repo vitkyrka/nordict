@@ -1,52 +1,51 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
+import com.google.gson.JsonParser
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
-import org.json.JSONObject
 
 class InfopediaDictionary(client: OkHttpClient) : Dictionary(client) {
     override val tag: String = "INFOPEDIA"
-    override val flag: Int = R.drawable.flag_pt
+    override val flagCode: String = "pt"
     override val lang: String = "pt"
-    override fun init() = Unit
 
     override fun search(query: String): List<SearchResult> {
-        val uriBuilder =
-            Uri.parse("https://www.infopedia.pt/dicionarios/lingua-portuguesa/sugestao-pesquisa/").buildUpon()
+        val uri = HttpUrl.Builder()
+            .scheme("https")
+            .host("www.infopedia.pt")
+            .addPathSegments("dicionarios/lingua-portuguesa/sugestao-pesquisa")
+            .addPathSegment(query)
+            .build()
 
-        uriBuilder.appendEncodedPath(query)
-
-        val page = fetch(uriBuilder.build().toString())
+        val page = fetch(uri.toString())
         if (page.isEmpty()) {
             return ArrayList();
         }
 
-        val obj = JSONObject(page)
-        val html = obj.getString("html")
+        val html = try {
+            JsonParser.parseString(page).asJsonObject.get("html")?.asString
+        } catch (e: Exception) {
+            null
+        } ?: return ArrayList()
 
         return InfopediaParser.parseSearch(html)
     }
 
     override fun fullSearch(query: String): List<SearchResult> = search(query)
 
-    override fun get(uri: Uri): Word? {
+    override fun get(uri: HttpUrl): Word? {
         if (uri.host != "www.infopedia.pt") {
             return null
         }
 
-        val builder = uri.buildUpon()
-        builder.clearQuery()
-        uri.queryParameterNames.forEach {
-            if (it != REFPARAM)
-                builder.appendQueryParameter(it, uri.getQueryParameter(it))
-        }
-        val newUri = builder.build()
+        val newUri = uri.withoutRefParam()
         val page = fetch(newUri.toString())
 
         val words = InfopediaParser.parse(page, newUri, tag)
         if (words.isEmpty()) return null
 
-        val ref = uri.getQueryParameter(REFPARAM) ?: return words[0]
+        val ref = uri.queryParameter(REFPARAM) ?: return words[0]
 
         val candidates = words.filter { ref in it.xrefs }
         if (candidates.isEmpty()) {

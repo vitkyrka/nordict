@@ -1,6 +1,7 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
@@ -123,13 +124,20 @@ class SoParser {
             return obj
         }
 
-        fun parseDisambiguation(page: String): List<Uri> {
-            val urls: ArrayList<Uri> = ArrayList()
+        /** Reads a query parameter out of a bare `?id=…&ref=…` href attribute. */
+        private fun queryParam(href: String, name: String): String? =
+            href.substringAfter('?', "")
+                .split('&')
+                .mapNotNull { part -> part.split('=', limit = 2).takeIf { it.size == 2 } }
+                .firstOrNull { it[0] == name }?.get(1)
+
+        fun parseDisambiguation(page: String): List<HttpUrl> {
+            val urls: ArrayList<HttpUrl> = ArrayList()
             val doc = Jsoup.parse(page, "https://svenska.se/so/")
             val element = doc.select(".artikel").first()
 
             element.select("a.slank")?.forEach {
-                urls.add(Uri.parse("https://svenska.se" + it.attr("href")))
+                ("https://svenska.se" + it.attr("href")).toHttpUrlOrNull()?.let(urls::add)
             }
 
             return urls
@@ -146,8 +154,7 @@ class SoParser {
 
             val selfUrl = doc.select(".gold").first().parent().attr("href")
                 ?: return words
-            val uri = Uri.parse(selfUrl)
-            val id = uri.getQueryParameter("id") ?: return words
+            val id = queryParam(selfUrl, "id") ?: return words
 
             doc.select(".superlemma")?.forEach lemma@{ lemma ->
                 val xrefs = ArrayList<String>()
@@ -198,9 +205,16 @@ class SoParser {
                     audio.add(url)
                 }
 
+                val wordUri = HttpUrl.Builder()
+                    .scheme("https")
+                    .host("svenska.se")
+                    .addPathSegment("so")
+                    .addQueryParameter("id", id)
+                    .addQueryParameter("ref", xrefs[0])
+                    .build()
+
                 val headword = Word(
-                    tag, word, word, summary.toString(), cleanpage,
-                    Uri.parse("https://svenska.se/so/?id=$id&ref=${xrefs[0]}").toHttpUrl(),
+                    tag, word, word, summary.toString(), cleanpage, wordUri,
                     // Required to avoid CORS errors in getCSS
                     "file://",
                     element, header, lemma

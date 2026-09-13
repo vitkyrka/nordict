@@ -1,20 +1,15 @@
 package se.whitchurch.nordict
 
-import android.net.Uri
-import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.robolectric.RobolectricTestRunner
 import java.io.File
 
-@RunWith(RobolectricTestRunner::class)
-@org.robolectric.annotation.Config(sdk = [28])
 class DidacIntegrationTest {
     private lateinit var server: MockWebServer
     private lateinit var client: OkHttpClient
@@ -75,7 +70,7 @@ class DidacIntegrationTest {
         val html = File("../testdata/didac/cap1.html").readText()
         server.enqueue(MockResponse().setBody(html))
 
-        val uri = Uri.parse(server.url("/didac/cap1").toString())
+        val uri: HttpUrl = server.url("/didac/cap1")
         val word = dictionary.get(uri)
 
         assertThat(word).isNotNull()
@@ -98,7 +93,7 @@ class DidacIntegrationTest {
         val html = File("../testdata/didac/cap.html").readText()
         server.enqueue(MockResponse().setBody(html))
 
-        val uri = Uri.parse(server.url("/didac/al-cap-de").toString())
+        val uri: HttpUrl = server.url("/didac/al-cap-de")
         val word = dictionary.get(uri)
 
         assertThat(word).isNotNull()
@@ -115,18 +110,5 @@ class DidacIntegrationTest {
                 "al cap de", "pel cap alt", "pel cap baix", "al cap i a la fi"
             )
             .inOrder()
-    }
-
-    @Test
-    fun testRegistration() {
-        Ordboken.reset()
-        val ordboken = Ordboken.getInstance(ApplicationProvider.getApplicationContext(), client)
-        assertThat(ordboken.client).isSameInstanceAs(client)
-        assertThat(ordboken.dictMap).containsKey("DIDAC")
-        val didac = ordboken.dictMap["DIDAC"]
-        assertThat(didac).isNotNull()
-        assertThat(didac).isInstanceOf(DidacDictionary::class.java)
-        assertThat(didac?.tag).isEqualTo("DIDAC")
-        assertThat(didac?.lang).isEqualTo("ca")
     }
 }

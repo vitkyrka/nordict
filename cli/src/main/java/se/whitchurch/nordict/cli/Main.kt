@@ -1,14 +1,23 @@
 package se.whitchurch.nordict.cli
 
+import com.google.gson.JsonParser
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.jsoup.Jsoup
 import se.whitchurch.nordict.CollinsParser
+import se.whitchurch.nordict.DdoParser
 import se.whitchurch.nordict.DiccionariParser
 import se.whitchurch.nordict.DidacParser
 import se.whitchurch.nordict.DleParser
 import se.whitchurch.nordict.EstParser
+import se.whitchurch.nordict.InfopediaParser
+import se.whitchurch.nordict.LeRobertParser
+import se.whitchurch.nordict.LingueeParser
+import se.whitchurch.nordict.SearchResult
+import se.whitchurch.nordict.SoParser
+import se.whitchurch.nordict.WiktionaryParser
 import se.whitchurch.nordict.AgentCommand
 import se.whitchurch.nordict.AgentOps
 import se.whitchurch.nordict.AgentProtocol
@@ -38,9 +47,156 @@ class Main {
     private fun estUrl(word: String): HttpUrl =
         "https://www.rae.es/diccionario-estudiante/$word".toHttpUrlOrNull()!!
 
-    private fun collinsUrl(word: String): HttpUrl =
-        "https://www.collinsdictionary.com/dictionary/spanish-english/${word.replace(" ", "-").lowercase()}"
+    private fun collinsUrl(dictCode: String, word: String): HttpUrl =
+        "https://www.collinsdictionary.com/dictionary/$dictCode/${word.replace(" ", "-").lowercase()}"
             .toHttpUrlOrNull()!!
+
+    private fun collinsAutocomplete(dictCode: String, query: String): HttpUrl =
+        "https://www.collinsdictionary.com/autocomplete/?q=$query&dictCode=$dictCode"
+            .toHttpUrlOrNull()!!
+
+    private fun lingueeUrl(word: String): HttpUrl =
+        "https://www.linguee.pt/portugues-ingles/search"
+            .toHttpUrlOrNull()!!
+            .newBuilder()
+            .addQueryParameter("qe", word)
+            .addQueryParameter("source", "auto")
+            .addQueryParameter("cw", "703")
+            .addQueryParameter("ch", "1332")
+            .build()
+
+    private fun infopediaUrl(word: String): HttpUrl =
+        "https://www.infopedia.pt/dicionarios/lingua-portuguesa/$word".toHttpUrlOrNull()!!
+
+    private fun infopediaSuggestions(query: String): HttpUrl =
+        "https://www.infopedia.pt/dicionarios/lingua-portuguesa/sugestao-pesquisa/$query"
+            .toHttpUrlOrNull()!!
+
+    private fun lerobertUrl(word: String): HttpUrl =
+        "https://dictionnaire.lerobert.com/definition/$word".toHttpUrlOrNull()!!
+
+    private fun lerobertAutocomplete(query: String): HttpUrl =
+        "https://dictionnaire.lerobert.com/autocomplete.json"
+            .toHttpUrlOrNull()!!
+            .newBuilder()
+            .addQueryParameter("q", query)
+            .addQueryParameter("t", "def")
+            .build()
+
+    private fun wiktionaryRest(short: String, query: String): HttpUrl =
+        "https://$short.wiktionary.org/w/rest.php/v1/search/title"
+            .toHttpUrlOrNull()!!
+            .newBuilder()
+            .addQueryParameter("q", query)
+            .addQueryParameter("limit", "10")
+            .build()
+
+    private fun wiktionaryUrl(short: String, word: String): HttpUrl =
+        "https://$short.m.wiktionary.org/wiki/$word".toHttpUrlOrNull()!!
+
+    private fun soAutocomplete(query: String): HttpUrl =
+        "https://svenska.se/wp-admin/admin-ajax.php"
+            .toHttpUrlOrNull()!!
+            .newBuilder()
+            .addQueryParameter("action", "tri_autocomplete")
+            .addQueryParameter("term", query)
+            .build()
+
+    private fun dslLiveSearch(short: String, query: String): HttpUrl =
+        "https://ws.dsl.dk/$short/livesearch"
+            .toHttpUrlOrNull()!!
+            .newBuilder()
+            .addQueryParameter("text", query)
+            .addQueryParameter("size", "50")
+            .build()
+
+    private fun dslEntryUri(short: String, word: String): HttpUrl =
+        "https://ws.dsl.dk/$short/query"
+            .toHttpUrlOrNull()!!
+            .newBuilder()
+            .addQueryParameter("app", "android")
+            .addQueryParameter("version", "2.1.5")
+            .addQueryParameter("q", word)
+            .build()
+
+    // ---- search-response decoders (mirror each Dictionary.search) ----
+
+    private fun soSearchResults(body: String): List<SearchResult> {
+        val results = ArrayList<SearchResult>()
+        val words = try {
+            JsonParser.parseString(body).asJsonArray
+        } catch (e: Exception) {
+            return results
+        }
+        for (el in words) {
+            if (!el.isJsonObject) continue
+            val obj = el.asJsonObject
+            val label = obj.get("label")?.takeIf { it.isJsonPrimitive }?.asString ?: continue
+            val link = obj.get("link")?.takeIf { it.isJsonPrimitive }?.asString ?: continue
+            ("https://svenska.se/$link").toHttpUrlOrNull()?.let { results.add(SearchResult(label, it)) }
+        }
+        return results
+    }
+
+    private fun dslSearchResults(body: String, short: String): List<SearchResult> =
+        try {
+            JsonParser.parseString(body).asJsonArray.mapNotNull { el ->
+                if (!el.isJsonPrimitive) null
+                else SearchResult(el.asString, dslEntryUri(short, el.asString))
+            }
+        } catch (e: Exception) {
+            emptyList()
+        }
+
+    private fun lerobertSearchResults(body: String): List<SearchResult> {
+        val results = ArrayList<SearchResult>()
+        val items = try {
+            JsonParser.parseString(body).asJsonArray
+        } catch (e: Exception) {
+            return results
+        }
+        for (el in items) {
+            if (!el.isJsonObject) continue
+            val item = el.asJsonObject
+            val display = item.get("display")?.takeIf { it.isJsonPrimitive }?.asString ?: continue
+            val page = item.get("page")?.takeIf { it.isJsonPrimitive }?.asString ?: continue
+            val title = Jsoup.parse(display).text()
+            val url = ("https://dictionnaire.lerobert.com" + page)
+                .replace("/conjugaison/", "/definition/")
+                .toHttpUrlOrNull() ?: continue
+            results.add(SearchResult(title, url))
+        }
+        return results
+    }
+
+    private fun wiktionarySearchResults(body: String, short: String): List<SearchResult> {
+        val results = ArrayList<SearchResult>()
+        val pages = try {
+            JsonParser.parseString(body).asJsonObject.getAsJsonArray("pages")
+        } catch (e: Exception) {
+            return results
+        }
+        for (el in pages) {
+            if (!el.isJsonObject) continue
+            val page = el.asJsonObject
+            val title = page.get("title")?.takeIf { it.isJsonPrimitive }?.asString ?: continue
+            val id = page.get("id")?.takeIf { it.isJsonPrimitive }?.asInt ?: continue
+            ("https://$short.m.wiktionary.org/?curid=$id").toHttpUrlOrNull()
+                ?.let { results.add(SearchResult(title, it)) }
+        }
+        return results
+    }
+
+    private fun infopediaSearchResults(body: String): List<SearchResult> {
+        val html = try {
+            JsonParser.parseString(body).asJsonObject.get("html")?.asString
+        } catch (e: Exception) {
+            null
+        } ?: return emptyList()
+        return InfopediaParser.parseSearch(html)
+    }
+
+    private val lingueeBase = "https://www.linguee.pt/".toHttpUrlOrNull()!!
 
     private fun didacUrl(word: String): HttpUrl =
         "https://www.diccionari.cat/cerca/didac"
@@ -118,13 +274,82 @@ class Main {
             aliases = listOf("colspan", "col"),
             tag = "COLSPAN",
             lang = "es",
-            wordUrl = { word -> collinsUrl(word) },
-            searchUrl = { query ->
-                "https://www.collinsdictionary.com/autocomplete/?q=$query&dictCode=spanish-english"
-                    .toHttpUrlOrNull()!!
-            },
+            wordUrl = { word -> collinsUrl("spanish-english", word) },
+            searchUrl = { query -> collinsAutocomplete("spanish-english", query) },
             parse = { page, uri -> CollinsParser.parse(page, uri, "COLSPAN", "spanish-english") },
-            searchResults = { body -> CollinsParser.parseSearch(body) { title -> collinsUrl(title) } }
+            searchResults = { body -> CollinsParser.parseSearch(body) { title -> collinsUrl("spanish-english", title) } }
+        ),
+        Dict(
+            aliases = listOf("colfren"),
+            tag = "COLFREN",
+            lang = "fr",
+            wordUrl = { word -> collinsUrl("french-english", word) },
+            searchUrl = { query -> collinsAutocomplete("french-english", query) },
+            parse = { page, uri -> CollinsParser.parse(page, uri, "COLFREN", "french-english") },
+            searchResults = { body -> CollinsParser.parseSearch(body) { title -> collinsUrl("french-english", title) } }
+        ),
+        Dict(
+            aliases = listOf("so"),
+            tag = "SO",
+            lang = "se",
+            wordUrl = null,
+            searchUrl = { query -> soAutocomplete(query) },
+            parse = { page, _ -> SoParser.parse(page, "SO") },
+            searchResults = { body -> soSearchResults(body) }
+        ),
+        Dict(
+            aliases = listOf("sdo"),
+            tag = "SDO",
+            lang = "se",
+            wordUrl = null,
+            searchUrl = { query -> dslLiveSearch("sdo", query) },
+            parse = { page, uri -> listOfNotNull(DdoParser.parse(page, uri, "SDO")) },
+            searchResults = { body -> dslSearchResults(body, "sdo") }
+        ),
+        Dict(
+            aliases = listOf("ddo"),
+            tag = "DDO",
+            lang = "dk",
+            wordUrl = null,
+            searchUrl = { query -> dslLiveSearch("ddo", query) },
+            parse = { page, uri -> listOfNotNull(DdoParser.parse(page, uri, "DDO")) },
+            searchResults = { body -> dslSearchResults(body, "ddo") }
+        ),
+        Dict(
+            aliases = listOf("lingpt"),
+            tag = "LINGPT",
+            lang = "pt",
+            wordUrl = { word -> lingueeUrl(word) },
+            searchUrl = { query -> lingueeUrl(query) },
+            parse = { page, uri -> LingueeParser.parse(page, uri, "LINGPT") },
+            searchResults = { body -> LingueeParser.parseSearch(body, lingueeBase) }
+        ),
+        Dict(
+            aliases = listOf("infopedia"),
+            tag = "INFOPEDIA",
+            lang = "pt",
+            wordUrl = { word -> infopediaUrl(word) },
+            searchUrl = { query -> infopediaSuggestions(query) },
+            parse = { page, uri -> InfopediaParser.parse(page, uri, "INFOPEDIA") },
+            searchResults = { body -> infopediaSearchResults(body) }
+        ),
+        Dict(
+            aliases = listOf("rob"),
+            tag = "ROB",
+            lang = "fr",
+            wordUrl = { word -> lerobertUrl(word) },
+            searchUrl = { query -> lerobertAutocomplete(query) },
+            parse = { page, uri -> LeRobertParser.parse(page, uri, "ROB") },
+            searchResults = { body -> lerobertSearchResults(body) }
+        ),
+        Dict(
+            aliases = listOf("wfr"),
+            tag = "WFR",
+            lang = "fr",
+            wordUrl = { word -> wiktionaryUrl("fr", word) },
+            searchUrl = { query -> wiktionaryRest("fr", query) },
+            parse = { page, uri -> WiktionaryParser.parse(page, uri, "WFR", "fr") },
+            searchResults = { body -> wiktionarySearchResults(body, "fr") }
         ),
         Dict(
             aliases = listOf("didac"),
@@ -218,7 +443,14 @@ class Main {
             val target = when {
                 url != null -> url
                 search -> dict.searchUrl(word ?: fallbackWord(filePath!!))
-                else -> dict.wordUrl(word ?: fallbackWord(filePath!!))
+                else -> {
+                    val w = word ?: fallbackWord(filePath!!)
+                    dict.wordUrl?.invoke(w) ?: return error(
+                        "dictionary ${dict.tag} has no word URL from a headword on the CLI — " +
+                            "run '${dict.aliases.first()} $w --search' to list entries, then " +
+                            "--url <result> (optionally with --file <page.html>) to parse a page"
+                    )
+                }
             }
             val body = if (filePath != null) pageFromFile(filePath, target).first else fetch(target)
 
@@ -328,7 +560,7 @@ class Main {
               openUri  open a word page URL, selecting the `__ref`-tagged homograph if present
               nextPage move to the next homograph/sub-entry of the loaded page
               back     leave the word view (headless: clear the loaded word)
-              setDict  tag = a dict alias or tag (dle/est/colspan/didac/gdlc/ca-es/ca-en)
+              setDict  tag = a dict alias or tag (dle/est/colspan/colfren/didac/gdlc/ca-es/ca-en/so/sdo/ddo/lingpt/infopedia/rob/wfr)
               setLang  lang = a language code (es/ca) — selects the first dict of that language
               state    snapshot of {activity, dict, lang, query, word}
               quit     close the session
@@ -394,6 +626,11 @@ class Main {
               didac cap                 all "cap" entries (cap1..cap4, cap-roig, ...)
               didac cap --search        autocomplete suggestions
               --url https://www.diccionari.cat/didac/cap1   single homograph page
+
+            Search-first dictionaries (so/sdo/ddo — and rob routes through search)
+            have no word URL from a headword: list entries with '--search', then
+            open one via '--url <result>'. lingpt/infopedia/wfr/colfren fetch a
+            word page directly like colspan.
 
             options:
               --dict <name>            dictionary to use (default: ${dictionaries.first().aliases.first()})
