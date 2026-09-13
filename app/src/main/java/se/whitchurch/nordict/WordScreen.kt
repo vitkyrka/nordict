@@ -102,8 +102,24 @@ class WordViewModel(
     var uiStatus: WordUiStatus by mutableStateOf(WordUiStatus.Loading)
     var webView: WebView? = null
 
+    /** True once [mWord] has been rendered into the current WebView (used by
+     * tests to observe that a re-created WebView reloaded its page). */
+    val webViewLoaded: Boolean
+        get() = loadedUri == mWord?.uri?.toString()
+
     private val ordboken: Ordboken by lazy { Ordboken.getInstance(getApplication()) }
     private var mResetZoomNextPause = false
+
+    // The uri that has been rendered into the *current* WebView (null until the
+    // current WebView renders something). Reset whenever a fresh WebView is
+    // created so an already-fetched word is re-rendered into it (e.g. popping
+    // back to a word destination that another word had been pushed over).
+    private var loadedUri: String? = null
+
+    // True while fetchWord()'s idling-resource increment is still covering the
+    // upcoming first render; it is consumed by maybeLoadWord() so reloads
+    // (which have no fetch in flight) get their own balanced increment.
+    private var fetchPending = false
 
     private val player: ExoPlayer by lazy {
         ExoPlayer.Builder(getApplication()).build()
@@ -123,7 +139,10 @@ class WordViewModel(
 
     fun fetchWord() {
         uiStatus = WordUiStatus.Loading
-        loadResource.increment()
+        if (!fetchPending) {
+            loadResource.increment()
+            fetchPending = true
+        }
 
         viewModelScope.launch {
             val word = withContext(Dispatchers.IO) { ordboken.getWord(uri) }
@@ -137,6 +156,7 @@ class WordViewModel(
                     WordUiStatus.Error(R.string.error_word)
                 }
                 loadResource.decrement()
+                fetchPending = false
                 return@launch
             }
 
@@ -148,12 +168,8 @@ class WordViewModel(
         }
     }
 
-    /** Persists the last-view state and the WebView scale when leaving a word. */
+    /** Persists the WebView scale when leaving a word. */
     fun onLeave() {
-        if (mWord != null) {
-            ordboken.setLastView(Ordboken.Where.WORD, mWord!!.uri.toString())
-        }
-
         val ed = ordboken.prefsEditor
 
         // If the WebView was never made visible, getScale() returns the default
@@ -168,10 +184,41 @@ class WordViewModel(
         ed.commit()
     }
 
+    /**
+     * Renders [mWord] into the current WebView unless it is already showing it.
+     * Called whenever the word or the WebView instance changes: a freshly
+     * created WebView (the destination was pushed over by another word and is
+     * being recomposed) must re-render the already-fetched word, or it would
+     * come back blank. The first render is covered by fetchWord()'s increment;
+     * later re-renders add their own balanced increment once.
+     */
+    fun maybeLoadWord() {
+        val word = mWord ?: return
+        if (webView == null) return
+        if (loadedUri == word.uri.toString()) return
+
+        loadedUri = word.uri.toString()
+        if (!fetchPending) {
+            uiStatus = WordUiStatus.Loading
+            pageFinished = false
+            loadResource.increment()
+        }
+        fetchPending = false
+        loadWebView(word)
+    }
+
     // ---------- WebView ----------
 
     @SuppressLint("AddJavascriptInterface")
     fun createWebView(context: Context): WebView {
+        // A prior WebView from a previous composition of this destination may
+        // still exist (detached) but must not be reused; drop it so a fresh
+        // instance reloads the word instead of coming back blank.
+        (webView?.parent as? android.view.ViewGroup)?.removeView(webView)
+        webView?.destroy()
+        webView = null
+        loadedUri = null
+
         val webView = WebView(context)
         this.webView = webView
         webView.webChromeClient = WebChromeClient()
@@ -471,12 +518,10 @@ fun WordScreen(
 
     // Load the word page as soon as the fetch lands. The AndroidView factory
     // can run before the coroutine finishes, so a fast fetch (or a retry)
-    // re-triggers this load after the WebView exists.
-    LaunchedEffect(word) {
-        if (word != null && !vm.pageFinished) {
-            vm.loadWebView(word)
-        }
-    }
+    // re-triggers this load after the WebView exists. Also keyed on the
+    // WebView instance so a fresh WebView created after the destination was
+    // pushed over by another word re-renders the already-fetched word.
+    LaunchedEffect(word, vm.webView) { vm.maybeLoadWord() }
 
     // Restore Ordboken state + the cross-dictionary hook on resume, matching
     // the old WordActivity.onResume/onPause duties.
@@ -531,7 +576,12 @@ fun WordScreen(
 
                 AndroidView(
                     factory = { ctx ->
-                        vm.createWebView(ctx)
+                        val webView = vm.createWebView(ctx)
+                        // A fast fetch (or a recreated destination) can have the
+                        // word ready before/while the WebView is created; render
+                        // it here too (idempotent via the loaded-Uri guard).
+                        vm.maybeLoadWord()
+                        webView
                     },
                     modifier = if (vm.pinToViewport) {
                         Modifier

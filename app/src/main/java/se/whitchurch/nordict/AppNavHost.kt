@@ -3,6 +3,7 @@ package se.whitchurch.nordict
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -15,10 +16,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -77,6 +81,35 @@ fun NordictApp(
     LaunchedEffect(navController) { onNavController(navController) }
     LaunchedEffect(navController, initialRoute) {
         if (initialRoute != null) navController.navigate(initialRoute)
+    }
+
+    // Persist the currently displayed destination when the app goes to the
+    // background so the next start resumes where the user left off: the word
+    // view saves the word it is showing, the search screen saves its query,
+    // and home clears the restore point. This mirrors the legacy contract
+    // where each activity saved its own screen in its onPause.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, ordboken) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) {
+                val route = navController.currentDestination?.route
+                when {
+                    route != null && route.startsWith(WORD_ROUTE) ->
+                        ordboken.currentWord?.let {
+                            ordboken.setLastView(Ordboken.Where.WORD, it.uri.toString())
+                        }
+                    route != null && route.startsWith(SEARCH_ROUTE) -> {
+                        val query =
+                            navController.currentBackStackEntry?.arguments?.getString("query") ?: ""
+                        ordboken.setLastView(Ordboken.Where.MAIN, query)
+                    }
+                    else -> ordboken.setLastView(Ordboken.Where.MAIN, "")
+                }
+                ordboken.prefsEditor.commit()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // Debounced autocomplete suggestions for the global search bar.
@@ -209,4 +242,10 @@ fun NordictApp(
             }
         }
     }
+
+    // Pressing back while the search overlay is expanded only dismisses the
+    // overlay (the legacy search screen in MainActivity did the same); it must
+    // not pop the destination underneath it. Registered after the NavHost so
+    // it takes precedence over the NavHost's own back handler while enabled.
+    BackHandler(enabled = searchActive) { searchActive = false }
 }
