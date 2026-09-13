@@ -17,8 +17,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
@@ -497,51 +499,8 @@ fun WordScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Word actions row (star / open in browser / reset zoom).
-        Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 4.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = word?.mTitle ?: "",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(horizontal = 8.dp),
-                    maxLines = 1
-                )
-                IconButton(onClick = { vm.toggleStar() }) {
-                    Icon(
-                        if (vm.mStarred) Icons.Filled.Star else Icons.Filled.StarBorder,
-                        contentDescription = context.getString(
-                            if (vm.mStarred) R.string.remove_bookmark else R.string.add_bookmark
-                        ),
-                        tint = if (vm.mStarred) Color(0xFFFBC02D) else Color.Unspecified
-                    )
-                }
-                IconButton(onClick = {
-                    vm.mWord?.uri?.let { url -> onOpenExternal(url.toAndroidUri()) }
-                }) {
-                    Icon(
-                        Icons.Filled.OpenInNew,
-                        contentDescription = context.getString(R.string.open_in_browser)
-                    )
-                }
-                IconButton(onClick = { vm.resetZoom() }) {
-                    Icon(
-                        Icons.Filled.ZoomIn,
-                        contentDescription = context.getString(R.string.menu_reset_zoom)
-                    )
-                }
-            }
-        }
-
-        BoxWithConstraints(modifier = Modifier.weight(1f)) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val maxH = maxHeight
             val scrollState = rememberScrollState()
 
@@ -614,35 +573,109 @@ fun WordScreen(
             }
         }
 
-        // Bottom action bar.
-        Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 3.dp) {
+        // Floating horizontal toolbar + FAB (Material 3 expressive).
+        if (word != null) {
             Row(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.End,
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = {
-                    vm.autoPlay = !vm.autoPlay
-                    ordboken.mPrefs.edit().putBoolean("autoPlay", vm.autoPlay).apply()
-                }) {
-                    Icon(
-                        painterResource(if (vm.autoPlay) R.drawable.autoplay_on else R.drawable.autoplay_off),
-                        contentDescription = null,
-                        tint = if (vm.autoPlay) Color(0xFF4A90D9) else Color.Unspecified
-                    )
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 6.dp,
+                    shape = RoundedCornerShape(28.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { vm.toggleStar() }) {
+                            Icon(
+                                if (vm.mStarred) Icons.Filled.Star else Icons.Filled.StarBorder,
+                                contentDescription = context.getString(
+                                    if (vm.mStarred) R.string.remove_bookmark else R.string.add_bookmark
+                                ),
+                                tint = if (vm.mStarred) Color(0xFFFBC02D) else Color.Unspecified
+                            )
+                        }
+                        IconButton(onClick = {
+                            vm.mWord?.audio?.let { audio -> vm.playAudio(audio) }
+                        }) {
+                            Icon(
+                                painterResource(R.drawable.play),
+                                contentDescription = context.getString(R.string.menu_play_audio)
+                            )
+                        }
+                        Box {
+                            var menuExpanded by remember { mutableStateOf(false) }
+                            IconButton(onClick = { menuExpanded = true }) {
+                                Icon(
+                                    Icons.Filled.MoreVert,
+                                    contentDescription = context.getString(R.string.menu_more)
+                                )
+                            }
+                            DropdownMenu(
+                                expanded = menuExpanded,
+                                onDismissRequest = { menuExpanded = false }
+                            ) {
+                                DropdownMenuItem(
+                                    text = { Text(context.getString(R.string.open_in_browser)) },
+                                    leadingIcon = {
+                                        Icon(Icons.Filled.OpenInNew, contentDescription = null)
+                                    },
+                                    onClick = {
+                                        vm.mWord?.uri?.let { url ->
+                                            onOpenExternal(url.toAndroidUri())
+                                        }
+                                        menuExpanded = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(context.getString(R.string.menu_autoplay)) },
+                                    leadingIcon = {
+                                        Icon(
+                                            painterResource(
+                                                if (vm.autoPlay) R.drawable.autoplay_on
+                                                else R.drawable.autoplay_off
+                                            ),
+                                            contentDescription = null,
+                                            tint = if (vm.autoPlay) Color(0xFF4A90D9)
+                                            else Color.Unspecified
+                                        )
+                                    },
+                                    onClick = {
+                                        vm.autoPlay = !vm.autoPlay
+                                        ordboken.mPrefs.edit()
+                                            .putBoolean("autoPlay", vm.autoPlay).apply()
+                                        menuExpanded = false
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(context.getString(R.string.menu_reset_zoom)) },
+                                    leadingIcon = {
+                                        Icon(Icons.Filled.ZoomIn, contentDescription = null)
+                                    },
+                                    onClick = {
+                                        vm.resetZoom()
+                                        menuExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
                 }
-                IconButton(onClick = { vm.share() }) {
+
+                FloatingActionButton(
+                    onClick = { vm.share() },
+                    containerColor = MaterialTheme.colorScheme.primaryContainer
+                ) {
                     Icon(
                         painterResource(R.drawable.add_card),
-                        contentDescription = context.getString(R.string.menu_share)
+                        contentDescription = context.getString(R.string.menu_add_card)
                     )
-                }
-                IconButton(onClick = {
-                    vm.mWord?.audio?.let { audio -> vm.playAudio(audio) }
-                }) {
-                    Icon(painterResource(R.drawable.play), contentDescription = null)
                 }
             }
         }
