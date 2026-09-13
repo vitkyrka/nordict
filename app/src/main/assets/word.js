@@ -1,15 +1,3 @@
-var setStar = function(on) {
-    var el = document.getElementById("bookmark");
-    var className = on ? "on" : "off";
-
-    el.onclick = function() {
-        ordboken.toggleStar();
-        return false;
-    };
-
-    el.className = className;
-};
-
 var getPos = function(regex, html) {
 	var starts = [];
 

@@ -22,8 +22,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.Star
-import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -50,14 +48,12 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebSettingsCompat.FORCE_DARK_OFF
 import androidx.webkit.WebSettingsCompat.FORCE_DARK_ON
 import androidx.webkit.WebViewFeature
-import se.whitchurch.nordict.ui.theme.NordictStarAmber
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import se.whitchurch.nordict.OrdbokenContract.FavoritesEntry
 import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
 import java.io.StringReader
 import java.net.URLDecoder
@@ -74,7 +70,7 @@ sealed interface WordUiStatus {
  * Loads and renders one word destination. The ViewModel is scoped to the word
  * NavBackStackEntry, so each pushed word keeps its own state exactly like the
  * old stacked WordActivities. Owns the WebView lifecycle, the audio player and
- * the SQLite history/star writes; navigation side effects flow out through the
+ * the SQLite history writes; navigation side effects flow out through the
  * [onOpenUri]/[onOpenExternal]/[onFillSearch] callbacks wired by [WordScreen].
  */
 class WordViewModel(
@@ -95,7 +91,6 @@ class WordViewModel(
     var onFillSearch: ((String) -> Unit)? = null
 
     var mWord: Word? by mutableStateOf(null)
-    var mStarred: Boolean by mutableStateOf(false)
     var autoPlay: Boolean by mutableStateOf(false)
     var pinToViewport: Boolean by mutableStateOf(false)
     var webViewVisible: Boolean by mutableStateOf(false)
@@ -163,7 +158,6 @@ class WordViewModel(
 
             pageFinished = false
             webViewVisible = false
-            starCheck()
             historySave()
             // The idling resource stays busy until onPageFinished decrements it.
         }
@@ -285,16 +279,6 @@ class WordViewModel(
             }
         }
 
-        webView.addJavascriptInterface(
-            object {
-                @JavascriptInterface
-                fun toggleStar() {
-                    this@WordViewModel.toggleStar()
-                }
-            },
-            "ordboken"
-        )
-
         return webView
     }
 
@@ -382,7 +366,7 @@ class WordViewModel(
         }
     }
 
-    // ---------- Star / history ----------
+    // ---------- History ----------
 
     private fun historySave() {
         val word = mWord ?: return
@@ -399,68 +383,6 @@ class WordViewModel(
                 db.insert(HistoryEntry.TABLE_NAME, "null", values)
                 db.close()
             }
-        }
-    }
-
-    private fun starCheck() {
-        viewModelScope.launch {
-            mStarred = withContext(Dispatchers.IO) { isStarred() }
-        }
-    }
-
-    fun toggleStar() {
-        val word = mWord ?: return
-        viewModelScope.launch {
-            val starred = withContext(Dispatchers.IO) {
-                val dbHelper = OrdbokenDbHelper(getApplication())
-                val db = dbHelper.writableDatabase
-                try {
-                    val cursor = db.query(
-                        FavoritesEntry.TABLE_NAME, null,
-                        FavoritesEntry.COLUMN_NAME_URL + "=?",
-                        arrayOf(word.uri.toString()), null, null, null, "1"
-                    )
-                    val count = cursor.count
-                    cursor.close()
-
-                    val wasStarred = count > 0
-                    if (wasStarred) {
-                        db.delete(
-                            FavoritesEntry.TABLE_NAME,
-                            FavoritesEntry.COLUMN_NAME_URL + "=?",
-                            arrayOf(word.uri.toString())
-                        )
-                    } else {
-                        val values = ContentValues()
-                        values.put(FavoritesEntry.COLUMN_NAME_TITLE, word.mTitle)
-                        values.put(HistoryEntry.COLUMN_NAME_SUMMARY, word.summary)
-                        values.put(FavoritesEntry.COLUMN_NAME_URL, word.uri.toString())
-                        db.insert(FavoritesEntry.TABLE_NAME, "null", values)
-                    }
-                    !wasStarred
-                } finally {
-                    db.close()
-                }
-            }
-            mStarred = starred
-        }
-    }
-
-    private fun isStarred(): Boolean {
-        val word = mWord ?: return false
-        val dbHelper = OrdbokenDbHelper(getApplication())
-        val db = dbHelper.readableDatabase
-        return try {
-            val cursor = db.query(
-                FavoritesEntry.TABLE_NAME, null,
-                FavoritesEntry.COLUMN_NAME_URL + "=?",
-                arrayOf(word.uri.toString()), null, null, null, "1"
-            )
-            val count = cursor.count
-            cursor.close()
-            count > 0
-        } finally {
-            db.close()
         }
     }
 
@@ -654,15 +576,6 @@ fun WordScreen(
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    IconButton(onClick = { vm.toggleStar() }) {
-                        Icon(
-                            if (vm.mStarred) Icons.Filled.Star else Icons.Filled.StarBorder,
-                            contentDescription = context.getString(
-                                if (vm.mStarred) R.string.remove_bookmark else R.string.add_bookmark
-                            ),
-                            tint = if (vm.mStarred) NordictStarAmber else Color.Unspecified
-                        )
-                    }
                     IconButton(onClick = {
                         vm.mWord?.audio?.let { audio -> vm.playAudio(audio) }
                     }) {

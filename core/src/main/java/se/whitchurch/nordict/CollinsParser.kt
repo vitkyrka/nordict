@@ -115,7 +115,7 @@ class CollinsParser {
 
             heads.forEachIndexed { index, head ->
                 // The first headword keeps the canonical (search-result) URL so
-                // history/starring stay clean; every other headword resolves via
+                // history stays clean; every other headword resolves via
                 // its own __ref.
                 val headUri = if (index == 0) uri
                 else uri.newBuilder().addQueryParameter(REFPARAM, head.ref).build()

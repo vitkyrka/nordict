@@ -19,7 +19,7 @@ import se.whitchurch.nordict.ui.theme.NordictTheme
 
 /**
  * The unified single-activity home: hosts the navigation graph ([NordictApp])
- * with the global search bar, dictionary nav, history/bookmarks, search
+ * with the global search bar, dictionary nav, history, search
  * results and the word view. Restores the last view on start (word or search
  * query); a fresh install opens the Home (history) screen.
  */

@@ -21,11 +21,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import se.whitchurch.nordict.OrdbokenContract.FavoritesEntry
 import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
 
 /**
- * The home destination: History/Bookmarks tabs backed by the SQLite tables.
+ * The home destination: the history list backed by the SQLite table.
  * Ported from the legacy HistoryActivity, minus the app's search bar (now the
  * global header) and the storage permission request (moved to MainActivity).
  */
@@ -35,49 +34,18 @@ fun HomeScreen(
     ordboken: Ordboken,
     onOpenWord: (title: String, url: String) -> Unit
 ) {
-    var selectedTab by remember { mutableStateOf(0) }
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        TabRow(selectedTabIndex = selectedTab) {
-            Tab(
-                selected = selectedTab == 0,
-                onClick = { selectedTab = 0 },
-                text = { Text(context.getString(R.string.history)) }
-            )
-            Tab(
-                selected = selectedTab == 1,
-                onClick = { selectedTab = 1 },
-                text = { Text(context.getString(R.string.bookmarks)) }
-            )
-        }
-
-        when (selectedTab) {
-            1 -> CommonListScreen(
-                context = context,
-                ordboken = ordboken,
-                table = FavoritesEntry.TABLE_NAME,
-                titleCol = FavoritesEntry.COLUMN_NAME_TITLE,
-                summaryCol = FavoritesEntry.COLUMN_NAME_SUMMARY,
-                dictCol = FavoritesEntry.COLUMN_NAME_DICT,
-                urlCol = FavoritesEntry.COLUMN_NAME_URL,
-                sortOrder = FavoritesEntry.COLUMN_NAME_TITLE + " ASC",
-                onOpenWord = onOpenWord
-            )
-
-            else -> CommonListScreen(
-                context = context,
-                ordboken = ordboken,
-                table = HistoryEntry.TABLE_NAME,
-                titleCol = HistoryEntry.COLUMN_NAME_TITLE,
-                summaryCol = HistoryEntry.COLUMN_NAME_SUMMARY,
-                dictCol = HistoryEntry.COLUMN_NAME_DICT,
-                urlCol = HistoryEntry.COLUMN_NAME_URL,
-                sortOrder = HistoryEntry.COLUMN_NAME_DATE + " DESC",
-                limit = 100,
-                onOpenWord = onOpenWord
-            )
-        }
-    }
+    CommonListScreen(
+        context = context,
+        ordboken = ordboken,
+        table = HistoryEntry.TABLE_NAME,
+        titleCol = HistoryEntry.COLUMN_NAME_TITLE,
+        summaryCol = HistoryEntry.COLUMN_NAME_SUMMARY,
+        dictCol = HistoryEntry.COLUMN_NAME_DICT,
+        urlCol = HistoryEntry.COLUMN_NAME_URL,
+        sortOrder = HistoryEntry.COLUMN_NAME_DATE + " DESC",
+        limit = 100,
+        onOpenWord = onOpenWord
+    )
 }
 
 data class WordRow(

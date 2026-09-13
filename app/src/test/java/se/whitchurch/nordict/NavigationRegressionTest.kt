@@ -85,7 +85,7 @@ class NavigationRegressionTest {
     private fun setUpFixtures() {
         app = ApplicationProvider.getApplicationContext<Application>()
         app!!.getSharedPreferences("ordboken", Context.MODE_PRIVATE).edit().clear().commit()
-        // History/favorites tables persist across tests in Robolectric's native
+        // History tables persist across tests in Robolectric's native
         // SQLite; a fresh file avoids double-CREATE crashes on the first open.
         app!!.deleteDatabase("Ordboken.db")
         Ordboken.reset()
@@ -104,7 +104,7 @@ class NavigationRegressionTest {
                 EstDictionary(client, estBase())
             )
         )
-        // Create the history/favorites tables exactly once, before the activity
+        // Create the history tables exactly once, before the activity
         // launch; the compose test rule's dispatchers make reads/writes overlap
         // otherwise and a write sneaks in before the first open finishes.
         OrdbokenDbHelper(app!!).readableDatabase.close()

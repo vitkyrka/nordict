@@ -71,7 +71,7 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
 - **`MainActivity.kt` + `AppNavHost.kt`** — the whole app is one activity: a
   global MD3 `SearchBar` (debounced live suggestions from `Ordboken.search`),
   the `DictionaryNav` rows, and a Navigation-Compose `NavHost` with three
-  destinations — `home` (history/bookmarks tabs), `search?query=`, and
+  destinations — `home` (history), `search?query=`, and
   `word?uri=&title=`. `MainActivity` sets the initial route from the persisted
   `lastWhere` (fresh install -> Home) and honors a `data:`-style intent by
   routing straight to the word destination.
@@ -84,7 +84,7 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
   for non-JSON dictionaries. JSON words pin the WebView to the viewport
   (internal scroll, reliable `#hom-N` anchors); legacy words let the outer
   `verticalScroll` own the page. Owns the WebView, an `ExoPlayer`, and the
-  oracle history/star SQLite writes; navigation side effects flow out through
+  oracle history SQLite writes; navigation side effects flow out through
   `onOpenUri`/`onOpenExternal`/`onFillSearch` callbacks.
 - **`<Name>Parser.kt`** — companion-object parsers that take a raw HTML page,
   `okhttp3.HttpUrl`, and dict `tag`, and return `List<Word>`. They use Jsoup and

@@ -13,9 +13,6 @@
     <string name="error_audio">Ljuduppspelningen misslyckades.</string>
     <string name="no_results">Inga resultat hittades.</string>
     <string name="history">Historik</string>
-    <string name="bookmarks">Bokmärken</string>
-    <string name="add_bookmark">Lägg till bokmärke</string>
-    <string name="remove_bookmark">Radera bokmärke</string>
     <string name="open_in_browser">Öppna i webbläsare</string>
     <string name="menu_reset_zoom">Återställ zoom</string>
     <string name="menu_add_card">Lägg till kort</string>
