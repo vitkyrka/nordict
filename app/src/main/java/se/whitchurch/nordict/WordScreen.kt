@@ -50,6 +50,7 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebSettingsCompat.FORCE_DARK_OFF
 import androidx.webkit.WebSettingsCompat.FORCE_DARK_ON
 import androidx.webkit.WebViewFeature
+import se.whitchurch.nordict.ui.theme.NordictStarAmber
 import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
 import com.google.gson.Gson
@@ -648,7 +649,7 @@ fun WordScreen(
                                 contentDescription = context.getString(
                                     if (vm.mStarred) R.string.remove_bookmark else R.string.add_bookmark
                                 ),
-                                tint = if (vm.mStarred) Color(0xFFFBC02D) else Color.Unspecified
+                                tint = if (vm.mStarred) NordictStarAmber else Color.Unspecified
                             )
                         }
                         IconButton(onClick = {
@@ -692,7 +693,7 @@ fun WordScreen(
                                                 else R.drawable.autoplay_off
                                             ),
                                             contentDescription = null,
-                                            tint = if (vm.autoPlay) Color(0xFF4A90D9)
+                                            tint = if (vm.autoPlay) MaterialTheme.colorScheme.primary
                                             else Color.Unspecified
                                         )
                                     },

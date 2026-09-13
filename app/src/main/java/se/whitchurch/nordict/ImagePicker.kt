@@ -21,6 +21,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import org.json.JSONArray
 import org.json.JSONException
 import java.util.*
+import se.whitchurch.nordict.ui.theme.NordictTheme
 
 internal const val GSTATIC_SERVER = "https://encrypted-tbn0.gstatic.com/"
 
@@ -38,7 +39,7 @@ class ImagePicker : AppCompatActivity() {
         val dictImages = intent?.getStringArrayListExtra("dictionaryImages") ?: arrayListOf()
 
         setContent {
-            MaterialTheme {
+            NordictTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     ImagePickerScreen(
                         initialWord = initialWord,

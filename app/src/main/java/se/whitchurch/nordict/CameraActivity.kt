@@ -35,6 +35,7 @@ import com.canhub.cropper.CropImageView
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import se.whitchurch.nordict.ui.theme.NordictTheme
 
 // Heavily based on https://developer.android.com/codelabs/camerax-getting-started
 class CameraActivity : AppCompatActivity() {
@@ -65,7 +66,7 @@ class CameraActivity : AppCompatActivity() {
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         setContent {
-            MaterialTheme {
+            NordictTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     CameraScreen(
                         onPreviewReady = { pv ->

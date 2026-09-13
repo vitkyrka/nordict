@@ -15,6 +15,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
 import se.whitchurch.nordict.Ordboken.Where
+import se.whitchurch.nordict.ui.theme.NordictTheme
 
 /**
  * The unified single-activity home: hosts the navigation graph ([NordictApp])
@@ -68,7 +69,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContent {
-            MaterialTheme {
+            NordictTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     NordictApp(
                         ordboken = ordboken,

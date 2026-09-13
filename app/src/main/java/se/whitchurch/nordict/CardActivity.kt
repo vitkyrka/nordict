@@ -24,7 +24,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -36,6 +35,7 @@ import androidx.core.content.ContextCompat
 import com.ichi2.anki.api.AddContentApi
 import okhttp3.Request
 import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
+import se.whitchurch.nordict.ui.theme.NordictTheme
 
 class CardActivity : androidx.appcompat.app.AppCompatActivity() {
     private lateinit var ordboken: Ordboken
@@ -95,7 +95,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         }
 
         setContent {
-            MaterialTheme {
+            NordictTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                     CardScreen()
                 }
@@ -194,7 +194,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 .padding(vertical = 5.dp),
             shape = RoundedCornerShape(2.dp),
             colors = if (merged.value && selectedDefinitions.contains(definition)) {
-                CardDefaults.cardColors(containerColor = Color.Yellow)
+                CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
             } else {
                 CardDefaults.cardColors()
             }
@@ -203,7 +203,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 Text(
                     text = "$title: ${definition.definition}",
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 val examplesText = definition.examples + extraExamples
                 if (examplesText.isNotEmpty()) {
@@ -387,7 +387,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 Text(
                     text = "${idiom.idiom}: ${idiom.definition}",
                     fontWeight = FontWeight.Bold,
-                    color = Color.Black
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 if (idiom.examples.isNotEmpty()) {
                     Text(
