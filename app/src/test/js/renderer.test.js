@@ -326,6 +326,28 @@ test('distinct sub-entry titles are shown plain without ordinals', () => {
     expect($('.homonym-ordinal').length).toBe(0);
 });
 
+test('combined pages prefix nav labels with the dictionary tag per entry', () => {
+    const dle = (title, ref) => ({ ...entry(title, ref), dictionary: 'DLE' });
+    const combined = homonymWord(
+        [dle('frente', '1'), entry('frente', '1'), entry('frente', '2')],
+        ['DLE::1']
+    );
+
+    renderWord(combined);
+
+    const labels = $('#hom-1 > .homonym-nav a').map((_, el) => $(el).text()).get();
+    expect(labels).toEqual(['DLE frente', 'EST frente1', 'EST frente2']);
+    // Ordinals are grouped per dictionary: the two EST entries get ¹/², the
+    // single DLE entry stays plain.
+    const ordinals = $('#hom-1 > .homonym-nav .homonym-ordinal').map((_, el) => $(el).text()).get();
+    expect(ordinals).toEqual(['1', '2']);
+    // A fully single-dictionary combined page keeps the plain labels.
+    renderWord(homonymWord([entry('muerte', '1'), entry('muerte natural', '2')], ['EST::1']));
+    const plain = $('#hom-1 > .homonym-nav a').map((_, el) => $(el).text()).get();
+    expect(plain).toEqual(['muerte', 'muerte natural']);
+    expect($('.homonym-ordinal').length).toBe(0);
+});
+
 test('word without homonym entries renders as a single article (no nav)', () => {
     const word = {
         mTitle: 'frente',

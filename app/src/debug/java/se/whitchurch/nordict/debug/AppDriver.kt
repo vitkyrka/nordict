@@ -12,6 +12,7 @@ import se.whitchurch.nordict.AgentResult
 import se.whitchurch.nordict.AgentState
 import se.whitchurch.nordict.ExactMatch
 import se.whitchurch.nordict.MainActivity
+import se.whitchurch.nordict.MultiDict
 import se.whitchurch.nordict.Ordboken
 import se.whitchurch.nordict.Word
 import se.whitchurch.nordict.toSearchResultData
@@ -88,6 +89,25 @@ class AppDriver(private val app: android.app.Application) {
             )
         }
         val uri = Uri.parse(exact.uri.toString())
+        if (exact.sources.isNotEmpty()) {
+            // Combined selection: open the merged page addressed by its sources;
+            // the loaded word's uri is the first source's page. The combined
+            // fetch always builds a fresh instance (no single-uri word cache),
+            // so wait for that fetch rather than a previously loaded same-uri
+            // combined word sitting in Ordboken.currentWord.
+            onMain {
+                requireMainActivity().navigateToSources(exact.sources, exact.mTitle, null)
+            }
+            val firstSource = exact.sources.first().uri
+            val previous = ordboken().currentWord
+            await({
+                val w = ordboken().currentWord
+                w != null && w !== previous && loadedUriMatches(firstSource, w)
+            }, 30_000)
+            val word = ordboken().currentWord
+                ?: throw IllegalStateException("word never loaded: $firstSource")
+            return wordResult(AgentOps.OPEN, word)
+        }
         return openUri(AgentOps.OPEN, uri, exact.mTitle)
     }
 
@@ -125,6 +145,17 @@ class AppDriver(private val app: android.app.Application) {
         }
 
         val next = entries[idx + 1]
+        if (MultiDict.isCombinedRef(ref)) {
+            // A combined page has no single fetchable page for the next entry;
+            // the merged word is already cached in memory, so swap the entry
+            // in place (fresh Word carrying the full combined entry set).
+            val swapped = onMain {
+                val combined = Word.withEntry(word, next, word.searchHeadword)
+                ordboken().currentWord = combined
+                combined
+            }
+            return wordResult(AgentOps.NEXT_PAGE, swapped)
+        }
         // The loaded word's uri already carries its own __ref (e.g.
         // /muerte?__ref=2); building the next page uri must not stack a
         // second __ref param, or the dictionary resolves the first one again.
@@ -160,10 +191,12 @@ class AppDriver(private val app: android.app.Application) {
     }
 
     private fun opSetDict(command: AgentCommand): AgentResult {
-        val tag = command.require("tag", command.tag)
+        val tags = command.selectionTags()
+        if (tags.isEmpty()) return AgentResult.error(AgentOps.SET_DICT, "no dictionary tag(s) given")
         return switchOp(AgentOps.SET_DICT) {
-            val ok = ordboken().setCurrentDictionary(tag)
-            ok to (if (ok) "dictionary is now ${ordboken().currentDictionary.tag}" else "unknown dictionary '$tag'")
+            val ok = ordboken().setCurrentDictionaries(tags)
+            ok to (if (ok) "selection is now ${ordboken().selectionSignature}"
+            else "unknown or incompatible selection '${tags.joinToString(",")}'")
         }
     }
 
@@ -209,10 +242,12 @@ class AppDriver(private val app: android.app.Application) {
     private fun snapshot(): AgentState {
         val word = ordboken().currentWord
         val route = (tracker.current as? MainActivity)?.navController?.currentDestination?.route
+        val signature = ordboken().selectionSignature
         return AgentState(
             activity = route?.let { routeName(it) } ?: (tracker.current?.javaClass?.simpleName ?: ""),
-            dict = ordboken().currentDictionary.tag,
+            dict = signature,
             lang = ordboken().currentDictionary.lang,
+            dicts = ordboken().activeDicts.takeIf { it.isNotEmpty() }?.map { it.tag },
             word = word?.let { wordResultOf(it) }
         )
     }
@@ -226,6 +261,9 @@ class AppDriver(private val app: android.app.Application) {
      * path must match, and if the request carries a `__ref`, that ref must be
      * among the loaded word's xrefs). The word JSON is available as soon as
      * the word ViewModel finishes, so this doubles as the "render" barrier.
+     * Reopening a single-dictionary page legitimately reuses the cached word
+     * instance (Ordboken's HttpUrl-keyed cache); combined pages handle their
+     * own freshness in [opOpen].
      */
     private fun waitForOpen(request: HttpUrl?, timeoutMs: Int = 30_000): Word {
         if (request == null) {

@@ -46,11 +46,22 @@ data class AgentCommand(
     val uri: String? = null,
     val title: String? = null,
     val tag: String? = null,
-    val lang: String? = null
+    val lang: String? = null,
+    // A multi-dictionary selection for `setDict` (ordered). When present it
+    // wins over `tag`; a comma-separated `tag` ("DLE,EST") also works.
+    val tags: List<String>? = null
 ) {
     /** Returns the named argument or throws a clear protocol error. */
     fun require(name: String, value: String?): String =
         value ?: throw IllegalArgumentException("command '$op' requires an argument '$name'")
+
+    /** The ordered dictionary selection a `setDict` names. */
+    fun selectionTags(): List<String> =
+        when {
+            tags != null && tags.isNotEmpty() -> tags
+            tag != null -> tag.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            else -> emptyList()
+        }
 }
 
 /**
@@ -75,9 +86,12 @@ data class AgentResult(
 
 /** A structured snapshot of what the agent is looking at. */
 data class AgentState(
-    val activity: String,
-    val dict: String,
-    val lang: String,
+    val activity: String = "",
+    val lang: String = "",
+    val dict: String = "",
+    // The active multi-dictionary selection (empty for single-dict). When set,
+    // `dict` is its comma-joined rendering.
+    val dicts: List<String>? = null,
     val query: String? = null,
     val word: WordResult? = null
 )

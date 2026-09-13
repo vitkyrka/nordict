@@ -64,6 +64,30 @@ class AgentProtocolTest {
     }
 
     @Test
+    fun selectionTagsPreferTagsOverCommaTag() {
+        val cmd = AgentCommand(op = AgentOps.SET_DICT, tag = "DLE,SO", tags = listOf("DLE", "EST"))
+        assertThat(cmd.selectionTags()).containsExactly("DLE", "EST").inOrder()
+        val comma = AgentCommand(op = AgentOps.SET_DICT, tag = " DLE , est ")
+        assertThat(comma.selectionTags()).containsExactly("DLE", "est").inOrder()
+        assertThat(AgentCommand(op = AgentOps.SET_DICT).selectionTags()).isEmpty()
+
+        val parsed = gson.fromJson(gson.toJson(cmd), AgentCommand::class.java)
+        assertThat(parsed.tags).containsExactly("DLE", "EST").inOrder()
+        assertThat(parsed.selectionTags()).containsExactly("DLE", "EST").inOrder()
+    }
+
+    @Test
+    fun combinedStateRoundTrips() {
+        val state = AgentState(
+            activity = "word",
+            lang = "es",
+            dict = "DLE,EST",
+            dicts = listOf("DLE", "EST")
+        )
+        assertThat(gson.fromJson(gson.toJson(state), AgentState::class.java)).isEqualTo(state)
+    }
+
+    @Test
     fun requireReturnsArgumentOrThrows() {
         val cmd = AgentCommand(op = AgentOps.SEARCH)
         assertThat(cmd.require("query", "frente")).isEqualTo("frente")

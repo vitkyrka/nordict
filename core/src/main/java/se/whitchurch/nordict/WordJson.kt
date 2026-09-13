@@ -73,7 +73,10 @@ object WordJson {
     data class SearchResultData(
         val mTitle: String,
         val mSummary: String,
-        val uri: String
+        val uri: String,
+        // The ordered tags of the dictionaries that produced this result;
+        // empty for ordinary single-dictionary searches.
+        val dicts: List<String> = emptyList()
     )
 
     fun Word.Gloss.toData(): GlossData {
@@ -96,7 +99,8 @@ fun SearchResult.toSearchResultData(): WordJson.SearchResultData {
     return WordJson.SearchResultData(
         mTitle = mTitle,
         mSummary = mSummary,
-        uri = uri.toString()
+        uri = uri.toString(),
+        dicts = dicts
     )
 }
 

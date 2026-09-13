@@ -80,6 +80,13 @@ class WordViewModel(
 
     private val uri: Uri = Uri.parse(savedStateHandle.get<String>("uri") ?: "")
 
+    // A combined (multi-dictionary) word carries the probe dictionaries'
+    // `sources` JSON and an optional namespaced ref (`"DLE::2"`) instead of a
+    // plain single-dictionary uri. Empty sources = a normal single word.
+    private val sources: List<CombSource> =
+        MultiDict.sourcesFromJson(savedStateHandle.get<String>("sources") ?: "")
+    private val ref: String? = savedStateHandle.get<String>("ref")?.takeIf { it.isNotEmpty() }
+
     companion object {
         // Shared across word destinations (Espresso idling).
         val loadResource: CountingIdlingResource = CountingIdlingResource("word")
@@ -87,6 +94,7 @@ class WordViewModel(
 
     // Wiring from the composing screen (reassigned on every recomposition).
     var onOpenUri: ((Uri, String) -> Unit)? = null
+    var onOpenSources: ((SearchResult) -> Unit)? = null
     var onOpenExternal: ((Uri) -> Unit)? = null
     var onFillSearch: ((String) -> Unit)? = null
 
@@ -154,7 +162,10 @@ class WordViewModel(
         }
 
         viewModelScope.launch {
-            val word = withContext(Dispatchers.IO) { ordboken.getWord(uri) }
+            val word = withContext(Dispatchers.IO) {
+                if (sources.isNotEmpty()) ordboken.getCombinedWord(sources, ref)
+                else ordboken.getWord(uri)
+            }
             mWord = word
             ordboken.currentWord = word
 
@@ -341,17 +352,36 @@ class WordViewModel(
 
     // ---------- Lookups ----------
 
-    /** A `/search/` link tapped inside the WebView. */
+    /** A `/search/` link tapped inside the WebView. Under an active multi-dict
+     * selection the link resolves across every selected dictionary and opens
+     * the combined page; otherwise it opens the current dictionary's exact
+     * match as usual. */
     fun linkSearch(query: String) {
         viewModelScope.launch {
-            val exact = withContext(Dispatchers.IO) {
-                val results = ordboken.currentDictionary.search(query)
-                ExactMatch.resolve(query, results) ?: SearchResult(query)
+            var combined: List<CombSource>? = null
+            var exact: SearchResult? = null
+            withContext(Dispatchers.IO) {
+                if (ordboken.activeDicts.isNotEmpty()) {
+                    val sources = MultiDict.resolveExact(ordboken.activeDicts, query)
+                    combined = sources.takeIf { it.isNotEmpty() }
+                    if (combined == null) exact = SearchResult(query)
+                } else {
+                    val results = ordboken.currentDictionary.search(query)
+                    exact = ExactMatch.resolve(query, results) ?: SearchResult(query)
+                }
             }
-            if (exact.uri.host == "fake") {
-                onFillSearch?.invoke(exact.mTitle)
-            } else {
-                onOpenUri?.invoke(exact.uri.toAndroidUri(), exact.mTitle)
+            when {
+                combined != null ->
+                    onOpenSources?.invoke(
+                        SearchResult(
+                            mTitle = query,
+                            uri = combined!!.first().uri,
+                            dicts = combined!!.map { it.tag },
+                            sources = combined!!
+                        )
+                    )
+                exact!!.uri.host == "fake" -> onFillSearch?.invoke(exact!!.mTitle)
+                else -> onOpenUri?.invoke(exact!!.uri.toAndroidUri(), exact!!.mTitle)
             }
             loadResource.decrement()
         }
@@ -473,10 +503,12 @@ fun WordScreen(
     vm: WordViewModel,
     ordboken: Ordboken,
     onOpenUri: (Uri, String) -> Unit,
+    onOpenSources: (SearchResult) -> Unit,
     onOpenExternal: (Uri) -> Unit,
     onFillSearch: (String) -> Unit
 ) {
     vm.onOpenUri = onOpenUri
+    vm.onOpenSources = onOpenSources
     vm.onOpenExternal = onOpenExternal
     vm.onFillSearch = onFillSearch
 
@@ -721,10 +753,11 @@ fun WordRoute(
     entry: NavBackStackEntry,
     ordboken: Ordboken,
     onOpenUri: (Uri, String) -> Unit,
+    onOpenSources: (SearchResult) -> Unit,
     onOpenExternal: (Uri) -> Unit,
     onFillSearch: (String) -> Unit
 ) {
     val vm: WordViewModel = viewModel(entry)
     Log.i("word", "rendering word route for ${vm.mWord}")
-    WordScreen(vm, ordboken, onOpenUri, onOpenExternal, onFillSearch)
+    WordScreen(vm, ordboken, onOpenUri, onOpenSources, onOpenExternal, onFillSearch)
 }

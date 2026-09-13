@@ -87,6 +87,23 @@ class MainActivity : AppCompatActivity() {
         navController?.navigate(wordRoute(uri.toString(), title))
     }
 
+    /**
+     * Navigates to a combined multi-dictionary word view; used by the debug
+     * agent driver. The word is addressed by its [sources] probe list, so the
+     * route stays on the merged page whatever the active dictionary is.
+     */
+    fun navigateToSources(sources: List<CombSource>, title: String, ref: String?) {
+        if (sources.isEmpty()) return
+        navController?.navigate(
+            wordRoute(
+                sources.first().uri.toString(),
+                title,
+                sources = MultiDict.sourcesToJson(sources),
+                ref = ref
+            )
+        )
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         intent.dataString?.let { data ->

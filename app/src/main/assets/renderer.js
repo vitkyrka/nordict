@@ -178,19 +178,25 @@ const template = (word) => {
 
 // Label each entry; entries with a title that appears more than once get a
 // RAE-style ordinal (frente¹, frente², ...) so same-name homographs are
-// distinguishable in the nav.
+// distinguishable in the nav. On a combined multi-dictionary page (entries
+// span more than one distinct `dictionary` label) every label is prefixed
+// with its dictionary tag, so a shared word rendered by DLE and EST reads
+// "DLE frente¹ | EST frente¹" with ordinals grouped per dictionary.
 const homonymLabels = (entries) => {
+    const mixed = new Set(entries.map(e => e.dictionary)).size > 1;
     const counts = {};
     entries.forEach(e => {
-        const t = e.mTitle;
-        counts[t] = (counts[t] || 0) + 1;
+        const k = e.dictionary + '|' + e.mTitle;
+        counts[k] = (counts[k] || 0) + 1;
     });
 
     const seen = {};
     return entries.map(e => {
+        const k = e.dictionary + '|' + e.mTitle;
         const t = e.mTitle;
-        const n = (seen[t] = (seen[t] || 0) + 1);
-        return { title: t, ordinal: counts[t] > 1 ? n : '' };
+        const n = (seen[k] = (seen[k] || 0) + 1);
+        const prefix = mixed && e.dictionary ? e.dictionary + ' ' : '';
+        return { title: prefix + t, ordinal: counts[k] > 1 ? n : '' };
     });
 };
 

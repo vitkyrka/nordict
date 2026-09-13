@@ -8,8 +8,10 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import okhttp3.OkHttpClient
+import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
@@ -178,7 +180,7 @@ class AppDriverTest {
 
         val unknown = drive(AgentCommand(op = AgentOps.SET_DICT, tag = "nope"))
         assertThat(unknown.ok).isFalse()
-        assertThat(unknown.error).contains("unknown dictionary 'nope'")
+        assertThat(unknown.error).contains("unknown or incompatible selection 'nope'")
     }
 
     @Test
@@ -193,6 +195,114 @@ class AppDriverTest {
         val ca = drive(AgentCommand(op = AgentOps.SET_LANG, lang = "ca"))
         assertThat(ca.ok).isFalse()
         assertThat(ca.error).contains("unknown language 'ca'")
+    }
+
+    @Test
+    fun combinedSelectionSearchesAndOpensAcrossDictionaries() {
+        // Re-seed Ordboken with the two dictionaries on distinct base paths so
+        // the combined engine can tell DLE and EST apart; a single dispatcher
+        // then serves every endpoint.
+        Ordboken.reset()
+        val client = OkHttpClient()
+        Ordboken.getInstance(
+            app!!, client,
+            arrayOf(
+                DleDictionary(client, server.url("/").toString().removeSuffix("/")),
+                EstDictionary(
+                    client,
+                    server.url("/diccionario-estudiante").toString().removeSuffix("/")
+                )
+            )
+        )
+        driver = AppDriver(app!!)
+        launchMain()
+
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path ?: return MockResponse().setResponseCode(404)
+                val q = request.requestUrl?.queryParameter("q").orEmpty()
+                val fixtures = File("../testdata")
+                return when {
+                    path.startsWith("/diccionario-estudiante/srv/keys") ->
+                        if (q == "frente") MockResponse().setBody(File(fixtures, "est-search.json").readText())
+                        else MockResponse().setBody("[]")
+                    path.startsWith("/srv/keys") ->
+                        when (q) {
+                            "frente" -> MockResponse().setBody(File(fixtures, "dle-search.json").readText())
+                            "frentero" -> MockResponse().setBody("""["frentero|frentero"]""")
+                            else -> MockResponse().setBody("[]")
+                        }
+                    path == "/diccionario-estudiante/frente" -> MockResponse().setBody(File(fixtures, "est.html").readText())
+                    path == "/diccionario-estudiante/muerte" -> MockResponse().setBody(File(fixtures, "est/muerte.html").readText())
+                    path == "/frente" -> MockResponse().setBody(File(fixtures, "dle.html").readText())
+                    else -> MockResponse().setResponseCode(404)
+                }
+            }
+        }
+
+        // Combined selection: setDict with a tag list stays combined.
+        val setDict = drive(AgentCommand(op = AgentOps.SET_DICT, tags = listOf("DLE", "EST")))
+        assertThat(setDict.ok).isTrue()
+        assertThat(setDict.message).contains("DLE,EST")
+        assertThat(setDict.state?.dict).isEqualTo("DLE,EST")
+        assertThat(setDict.state?.dicts).containsExactly("DLE", "EST").inOrder()
+
+        // frente exists in both dictionaries; frentero only in DLE.
+        val search = drive(AgentCommand(op = AgentOps.SEARCH, query = "frente"))
+        assertThat(search.ok).isTrue()
+        val frente = search.results!!.first { it.mTitle == "frente" }
+        assertThat(frente.dicts).containsExactly("DLE", "EST").inOrder()
+
+        // Opening a shared headword renders the merged page (refs namespaced).
+        val open = drive(AgentCommand(op = AgentOps.OPEN, query = "frente"))
+        assertThat(open.ok).isTrue()
+        assertThat(open.state?.dict).isEqualTo("DLE,EST")
+        assertThat(open.word!!.word?.mTitle).isEqualTo("frente")
+        assertThat(open.word!!.homonyms.map { it.ref })
+            .containsExactly("DLE::1", "EST::1").inOrder()
+
+        // nextPage walks the combined set in memory (DLE first, then EST).
+        val next = drive(AgentCommand(op = AgentOps.NEXT_PAGE))
+        assertThat(next.ok).isTrue()
+        assertThat(next.word!!.homonyms.map { it.ref })
+            .containsExactly("DLE::1", "EST::1").inOrder()
+        assertThat(next.word!!.word?.xrefs).containsExactly("EST::1")
+
+        val last = drive(AgentCommand(op = AgentOps.NEXT_PAGE))
+        assertThat(last.ok).isTrue()
+        assertThat(last.message).contains("already at last entry (2 of 2)")
+
+        // Reopening the same combined headword while an old combined word is
+        // still loaded must return the fresh fetch (default DLE::1 selection),
+        // not the previously loaded SWAPPED word instance.
+        val stale = Ordboken.getInstance(app!!).currentWord
+        val reopened = drive(AgentCommand(op = AgentOps.OPEN, query = "frente"))
+        assertThat(reopened.ok).isTrue()
+        assertThat(reopened.word!!.word?.xrefs).containsExactly("DLE::1")
+        assertThat(Ordboken.getInstance(app!!).currentWord !== stale).isTrue()
+
+        // Any single-dict collapse (agent or UI chip) restores the plain path.
+        val collapse = drive(AgentCommand(op = AgentOps.SET_DICT, tag = "DLE"))
+        assertThat(collapse.ok).isTrue()
+        assertThat(collapse.state?.dict).isEqualTo("DLE")
+        assertThat(collapse.state?.dicts).isNull()
+    }
+
+    @Test
+    fun combinedSelectionRejectsUnknownTags() {
+        launchMain()
+
+        val unknown = drive(AgentCommand(op = AgentOps.SET_DICT, tags = listOf("DLE", "nope")))
+        assertThat(unknown.ok).isFalse()
+        assertThat(unknown.error).contains("unknown or incompatible selection 'DLE,nope'")
+        // The failed selection leaves the previous one intact.
+        assertThat(drive(AgentCommand(op = AgentOps.STATE)).state?.dict).isEqualTo("DLE")
+        assertThat(drive(AgentCommand(op = AgentOps.STATE)).state?.dicts).isNull()
+
+        // An empty tag list is rejected too.
+        val empty = drive(AgentCommand(op = AgentOps.SET_DICT))
+        assertThat(empty.ok).isFalse()
+        assertThat(empty.error).contains("no dictionary tag(s) given")
     }
 
     @Test

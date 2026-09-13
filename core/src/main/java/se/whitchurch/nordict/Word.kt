@@ -228,5 +228,83 @@ class Word(
         fun homonymEntries(words: List<Word>): ArrayList<HomonymEntry> {
             return ArrayList(words.map { toHomonymEntry(it) })
         }
+
+        /**
+         * Builds a JSON-rendered word that has no single source page of its own:
+         * a combined multi-dictionary entry set. The top-level fields come from
+         * [base] (the first dictionary that resolved), so a combined word that
+         * totals a single entry renders as a plain article; `mHomonymEntries`
+         * carries every dictionary's entries in selection order.
+         */
+        fun combined(
+            base: Word,
+            dictionaryLabel: String,
+            entries: List<HomonymEntry>,
+            headword: String,
+            ref: String?
+        ): Word {
+            val word = Word(
+                dict = base.dict,
+                mTitle = base.mTitle,
+                mSlug = base.mSlug,
+                summary = base.summary,
+                mText = base.mText,
+                uri = base.uri,
+                baseUrl = base.baseUrl,
+                element = org.jsoup.Jsoup.parseBodyFragment("").body(),
+                header = "",
+                xrefs = arrayListOf(ref ?: entries.firstOrNull()?.ref ?: ""),
+                renderAsJson = true
+            )
+            word.dictionary = dictionaryLabel
+            word.rawHeadword = headword
+            word.pos = base.pos
+            word.gender = base.gender
+            word.conjugation = base.conjugation
+            word.participle = base.participle
+            word.etymology = base.etymology
+            word.pronunciation = base.pronunciation
+            word.idioms.addAll(base.idioms)
+            word.definitions.addAll(base.definitions)
+            word.audio.addAll(base.audio)
+            word.mHomonymEntries.addAll(entries)
+            return word
+        }
+
+        /**
+         * A fresh word presenting [entry] as the current entry of the combined
+         * page [page]: all slices come from the entry except the full combined
+         * entry set, so an in-memory `nextPage` selection swap keeps the whole
+         * page (and its nav) intact while the headline reflects the selection.
+         */
+        fun withEntry(page: Word, entry: HomonymEntry, headword: String): Word {
+            val word = Word(
+                dict = page.dict,
+                mTitle = entry.mTitle,
+                mSlug = page.mSlug,
+                summary = page.summary,
+                mText = page.mText,
+                uri = page.uri,
+                baseUrl = page.baseUrl,
+                element = page.element,
+                header = page.header,
+                lemma = page.lemma,
+                xrefs = arrayListOf(entry.ref),
+                renderAsJson = true
+            )
+            word.dictionary = entry.dictionary
+            word.rawHeadword = headword
+            word.pos = page.pos
+            word.gender = page.gender
+            word.conjugation = entry.conjugation
+            word.participle = entry.participle
+            word.etymology = entry.etymology
+            word.pronunciation = entry.pronunciation
+            word.idioms.addAll(entry.idioms)
+            word.definitions.addAll(entry.definitions)
+            word.audio.addAll(entry.audio)
+            word.mHomonymEntries.addAll(page.mHomonymEntries)
+            return word
+        }
     }
 }

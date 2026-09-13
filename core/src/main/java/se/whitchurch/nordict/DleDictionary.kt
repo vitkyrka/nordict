@@ -9,6 +9,7 @@ class DleDictionary(client: OkHttpClient, private val baseUrl: String = "https:/
     override val tag: String = "DLE"
     override val flagCode: String = "es"
     override val lang: String = "es"
+    override val supportsCombining: Boolean = true
 
     private fun fetchBody(requestUrl: String): String {
         val request = Request.Builder().url(requestUrl)

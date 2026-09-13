@@ -36,8 +36,17 @@ const val HOME_ROUTE = "home"
 const val SEARCH_ROUTE = "search"
 const val WORD_ROUTE = "word"
 
-fun wordRoute(uri: String, title: String): String =
-    "$WORD_ROUTE?uri=${Uri.encode(uri)}&title=${Uri.encode(title)}"
+fun wordRoute(
+    uri: String,
+    title: String,
+    sources: String? = null,
+    ref: String? = null
+): String {
+    var route = "$WORD_ROUTE?uri=${Uri.encode(uri)}&title=${Uri.encode(title)}"
+    if (sources != null) route += "&sources=${Uri.encode(sources)}"
+    if (ref != null) route += "&ref=${Uri.encode(ref)}"
+    return route
+}
 
 fun searchRoute(query: String): String =
     "$SEARCH_ROUTE?query=${Uri.encode(query)}"
@@ -66,6 +75,25 @@ fun NordictApp(
     fun openWord(uri: Uri, title: String) {
         searchActive = false
         navController.navigate(wordRoute(uri.toString(), title))
+    }
+
+    // Combined words (a search result carrying dictionary provenance) render
+    // the merged multi-dict page addressed by a `sources` JSON param; the
+    // route also keeps the first source's uri for the back-stack/persistence.
+    fun openSources(result: SearchResult) {
+        searchActive = false
+        val sources = result.sources
+        if (sources.isEmpty()) {
+            openWord(result.uri.toAndroidUri(), result.mTitle)
+            return
+        }
+        navController.navigate(
+            wordRoute(
+                sources.first().uri.toString(),
+                result.mTitle,
+                sources = MultiDict.sourcesToJson(sources)
+            )
+        )
     }
 
     fun openWordUrl(rawUrl: String, title: String) {
@@ -111,8 +139,10 @@ fun NordictApp(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Debounced autocomplete suggestions for the global search bar.
-    LaunchedEffect(searchQuery, ordboken.currentIndex) {
+    // Debounced autocomplete suggestions for the global search bar. Recomposes
+    // on the selection signature so a dictionary/combined-selection switch
+    // re-runs the prefetch under the new selection.
+    LaunchedEffect(searchQuery, ordboken.selectionSignature) {
         if (searchQuery.isBlank()) {
             suggestions = emptyList()
             return@LaunchedEffect
@@ -160,7 +190,7 @@ fun NordictApp(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { openWord(result.uri.toAndroidUri(), result.mTitle) }
+                            .clickable { openSources(result) }
                             .padding(horizontal = 16.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -172,6 +202,15 @@ fun NordictApp(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                            if (result.dicts.isNotEmpty()) {
+                                Text(
+                                    text = result.dicts.joinToString(" · "),
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
                             if (result.mSummary.isNotEmpty()) {
                                 Text(
                                     text = result.mSummary,
@@ -218,16 +257,19 @@ fun NordictApp(
                     )
                 }
                 composable(
-                    route = "$WORD_ROUTE?uri={uri}&title={title}",
+                    route = "$WORD_ROUTE?uri={uri}&title={title}&sources={sources}&ref={ref}",
                     arguments = listOf(
                         navArgument("uri") { type = NavType.StringType; defaultValue = "" },
-                        navArgument("title") { type = NavType.StringType; defaultValue = "" }
+                        navArgument("title") { type = NavType.StringType; defaultValue = "" },
+                        navArgument("sources") { type = NavType.StringType; defaultValue = "" },
+                        navArgument("ref") { type = NavType.StringType; defaultValue = "" }
                     )
                 ) { entry ->
                     WordRoute(
                         entry = entry,
                         ordboken = ordboken,
                         onOpenUri = { uri, title -> openWord(uri, title) },
+                        onOpenSources = { result -> openSources(result) },
                         onOpenExternal = { uri ->
                             val browserIntent = Intent(Intent.ACTION_VIEW, uri)
                             context.startActivity(browserIntent)

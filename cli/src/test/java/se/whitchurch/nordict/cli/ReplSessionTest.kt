@@ -217,6 +217,104 @@ class ReplSessionTest {
     }
 
     @Test
+    fun combinedSelectionSearchesAndOpensAcrossDictionaries() {
+        val r = runScript(
+            driver(),
+            """{"op":"setDict","tag":"DLE,EST"}""",
+            """{"op":"state"}""",
+            """{"op":"search","query":"frente"}""",
+            """{"op":"open","query":"frente"}""",
+            """{"op":"nextPage"}""",
+            """{"op":"nextPage"}""",
+            """{"op":"back"}"""
+        )
+
+        ok(r[0])
+        assertThat(r[0].state?.dict).isEqualTo("DLE,EST")
+        assertThat(r[0].state?.dicts).containsExactly("DLE", "EST").inOrder()
+        assertThat(r[0].state?.lang).isEqualTo("es")
+
+        ok(r[1])
+        assertThat(r[1].state?.dict).isEqualTo("DLE,EST")
+
+        ok(r[2])
+        assertThat(r[2].results).isNotEmpty()
+        assertThat(r[2].results!![0].mTitle).isEqualTo("frente")
+        assertThat(r[2].results!![0].dicts).containsExactly("DLE", "EST").inOrder()
+        assertThat(r[2].results!![0].uri).isEqualTo("https://dle.rae.es/frente")
+
+        ok(r[3])
+        assertThat(r[3].word?.word?.mTitle).isEqualTo("frente")
+        assertThat(r[3].word?.homonyms?.map { it.ref })
+            .containsExactly("DLE::1", "EST::1").inOrder()
+        assertThat(r[3].word?.selected).isEqualTo(0)
+        assertThat(r[3].state?.dict).isEqualTo("DLE,EST")
+
+        // Combined nextPage walks every entry across both dictionaries in memory.
+        ok(r[4])
+        assertThat(r[4].word?.selected).isEqualTo(1)
+        ok(r[5])
+        assertThat(r[5].message).contains("already at last entry (2 of 2)")
+
+        ok(r[6])
+    }
+
+    @Test
+    fun setDictCollapsesCombinedSelectionBackToSingle() {
+        val r = runScript(
+            driver(),
+            """{"op":"setDict","tags":["DLE","EST"]}""",
+            """{"op":"setDict","tag":"est"}""",
+            """{"op":"open","query":"frente"}""",
+            """{"op":"nextPage"}"""
+        )
+
+        ok(r[0])
+        assertThat(r[0].state?.dicts).containsExactly("DLE", "EST").inOrder()
+
+        ok(r[1])
+        assertThat(r[1].state?.dict).isEqualTo("EST")
+        assertThat(r[1].state?.dicts).isNull()
+
+        // Now a single-dictionary selection: EST alone, plain page.
+        ok(r[2])
+        assertThat(r[2].word?.word?.mTitle).isEqualTo("frente")
+        assertThat(r[2].word?.homonyms?.map { it.ref }).containsExactly("1").inOrder()
+        assertThat(r[2].word?.selected).isEqualTo(0)
+
+        ok(r[3])
+        assertThat(r[3].message).contains("already at last entry (1 of 1)")
+        assertThat(r[3].word?.selected).isEqualTo(0)
+    }
+
+    @Test
+    fun combinedSelectionRejectsMixedSupportsAndLanguages() {
+        val r = runScript(
+            driver(),
+            """{"op":"setDict","tags":["DLE","LINGPT"]}""",
+            """{"op":"setDict","tags":["DLE","SO"]}""",
+            """{"op":"setDict","tags":["DLE","COLFREN"]}""",
+            """{"op":"setLang","lang":"es"}""",
+            """{"op":"state"}"""
+        )
+
+        // LINGPT/COLFREN are not combining-capable; SO is the same-language but
+        // legacy. Every mixed selection is rejected with a clear message.
+        assertThat(r[0].ok).isFalse()
+        assertThat(r[0].error).contains("does not support combining")
+        assertThat(r[1].ok).isFalse()
+        assertThat(r[1].error).contains("does not support combining")
+        assertThat(r[2].ok).isFalse()
+        assertThat(r[2].error).contains("does not support combining")
+
+        // A failed selection leaves the previous selection intact.
+        ok(r[3])
+        assertThat(r[3].state?.dict).isEqualTo("DLE")
+        ok(r[4])
+        assertThat(r[4].state?.dict).isEqualTo("DLE")
+    }
+
+    @Test
     fun quitClosesTheSession() {
         val driver = driver()
         val input = ByteArrayInputStream(

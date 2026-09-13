@@ -22,7 +22,11 @@ import se.whitchurch.nordict.AgentCommand
 import se.whitchurch.nordict.AgentOps
 import se.whitchurch.nordict.AgentProtocol
 import se.whitchurch.nordict.AgentResult
+import se.whitchurch.nordict.CombSource
+import se.whitchurch.nordict.MultiDict
+import se.whitchurch.nordict.Word
 import se.whitchurch.nordict.WordJson
+import se.whitchurch.nordict.toWordData
 import java.io.File
 import kotlin.system.exitProcess
 
@@ -256,6 +260,7 @@ class Main {
             aliases = listOf("dle"),
             tag = "DLE",
             lang = "es",
+            supportsCombining = true,
             wordUrl = { word -> dleUrl(word) },
             searchUrl = { query -> "https://dle.rae.es/srv/keys?q=$query".toHttpUrlOrNull()!! },
             parse = { page, uri -> DleParser.parse(page, uri, "DLE") },
@@ -265,6 +270,7 @@ class Main {
             aliases = listOf("est"),
             tag = "EST",
             lang = "es",
+            supportsCombining = true,
             wordUrl = { word -> estUrl(word) },
             searchUrl = { query -> "https://www.rae.es/diccionario-estudiante/srv/keys?q=$query".toHttpUrlOrNull()!! },
             parse = { page, uri -> EstParser.parse(page, uri, "EST") },
@@ -274,6 +280,7 @@ class Main {
             aliases = listOf("colspan", "col"),
             tag = "COLSPAN",
             lang = "es",
+            supportsCombining = true,
             wordUrl = { word -> collinsUrl("spanish-english", word) },
             searchUrl = { query -> collinsAutocomplete("spanish-english", query) },
             parse = { page, uri -> CollinsParser.parse(page, uri, "COLSPAN", "spanish-english") },
@@ -355,6 +362,7 @@ class Main {
             aliases = listOf("didac"),
             tag = "DIDAC",
             lang = "ca",
+            supportsCombining = true,
             wordUrl = { word -> didacUrl(word) },
             searchUrl = { query -> didacAutocomplete(query) },
             parse = { page, uri -> DidacParser.parse(page, uri, "DIDAC") },
@@ -362,9 +370,9 @@ class Main {
                 DidacParser.parseSearch(body) { path -> "https://www.diccionari.cat$path".toHttpUrlOrNull()!! }
             }
         ),
-        diccionariDict("gdlc", "GDLC", "gran-diccionari-de-la-llengua-catalana", "diccionari_gdlc", "diccionari-gdlc", "GDLC", false),
-        diccionariDict("ca-es", "CA-ES", "diccionari-catala-castella", "diccionari_ca_es_", "diccionari-ca-es", "catala-castella", true),
-        diccionariDict("ca-en", "CA-EN", "diccionari-catala-angles", "diccionari_ca_en", "diccionari-ca-en", "catala-angles", true)
+        diccionariDict("gdlc", "GDLC", "gran-diccionari-de-la-llengua-catalana", "diccionari_gdlc", "diccionari-gdlc", "GDLC", false).withCombining(),
+        diccionariDict("ca-es", "CA-ES", "diccionari-catala-castella", "diccionari_ca_es_", "diccionari-ca-es", "catala-castella", true).withCombining(),
+        diccionariDict("ca-en", "CA-EN", "diccionari-catala-angles", "diccionari_ca_en", "diccionari-ca-en", "catala-angles", true).withCombining()
     )
 
     fun run(args: Array<String>): Int {
@@ -375,7 +383,7 @@ class Main {
         var url: HttpUrl? = null
         var filePath: String? = null
         var outputPath: String? = null
-        var dict: Dict = dictionaries.first()
+        val selectedDicts = mutableListOf<Dict>()
         var search = false
         val positional = mutableListOf<String>()
 
@@ -386,8 +394,11 @@ class Main {
                     val alias = args.getOrNull(++i)
                     if (alias == null) return error("--dict needs a dictionary name: ${aliasesString()}")
                     if (alias.startsWith("-")) return error("--dict needs a dictionary name, got '$alias'")
-                    dict = dictionaries.firstOrNull { alias in it.aliases }
-                        ?: return error("unknown dictionary '$alias' (choose from: ${aliasesString()})")
+                    for (name in alias.split(',')) {
+                        val named = dictionaries.firstOrNull { it.tag == name || name in it.aliases }
+                        if (named == null) return error("unknown dictionary '$name' (choose from: ${aliasesString()})")
+                        selectedDicts.add(named)
+                    }
                 }
                 "--url" -> {
                     val raw = args.getOrNull(++i)
@@ -413,16 +424,21 @@ class Main {
         }
 
         // A leading positional that names a dictionary selects it: "est frente"
-        // means EST, word "frente". "frente" alone still defaults to DLE.
+        // means EST, word "frente". A comma list selects several: "dle,est frente".
         val firstPos = positional.firstOrNull()?.takeIf { !it.startsWith("-") }
         if (firstPos != null) {
-            val named = dictionaries.firstOrNull { firstPos in it.aliases }
+            val names = firstPos.split(',')
+            val named = if (names.all { n -> dictionaries.any { it.tag == n || n in it.aliases } }) {
+                names.mapNotNull { n -> dictionaries.firstOrNull { it.tag == n || n in it.aliases } }
+            } else {
+                null
+            }
             if (named != null) {
-                if (dict !== dictionaries.first()) {
+                if (selectedDicts.isNotEmpty()) {
                     return error("give the dictionary once, either as --dict or as the first argument")
                 }
                 positional.removeAt(0)
-                dict = named
+                selectedDicts.addAll(named)
             }
         }
 
@@ -432,63 +448,149 @@ class Main {
 
         if (filePath == null && url == null && word == null) {
             return error(
-                "usage: nordict [<dict>] <word> | [<dict>] <query> --search | " +
-                    "[--dict <dict>] --url <url> | [--dict <dict>] --file <page.html|search.json> | -o out.json"
+                "usage: nordict [<dict>[,<dict>...]] <word> | [<dict>[,<dict>...]] <query> --search | " +
+                    "[--dict <dict>[,<dict>...]] --url <url> | [--dict <dict>] --file <page.html|search.json> | -o out.json"
             )
         }
 
+        val selection: List<Dict> = selectedDicts.ifEmpty { listOf(dictionaries.first()) }
+        if (selection.size > 1) {
+            val unsupported = selection.filterNot { it.supportsCombining }
+            if (unsupported.isNotEmpty()) {
+                return error("dictionary ${unsupported.first().tag} does not support combining with other dictionaries")
+            }
+            if (selection.map { it.lang }.distinct().size != 1) {
+                return error(
+                    "combined lookup requires one language (got ${selection.map { it.lang }.distinct().joinToString(",")})"
+                )
+            }
+        }
+
         try {
-            // Words and search both resolve (url | ?? ) to a single target; the
-            // body source is --file, --url, or a live fetch of that target.
-            val target = when {
-                url != null -> url
-                search -> dict.searchUrl(word ?: fallbackWord(filePath!!))
-                else -> {
-                    val w = word ?: fallbackWord(filePath!!)
-                    dict.wordUrl?.invoke(w) ?: return error(
-                        "dictionary ${dict.tag} has no word URL from a headword on the CLI — " +
-                            "run '${dict.aliases.first()} $w --search' to list entries, then " +
-                            "--url <result> (optionally with --file <page.html>) to parse a page"
-                    )
+            val w = word ?: fallbackWord(filePath!!)
+            if (url != null || filePath != null) {
+                if (selection.size > 1) {
+                    return error("--url/--file parse one dictionary page; combine directly with a word: '${selection.joinToString(",") { it.aliases.first() }} $w'")
                 }
-            }
-            val body = if (filePath != null) pageFromFile(filePath, target).first else fetch(target)
-
-            val output = if (search) {
-                val results = dict.searchResults(body)
-                if (results.isEmpty()) {
-                    System.err.println("no search results from $target (${dict.tag})")
-                    return 1
-                }
-                Output(
-                    json = WordJson.searchJson(results),
-                    summary = "${results.size} result(s) from $target (${dict.tag})"
-                )
-            } else {
-                val words = dict.parse(body, target)
-                if (words.isEmpty()) {
-                    System.err.println("no words parsed from $target (${dict.tag})")
-                    return 1
-                }
-                Output(
-                    json = WordJson.toJson(words),
-                    summary = "parsed ${words.size} word(s), " +
-                        "${words.sumOf { it.definitions.size }} definition(s), " +
-                        "${words.sumOf { it.idioms.size }} idiom(s) from $target (${dict.tag})"
-                )
+                val dict = selection.first()
+                return emitWordOrSearch(dict, w, url, filePath, search, outputPath)
             }
 
-            if (outputPath != null) {
-                File(outputPath).writeText(output.json)
-                System.err.println("wrote $outputPath")
-            } else {
-                print(output.json)
-                System.err.println(output.summary)
+            if (search) {
+                return emitSearch(selection, w, outputPath)
             }
-            return 0
+
+            if (selection.size == 1) {
+                return emitWord(selection.first(), w, outputPath)
+            }
+
+            // Combined multi-dictionary word: fetch every selection dictionary in
+            // parallel, aggregate their page entries into one renderable set, and
+            // dump the entries as the flat per-entry JSON array the renderer
+            // draws as a combined homonym page (each entry labeled with its
+            // dictionary, xrefs namespaced "DICT::id").
+            val lookups = selection.map { it.asLookup(::fetch) }
+            val sources = selection.map { d -> CombSource(d.tag, d.wordUrl!!.invoke(w)) }
+            val combined = MultiDict.fetch(lookups, sources, headword = w)
+                ?: return error("no words parsed for '$w' from ${selection.joinToString(",") { it.tag }}")
+            val entries = combined.mHomonymEntries
+                .filter { it.mTitle.isNotEmpty() || it.definitions.isNotEmpty() || it.idioms.isNotEmpty() }
+                .map { Word.withEntry(combined, it, w).toWordData() }
+            if (entries.isEmpty()) return error("no words parsed for '$w' from ${selection.joinToString(",") { it.tag }}")
+            return emit(
+                WordJson.gson.toJson(entries),
+                "${entries.size} entry/ies for '$w' from ${selection.joinToString(",") { it.tag }}",
+                outputPath
+            )
         } catch (e: Exception) {
             return error(e.message ?: e.toString())
         }
+    }
+
+    private fun emitWordOrSearch(
+        dict: Dict,
+        word: String,
+        url: HttpUrl?,
+        filePath: String?,
+        search: Boolean,
+        outputPath: String?
+    ): Int {
+        val target = when {
+            url != null -> url
+            search -> dict.searchUrl(word)
+            else -> dict.wordUrl?.invoke(word) ?: return error(
+                "dictionary ${dict.tag} has no word URL from a headword on the CLI — " +
+                    "run '${dict.aliases.first()} $word --search' to list entries, then " +
+                    "--url <result> (optionally with --file <page.html>) to parse a page"
+            )
+        }
+        val body = if (filePath != null) pageFromFile(filePath, target).first else fetch(target)
+        return if (search) {
+            val results = dict.searchResults(body)
+            if (results.isEmpty()) {
+                System.err.println("no search results from $target (${dict.tag})")
+                return 1
+            }
+            emit(
+                WordJson.searchJson(results),
+                "${results.size} result(s) from $target (${dict.tag})",
+                outputPath
+            )
+        } else {
+            val words = dict.parse(body, target)
+            if (words.isEmpty()) {
+                System.err.println("no words parsed from $target (${dict.tag})")
+                return 1
+            }
+            emit(
+                WordJson.toJson(words),
+                "parsed ${words.size} word(s), " +
+                    "${words.sumOf { it.definitions.size }} definition(s), " +
+                    "${words.sumOf { it.idioms.size }} idiom(s) from $target (${dict.tag})",
+                outputPath
+            )
+        }
+    }
+
+    /** Single-dictionary word lookup (the exact legacy path). */
+    private fun emitWord(dict: Dict, word: String, outputPath: String?): Int {
+        val target = dict.wordUrl?.invoke(word) ?: return error(
+            "dictionary ${dict.tag} has no word URL from a headword on the CLI — " +
+                "run '${dict.aliases.first()} $word --search' to list entries, then " +
+                "--url <result> (optionally with --file <page.html>) to parse a page"
+        )
+        return emitWordOrSearch(dict, word, null, null, false, outputPath)
+    }
+
+    private fun emitSearch(selection: List<Dict>, query: String, outputPath: String?): Int {
+        if (selection.size == 1) {
+            return emitWordOrSearch(selection.first(), query, null, null, true, outputPath)
+        }
+        // Combined search: every selection dictionary's autocomplete runs in
+        // parallel and merges by headword, tagging each result with its sources.
+        val results = MultiDict.mergeSearch(
+            selection.map { d -> d.tag to d.searchResults(fetch(d.searchUrl(query))) }
+        )
+        if (results.isEmpty()) {
+            System.err.println("no search results for '$query' from ${selection.joinToString(",") { it.tag }}")
+            return 1
+        }
+        return emit(
+            WordJson.searchJson(results),
+            "${results.size} result(s) for '$query' from ${selection.joinToString(",") { it.tag }}",
+            outputPath
+        )
+    }
+
+    private fun emit(json: String, summary: String, outputPath: String?): Int {
+        if (outputPath != null) {
+            File(outputPath).writeText(json)
+            System.err.println("wrote $outputPath")
+        } else {
+            print(json)
+            System.err.println(summary)
+        }
+        return 0
     }
 
     private fun runRepl(args: Array<String>): Int {
@@ -575,7 +677,8 @@ class Main {
         )
     }
 
-    private data class Output(val json: String, val summary: String)
+    /** Marks a registered dictionary as combining-capable (keepers of the 7). */
+    private fun Dict.withCombining(): Dict = copy(supportsCombining = true)
 
     private fun aliasesString(): String = dictionaries.joinToString(", ") { it.aliases.joinToString("/") + " (" + it.tag + ")" }
 

@@ -1,0 +1,184 @@
+package se.whitchurch.nordict
+
+import com.google.common.truth.Truth.assertThat
+import okhttp3.OkHttpClient
+import okhttp3.mockwebserver.Dispatcher
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.RecordedRequest
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
+import java.io.File
+
+/**
+ * Combined multi-dictionary engine tests: DLE + EST (the same-language, all
+ * JSON-rendered pair) share one MockWebServer with the live hosts' path
+ * shapes, served from the `testdata/` fixtures via a path dispatcher.
+ */
+class MultiDictTest {
+
+    private lateinit var server: MockWebServer
+    private lateinit var dle: DleDictionary
+    private lateinit var est: EstDictionary
+
+    private fun fixture(name: String): String = File("../testdata/$name").readText()
+
+    @Before
+    fun setUp() {
+        server = MockWebServer()
+        server.start()
+        val base = server.url("/").toString().removeSuffix("/")
+        val estBase = server.url("/diccionario-estudiante").toString().removeSuffix("/")
+        val client = OkHttpClient()
+        dle = DleDictionary(client, base)
+        est = EstDictionary(client, estBase)
+
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path ?: return MockResponse().setResponseCode(404)
+                return when {
+                    // DLE search keys are query-specific: only "frentero" has its
+                    // own list, everything else serves the shared frente fixture.
+                    path.startsWith("/srv/keys") && request.requestUrl?.queryParameter("q") == "frentero" ->
+                        MockResponse().setBody("""["frentero|frentero"]""")
+                    path.startsWith("/srv/keys") -> MockResponse().setBody(fixture("dle-search.json"))
+                    path.startsWith("/frente") -> MockResponse().setBody(fixture("dle.html"))
+                    path.startsWith("/diccionario-estudiante/srv/keys") ->
+                        MockResponse().setBody(fixture("est-search.json"))
+                    path.startsWith("/diccionario-estudiante/frente") -> MockResponse().setBody(fixture("est.html"))
+                    path.startsWith("/diccionario-estudiante/muerte") -> MockResponse().setBody(fixture("est/muerte.html"))
+                    path.startsWith("/diccionario-estudiante/cagar") -> MockResponse().setBody(fixture("est/cagar.html"))
+                    else -> {
+                        println("unexpected path: $path")
+                        MockResponse().setResponseCode(404)
+                    }
+                }
+            }
+        }
+    }
+
+    @After
+    fun tearDown() {
+        server.shutdown()
+    }
+
+    private fun lookups() = listOf(dle, est)
+
+    /** A legacy (non-combining) dictionary with a different language. */
+    private class FakeLegacy(client: OkHttpClient) : Dictionary(client) {
+        override val tag = "SO"
+        override val flagCode = "sedk"
+        override val lang = "sv"
+        override fun search(query: String) = emptyList<SearchResult>()
+        override fun fullSearch(query: String) = emptyList<SearchResult>()
+        override fun get(uri: okhttp3.HttpUrl): Word? = null
+    }
+
+    @Test
+    fun canCombineAcceptsSameLanguageCombiningSelection() {
+        assertThat(MultiDict.canCombine(lookups())).isTrue()
+
+        val legacy = FakeLegacy(okhttp3.OkHttpClient())
+        assertThat(MultiDict.canCombine(listOf(dle, legacy))).isFalse() // mixed support
+        assertThat(MultiDict.canCombine(emptyList())).isFalse()
+    }
+
+    @Test
+    fun combinedSearchMergesByHeadwordAndTagsSources() {
+        val merged = MultiDict.search(lookups(), "frente")
+
+        // "frente" exists in both dictionaries: one result, both tags, both sources.
+        assertThat(merged).isNotEmpty()
+        val frente = merged.first { it.mTitle == "frente" }
+        assertThat(frente.dicts).containsExactly("DLE", "EST").inOrder()
+        assertThat(frente.sources).hasSize(2)
+        assertThat(frente.sources[0].tag).isEqualTo("DLE")
+        assertThat(frente.sources[0].uri.toString()).contains("/frente")
+        assertThat(frente.sources[1].tag).isEqualTo("EST")
+
+        // DLE-only and EST-only results appear once, dicts single.
+        assertThat(merged.map { it.mTitle })
+            .containsExactly("frente", "frentero", "frente a", "frente a frente",
+                "frente por frente", "al frente", "con la frente muy alta",
+                "dar un paso al frente", "de frente", "dos dedos de frente",
+                "en frente").inOrder()
+        assertThat(merged.first { it.mTitle == "frentero" }.dicts).containsExactly("DLE")
+        assertThat(merged.first { it.mTitle == "al frente" }.dicts).containsExactly("EST")
+    }
+
+    @Test
+    fun combinedFetchAggregatesPagesIntoOneWord() {
+        val sources = listOf(
+            CombSource("DLE", server.url("/frente")),
+            CombSource("EST", server.url("/diccionario-estudiante/frente"))
+        )
+
+        val combined = MultiDict.fetch(lookups(), sources, headword = "frente")!!
+
+        assertThat(combined.mTitle).isEqualTo("frente")
+        assertThat(combined.renderAsJson).isTrue()
+        assertThat(combined.dictionary).isEqualTo("DLE")
+        // One entry per source page, selection order, namespaced refs.
+        assertThat(combined.mHomonymEntries).hasSize(2)
+        assertThat(combined.mHomonymEntries.map { it.ref })
+            .containsExactly("DLE::1", "EST::1").inOrder()
+        assertThat(combined.mHomonymEntries.map { it.mTitle })
+            .containsExactly("frente", "frente").inOrder()
+        // The headword carries through for re-searches.
+        assertThat(combined.searchHeadword).isEqualTo("frente")
+        // The first dictionary's content is the headline-level slice.
+        assertThat(combined.definitions).isNotEmpty()
+    }
+
+    @Test
+    fun combinedFetchReflectsRefSelection() {
+        // The EST "muerte" page has three entries; a combined fetch over it
+        // (with a namespaced ref) aggregates page order + labels and selects.
+        val sources = listOf(
+            CombSource("EST", server.url("/diccionario-estudiante/muerte"))
+        )
+        val combined = MultiDict.fetch(lookups(), sources, ref = "EST::2")!!
+
+        assertThat(combined.mHomonymEntries.map { it.mTitle })
+            .containsExactly("muerte", "muerte natural", "muerte violenta").inOrder()
+        assertThat(combined.mHomonymEntries.map { it.ref })
+            .containsExactly("EST::1", "EST::2", "EST::3").inOrder()
+        assertThat(combined.mHomonymEntries.map { it.dictionary })
+            .containsExactly("EST", "EST", "EST").inOrder()
+        assertThat(combined.xrefs).containsExactly("EST::2")
+    }
+
+    @Test
+    fun resolveExactKeepsMatchingDictionariesInSelectionOrder() {
+        val both = MultiDict.resolveExact(lookups(), "frente")
+        assertThat(both.map { it.tag }).containsExactly("DLE", "EST").inOrder()
+
+        val onlyDle = MultiDict.resolveExact(lookups(), "frentero")
+        assertThat(onlyDle.map { it.tag }).containsExactly("DLE")
+    }
+
+    @Test
+    fun refsAndLabels() {
+        assertThat(MultiDict.refOf("DLE", "3")).isEqualTo("DLE::3")
+        assertThat(MultiDict.isCombinedRef("DLE::3")).isTrue()
+        assertThat(MultiDict.isCombinedRef("3")).isFalse()
+        assertThat(MultiDict.labelFor("", "DLE")).isEqualTo("DLE")
+        assertThat(MultiDict.labelFor("Easy Learning", "COLSPAN")).isEqualTo("Easy Learning")
+    }
+
+    @Test
+    fun sourcesJsonRoundTrips() {
+        val sources = listOf(
+            CombSource("DLE", server.url("/frente"), "Parte superior de la cara"),
+            CombSource("EST", server.url("/diccionario-estudiante/frente"))
+        )
+        val json = MultiDict.sourcesToJson(sources)
+        assertThat(json).contains("DLE")
+
+        val back = MultiDict.sourcesFromJson(json)
+        assertThat(back).isEqualTo(sources)
+        assertThat(MultiDict.sourcesFromJson("not json")).isEmpty()
+        assertThat(MultiDict.sourcesFromJson("")).isEmpty()
+    }
+}

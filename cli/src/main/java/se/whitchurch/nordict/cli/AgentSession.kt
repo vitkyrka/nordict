@@ -9,7 +9,9 @@ import se.whitchurch.nordict.AgentOps
 import se.whitchurch.nordict.AgentProtocol
 import se.whitchurch.nordict.AgentResult
 import se.whitchurch.nordict.AgentState
+import se.whitchurch.nordict.CombSource
 import se.whitchurch.nordict.ExactMatch
+import se.whitchurch.nordict.MultiDict
 import se.whitchurch.nordict.SearchResult
 import se.whitchurch.nordict.Word
 import se.whitchurch.nordict.toSearchResultData
@@ -53,12 +55,21 @@ class HeadlessAgentDriver(
     private val fetch: (HttpUrl) -> String = { url -> liveFetch(url) }
 ) : AgentBackend {
 
-    private var active: Dict = dictionaries.first()
+    private val selection = mutableListOf(dictionaries.first())
+    private var combinedPage: Word? = null
     private var currentPage: List<Word> = emptyList()
     private var selectedIdx: Int = 0
     private var loadedWord: Word? = null
     private var lastQuery: String? = null
     private var activity: String = "MainActivity"
+
+    /** The active selection as [Dict]s (its ordering drives search/combining). */
+    private val activeDicts: List<Dict>
+        get() = selection.toList()
+
+    /** The dictionary a `setLang`/single `setDict` names. */
+    private val active: Dict
+        get() = selection.first()
 
     override fun execute(command: AgentCommand): AgentResult {
         return try {
@@ -107,7 +118,27 @@ class HeadlessAgentDriver(
                     if (suggestions.isEmpty()) "" else " (run search to pick from: ${suggestions.joinToString(", ")})"
             )
         }
-        return openAt(exact.uri, query, AgentOps.OPEN)
+        // Single-dictionary results carry no sources; a combined selection's
+        // merged result lists every matching dictionary's page.
+        val sources = exact.sources.ifEmpty { listOf(CombSource(active.tag, exact.uri)) }
+        return openSources(sources, query, AgentOps.OPEN)
+    }
+
+    private fun openSources(sources: List<CombSource>, query: String?, op: String): AgentResult {
+        if (sources.isEmpty()) {
+            return AgentResult.error(op, "no source page for '$query'")
+        }
+        if (sources.size == 1) {
+            return openAt(sources[0].uri, query, op)
+        }
+        val combined = MultiDict.fetch(activeDicts.map { it.asLookup(fetch) }, sources, headword = query.orEmpty())
+            ?: return AgentResult.error(op, "no words parsed from combined sources (${sources.joinToString(",") { it.tag }})")
+        selectedIdx = combined.mHomonymEntries.indexOfFirst { it.ref == combined.xrefs.firstOrNull() }.coerceAtLeast(0)
+        combinedPage = combined
+        loadedWord = combined
+        lastQuery = query
+        activity = "WordActivity"
+        return okPayload(op, snapshot())
     }
 
     private fun opOpenUri(command: AgentCommand): AgentResult {
@@ -129,6 +160,7 @@ class HeadlessAgentDriver(
         val selected = selectWord(words, uri)
         currentPage = words
         selectedIdx = words.indexOf(selected).takeIf { it >= 0 } ?: 0
+        combinedPage = null
         loadedWord = selected
         lastQuery = query
         activity = "WordActivity"
@@ -149,6 +181,23 @@ class HeadlessAgentDriver(
     }
 
     private fun opNextPage(command: AgentCommand): AgentResult {
+        val combined = combinedPage
+        if (combined != null) {
+            val entries = combined.mHomonymEntries
+            if (selectedIdx >= entries.size - 1) {
+                val state = snapshot()
+                return AgentResult(
+                    ok = true,
+                    op = AgentOps.NEXT_PAGE,
+                    message = "already at last entry (${selectedIdx + 1} of ${entries.size})",
+                    state = state,
+                    word = state.word
+                )
+            }
+            selectedIdx++
+            loadedWord = Word.withEntry(combined, entries[selectedIdx], combined.searchHeadword)
+            return okPayload(AgentOps.NEXT_PAGE, snapshot())
+        }
         if (currentPage.isEmpty()) {
             return AgentResult.error(AgentOps.NEXT_PAGE, "no word loaded — open a word first")
         }
@@ -181,18 +230,36 @@ class HeadlessAgentDriver(
     }
 
     private fun opSetDict(command: AgentCommand): AgentResult {
-        val tagOrAlias = command.require("tag", command.tag)
-        val dict = dictionaries.firstOrNull { it.tag == tagOrAlias || tagOrAlias in it.aliases }
-            ?: return AgentResult.error(
-                AgentOps.SET_DICT,
-                "unknown dictionary '$tagOrAlias' — known: ${dictionaries.joinToString(", ") { it.aliases.joinToString("/") + " (" + it.tag + ")" }}"
-            )
-        active = dict
+        val tagOrAlias = command.selectionTags()
+        if (tagOrAlias.isEmpty()) {
+            return AgentResult.error(AgentOps.SET_DICT, "setDict needs a tag (e.g. {\"tag\":\"est\"} or {\"tags\":[\"DLE\",\"EST\"]})")
+        }
+        val picks = tagOrAlias.map { name ->
+            dictionaries.firstOrNull { it.tag == name || name in it.aliases }
+                ?: return AgentResult.error(
+                    AgentOps.SET_DICT,
+                    "unknown dictionary '$name' — known: ${dictionaries.joinToString(", ") { it.aliases.joinToString("/") + " (" + it.tag + ")" }}"
+                )
+        }
+        if (picks.size > 1) {
+            val unsupported = picks.filterNot { it.supportsCombining }
+            if (unsupported.isNotEmpty()) {
+                return AgentResult.error(AgentOps.SET_DICT, "dictionary ${unsupported.first().tag} does not support combining")
+            }
+            if (picks.map { it.lang }.distinct().size != 1) {
+                return AgentResult.error(
+                    AgentOps.SET_DICT,
+                    "combined selection requires one language (got ${picks.map { it.lang }.distinct().joinToString(",")})"
+                )
+            }
+        }
+        selection.clear()
+        selection.addAll(picks)
         clearLoaded()
         return AgentResult(
             ok = true,
             op = AgentOps.SET_DICT,
-            message = "dictionary is now ${dict.tag}",
+            message = "dictionary is now ${displaySelection()}",
             state = snapshot()
         )
     }
@@ -204,7 +271,8 @@ class HeadlessAgentDriver(
                 AgentOps.SET_LANG,
                 "unknown language '$lang' — known: ${dictionaries.map { it.lang }.distinct().joinToString(", ")}"
             )
-        active = dict
+        selection.clear()
+        selection.add(dict)
         clearLoaded()
         return AgentResult(
             ok = true,
@@ -214,22 +282,31 @@ class HeadlessAgentDriver(
         )
     }
 
+    /** The selection rendered for messages/snapshots ("DLE,EST" or a single tag). */
+    private fun displaySelection(): String = selection.joinToString(",") { it.tag }
+
     private fun clearLoaded() {
         currentPage = emptyList()
+        combinedPage = null
         loadedWord = null
         selectedIdx = 0
         lastQuery = null
         activity = "MainActivity"
     }
 
-    private fun searchResults(query: String): List<SearchResult> =
-        active.searchResults(fetch(active.searchUrl(query)))
+    private fun searchResults(query: String): List<SearchResult> {
+        if (selection.size > 1) {
+            return MultiDict.search(activeDicts.map { it.asLookup(fetch) }, query)
+        }
+        return active.searchResults(fetch(active.searchUrl(query)))
+    }
 
     private fun snapshot(): AgentState =
         AgentState(
             activity = activity,
-            dict = active.tag,
-            lang = active.lang,
+            dict = displaySelection(),
+            dicts = if (selection.size > 1) selection.map { it.tag } else null,
+            lang = selection.first().lang,
             query = lastQuery,
             word = loadedWord?.let { wordResultOf(it, currentPage) }
         )

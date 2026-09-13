@@ -41,13 +41,25 @@ class Ordboken private constructor(
     // when the dictionary (or its per-language selection) changes.
     var currentIndex by mutableStateOf(0)
 
+    // The active multi-dictionary selection (empty = a single dictionary, the
+    // normal state, driven by [currentDictionary]). Set by the agent driver
+    // (or a future multi-select UI); any single-dict switch — a nav chip, a
+    // language switch, or an agent `setDict tag`/`setLang` — collapses it.
+    var activeDicts by mutableStateOf<List<Dictionary>>(emptyList())
+
+    /** The key the suggestion search and its cache use: the selection's tag
+     * order when combining, else the current dictionary's tag. */
+    val selectionSignature: String
+        get() = if (activeDicts.isEmpty()) currentDictionary.tag
+        else activeDicts.joinToString(",") { it.tag }
+
     private var dictionaries: Array<Dictionary>
     lateinit var dictMap: Map<String, Dictionary>
     private var flags: Array<Int>
     private var languages: Array<String> = emptyArray()
     private var languageFlags: Map<String, Int> = emptyMap()
     private val mCache: LruCache<HttpUrl, Word> = LruCache(25)
-    private val mSearchResultCache: LruCache<Pair<String, Int>, List<SearchResult>> = LruCache(25)
+    private val mSearchResultCache: LruCache<String, List<SearchResult>> = LruCache(25)
 
     val isOnline: Boolean
         get() {
@@ -148,16 +160,29 @@ class Ordboken private constructor(
     }
 
     fun search(query: String, count: Int): List<SearchResult> {
-        val key = Pair.create(query, currentIndex)
+        val key = "$selectionSignature:$query"
         var results: List<SearchResult>?
 
         results = mSearchResultCache.get(key)
         if (results == null) {
-            results = currentDictionary.search(query)
+            results = if (activeDicts.isNotEmpty()) MultiDict.search(activeDicts, query)
+            else currentDictionary.search(query)
             mSearchResultCache.put(key, results)
         }
 
         return results
+    }
+
+    /**
+     * Fetches and merges a combined dictionary page from the probe
+     * dictionaries in [sources] (the word's own `sources` route param),
+     * honouring a namespaced `__ref`-style ref (`"DLE::2"`) when given.
+     */
+    fun getCombinedWord(sources: List<CombSource>, ref: String? = null): Word? {
+        if (sources.isEmpty()) return null
+        val lookups = sources.mapNotNull { dictMap[it.tag] }
+        if (lookups.isEmpty()) return null
+        return MultiDict.fetch(lookups, sources, ref = ref)
     }
 
     fun onResume(activity: AppCompatActivity) {
@@ -179,6 +204,7 @@ class Ordboken private constructor(
      */
     fun setCurrentDictionary(index: Int) {
         if (index !in dictionaries.indices) return
+        updateActiveDicts(emptyList())
         currentIndex = index
         currentDictionary = dictionaries[index]
         currentFlag = flags[index]
@@ -204,6 +230,33 @@ class Ordboken private constructor(
         val stored = storedDictIndex(lang)
         setCurrentDictionary(if (stored in indices) stored else indices.first())
         return true
+    }
+
+    /**
+     * Selects a multi-dictionary combination by tag. A single tag collapses
+     * to the normal single-dictionary state; several tags must all support
+     * combining and share one language ([MultiDict.canCombine]).
+     */
+    fun setCurrentDictionaries(tags: List<String>): Boolean {
+        if (tags.isEmpty()) return false
+        val picked = tags.mapNotNull { tag ->
+            dictionaries.firstOrNull { it.tag.equals(tag, ignoreCase = true) }
+        }
+        if (picked.size != tags.size) return false
+        if (picked.size == 1) return setCurrentDictionary(picked.first().tag)
+        if (!MultiDict.canCombine(picked)) return false
+        updateActiveDicts(picked)
+        val first = picked.first()
+        val index = dictionaries.indexOfFirst { it === first }
+        if (index >= 0) currentIndex = index
+        currentDictionary = first
+        currentFlag = flags[currentIndex]
+        onDictChanged?.invoke()
+        return true
+    }
+
+    private fun updateActiveDicts(dicts: List<Dictionary>) {
+        if (activeDicts != dicts) activeDicts = dicts
     }
 
     private fun storedDictIndex(lang: String): Int = mPrefs.getInt("dictIndex_$lang", -1)

@@ -5,8 +5,8 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.logging.Logger
 
-abstract class Dictionary(val client: OkHttpClient) {
-    abstract val tag: String
+abstract class Dictionary(val client: OkHttpClient) : WordLookup {
+    override abstract val tag: String
 
     /**
      * Language/flag key, mapped to a drawable at the app boundary
@@ -15,9 +15,19 @@ abstract class Dictionary(val client: OkHttpClient) {
      */
     abstract val flagCode: String
     abstract val lang: String
-    abstract fun search(query: String): List<SearchResult>
+
+    /**
+     * True when this dictionary can take part in a combined multi-dictionary
+     * lookup: its parsed words are JSON-rendered (`renderAsJson`), carry the
+     * `mHomonymEntries` page snapshot, and share one search-page shape with the
+     * other dictionaries of its language. Only a same-language, all-combining
+     * selection combines; everything else keeps single-dictionary behavior.
+     */
+    open val supportsCombining: Boolean = false
+
+    override abstract fun search(query: String): List<SearchResult>
     abstract fun fullSearch(query: String): List<SearchResult>
-    abstract fun get(uri: HttpUrl): Word?
+    override abstract fun get(uri: HttpUrl): Word?
 
     protected val log: Logger by lazy { Logger.getLogger(tag) }
 
