@@ -14,7 +14,6 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
@@ -25,7 +24,6 @@ import se.whitchurch.nordict.DleDictionary
 import se.whitchurch.nordict.EstDictionary
 import se.whitchurch.nordict.MainActivity
 import se.whitchurch.nordict.Ordboken
-import se.whitchurch.nordict.WordActivity
 import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -36,13 +34,12 @@ import java.util.concurrent.TimeoutException
  * Drives [AppDriver] (the app-side agent) against a Robolectric app seeded
  * with DLE/EST pointing at MockWebServer. [AppDriver.execute] runs on a
  * background thread (exactly like the agent server's connection thread) while
- * this test thread keeps the main looper idling so the app's own tasks run.
+ * this test thread keeps the main looper idling so the app's own coroutines
+ * run.
  *
- * Robolectric does not auto-create activities started via `startActivity`,
- * so operations that merely start a new word view (`open`, `openUri`,
- * `nextPage`) are covered end-to-end on a device (see AGENTS.md, `repl
- * --device`); here we cover the operations that run on the current view
- * (search, setDict/setLang, state, back) plus the exact-match error paths.
+ * The app is a single-[MainActivity] navigation graph, so unlike the legacy
+ * separate-activity app, `open`/`openUri`/`nextPage`/`back` all run inside
+ * the same launched activity and are fully covered here end-to-end.
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
@@ -51,6 +48,7 @@ class AppDriverTest {
     private lateinit var server: MockWebServer
     private lateinit var driver: AppDriver
     private var app: android.app.Application? = null
+    private lateinit var scenario: ActivityScenario<MainActivity>
 
     @Before
     fun setUp() {
@@ -77,40 +75,17 @@ class AppDriverTest {
     fun tearDown() {
         Ordboken.reset()
         server.shutdown()
+        if (::scenario.isInitialized) scenario.close()
     }
 
     /**
-     * Launches [MainActivity]. MainActivity.restoreLastView() auto-searches the
-     * last query on launch, so a dummy response is queued first and we wait for
-     * that one request to be served; the tests below then own every enqueue.
+     * Launches [MainActivity]. A fresh-test prefs file has no saved "lastWhere",
+     * so the app lands on the Home (history) destination with no network calls.
      */
     private fun launchMain() {
-        server.enqueue(MockResponse().setBody("[]"))
-        ActivityScenario.launch(MainActivity::class.java)
-        val started = System.currentTimeMillis()
-        while (server.requestCount < 1) {
-            shadowOf(Looper.getMainLooper()).idle()
-            Thread.sleep(10)
-            if (System.currentTimeMillis() - started > 10_000) {
-                throw AssertionError("startup auto-search never hit the mock server")
-            }
-        }
+        scenario = ActivityScenario.launch(MainActivity::class.java)
+        awaitCondition { (trackedActivity() as? MainActivity)?.navController != null }
     }
-
-    /** Launches a word view straight into [path] (an EST URL). */
-    private fun launchWord(path: String): ActivityScenario<WordActivity> {
-        val intent = Intent(app, WordActivity::class.java)
-            .setData(Uri.parse(server.url(path).toString()))
-        return ActivityScenario.launch(intent)
-    }
-
-    /** Same as [launchWord] but via [Robolectric.buildActivity] so the view can
-     * be destroyed deterministically (Robolectric cannot reproduce the
-     * finish()-triggers-destroy lifecycle of a scenario activity). */
-    private fun launchWordController(path: String): org.robolectric.android.controller.ActivityController<WordActivity> =
-        Robolectric.buildActivity(WordActivity::class.java, Intent(app, WordActivity::class.java)
-            .setData(Uri.parse(server.url(path).toString())))
-            .setup()
 
     /** JUnit-friendly `Await`: idles the main looper until [condition]. */
     private fun awaitCondition(timeoutMs: Long = 15_000, condition: () -> Boolean) {
@@ -125,8 +100,8 @@ class AppDriverTest {
 
     /**
      * Drives one command on a background thread while this thread keeps the
-     * main looper going. The word-view ops that need the app to load a page
-     * return as soon as [Ordboken.currentWord] reflects the result.
+     * main looper going. Word-loading ops return as soon as
+     * [Ordboken.currentWord] reflects the result.
      */
     private fun drive(command: AgentCommand): AgentResult {
         val executor = Executors.newSingleThreadExecutor()
@@ -227,17 +202,21 @@ class AppDriverTest {
         // returns null), so serve the page twice for the EST retrieval.
         server.enqueue(MockResponse().setBody(html))
         server.enqueue(MockResponse().setBody(html))
-        val scenario = launchWord("/muerte")
-        awaitCondition { Ordboken.getInstance(app!!).currentWord?.mTitle == "muerte" }
+        launchMain()
+
+        val open = drive(AgentCommand(
+            op = AgentOps.OPEN_URI,
+            uri = server.url("/muerte").toString()
+        ))
+        assertThat(open.ok).isTrue()
 
         val state = drive(AgentCommand(op = AgentOps.STATE))
         assertThat(state.ok).isTrue()
-        assertThat(state.state?.activity).isEqualTo("WordActivity")
+        assertThat(state.state?.activity).isEqualTo("word")
         assertThat(state.state?.dict).isEqualTo("DLE")
         assertThat(state.state?.word?.word?.mTitle).isEqualTo("muerte")
         assertThat(state.state?.word!!.homonyms.map { it.ref }).containsExactly("1", "2", "3").inOrder()
         assertThat(state.state!!.word!!.selected).isEqualTo(0)
-        scenario.close()
     }
 
     @Test
@@ -245,22 +224,21 @@ class AppDriverTest {
         val html = File("../testdata/est/muerte.html").readText()
         server.enqueue(MockResponse().setBody(html))
         server.enqueue(MockResponse().setBody(html))
-        val controller = launchWordController("/muerte")
-        awaitCondition { Ordboken.getInstance(app!!).currentWord?.mTitle == "muerte" }
+        launchMain()
+
+        val open = drive(AgentCommand(
+            op = AgentOps.OPEN_URI,
+            uri = server.url("/muerte").toString()
+        ))
+        assertThat(open.ok).isTrue()
 
         val back = drive(AgentCommand(op = AgentOps.BACK))
         assertThat(back.ok).isTrue()
-        // Robolectric never destroys a finished scenario activity, so the
-        // driver reports the view as closed (the real destroy/teardown is
-        // simulated below); on a device it lands on whatever was beneath.
         assertThat(back.message).contains("closed the word view")
 
-        // Robolectric cannot reproduce finish()-driven teardown, so simulate
-        // the system destroying the finished view; the device E2E covers the
-        // real back-button lifecycle.
-        controller.destroy()
-        awaitCondition { trackedActivity() == null }
-        assertThat(drive(AgentCommand(op = AgentOps.STATE)).state?.activity).isEmpty()
+        // Popping the word destination lands back on Home.
+        val state = drive(AgentCommand(op = AgentOps.STATE))
+        assertThat(state.state?.activity).isEqualTo("home")
     }
 
     private fun trackedActivity(): android.app.Activity? =

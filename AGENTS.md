@@ -45,16 +45,34 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
 - **`Dictionary.kt`** — interface for a dictionary (`tag`, `lang`,
   `search(query)`, `get(uri)`). Concrete impls are named `<Name>Dictionary.kt`
   (e.g. `EstDictionary`, `DleDictionary`, `DdoDictionary`).
-- **`Ordboken.kt`** — dictionary registry (`dictMap` keyed by `tag`) and the
-  app entry point for lookups. Also builds the action bar's two-row navigation
-  in `onResume`: a language row (`langRadio`) with one flag-only button per
-  language, and a dictionary row (`dictRadio`, ids `radioScroll`/`dictRadio`)
-  showing only the selected language's dictionaries with full tags
-  (e.g. `DLE`). Language buttons carry `tag`/`contentDescription` = lang code;
-  dict buttons carry `tag` = global index into `dictionaries`. Each dictionary's
-  last selection is remembered per language in prefs under `dictIndex_<lang>`
-  (falls back to the first dict of a language); `currentIndex` remains the
-  global index.
+- **`Ordboken.kt`** — dictionary registry (`dictMap` keyed by `tag`), the app
+  entry point for lookups (`getWord(uri)`, cached, probes every dictionary; and
+  `search(query, count)`, cached per `currentIndex`), and the persisted
+  `lastWhere`/`lastWhat`/`currentIndex` state. `currentIndex` is Compose state
+  (`mutableStateOf`), so the Compose `DictionaryNav` rows and the search-bar
+  suggestions recompose when the dictionary changes. Each language's selection
+  is remembered in prefs under `dictIndex_<lang>` (falls back to the first dict
+  of a language); `currentIndex` remains the global index. `setLanguage(lang)`
+  / `setCurrentDictionary(index)` are the single switching path shared by the
+  nav rows and the agent driver.
+- **`MainActivity.kt` + `AppNavHost.kt`** — the whole app is one activity: a
+  global MD3 `SearchBar` (debounced live suggestions from `Ordboken.search`),
+  the `DictionaryNav` rows, and a Navigation-Compose `NavHost` with three
+  destinations — `home` (history/bookmarks tabs), `search?query=`, and
+  `word?uri=&title=`. `MainActivity` sets the initial route from the persisted
+  `lastWhere` (fresh install -> Home) and honors a `data:`-style intent by
+  routing straight to the word destination.
+- **`WordScreen.kt`** — the word destination: `WordViewModel` (scoped to the
+  word `NavBackStackEntry` via `viewModel(entry)`, so stacked word views keep
+  independent state like the old activities). It fetches the word through
+  `Ordboken.getWord` and, when `word.renderAsJson` is true, serializes the
+  `Word` with Gson and injects it into `assets/word_template.html` via
+  `loadWord(...)`; otherwise it keeps the original HTML fragments (`getPage()`)
+  for non-JSON dictionaries. JSON words pin the WebView to the viewport
+  (internal scroll, reliable `#hom-N` anchors); legacy words let the outer
+  `verticalScroll` own the page. Owns the WebView, an `ExoPlayer`, and the
+  oracle history/star SQLite writes; navigation side effects flow out through
+  `onOpenUri`/`onOpenExternal`/`onFillSearch` callbacks.
 - **`<Name>Parser.kt`** — companion-object parsers that take a raw HTML page,
   `okhttp3.HttpUrl`, and dict `tag`, and return `List<Word>`. They use Jsoup and
   clone the fragments they keep in `Word.element`. DLE, EST, and Collins all
@@ -71,10 +89,6 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
   (excluded from Gson output). `Word.Synonym` carries the display `text`, an
   `href` (the full source link target, e.g. a RAE DLE `?id=` deep-link), and a
   `plev` marker (the DLE `abbr.sin_alert` title, e.g. "malsonante").
-- **`WordActivity.kt`** — fetches a word and, when `word.renderAsJson` is true,
-  serializes the `Word` with Gson and injects it into
-  `assets/word_template.html` via `loadWord(...)`. Otherwise it keeps the
-  original HTML fragments (`getPage()`) for non-JSON dictionaries.
 - **`assets/renderer.js`** — builds the DOM from the JSON word object
   (`renderWord(word)` -> `$('#content').html(...)`).
 - **`assets/word.js`** — turns words inside definitions/examples into
@@ -85,7 +99,7 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
   (`span.grammar`/`domain`/`geo`, `ol.definitions`, `ul.idiom-list`, gender
   backgrounds, small-screen layout). Loaded by `word_template.html`.
 - **`assets/word.css`** — styling/overrides for legacy dictionaries that render
-  original HTML from their sources (loaded in `WordActivity.loadWebView` on the
+  original HTML from their sources (loaded by `WordScreen`'s WebView on the
   non-JSON path).
 
 ### The JSON rendering + testing pipeline (what most parser work touches)
@@ -162,9 +176,10 @@ The debug build ships a loopback agent server (`app/src/debug/.../AgentServer`,
 `AgentResult` (`ok`, `error`, optional `state`/`word`), in order, over a
 persistent session until EOF or `quit`. `"word"` carries the loaded word's
 `mTitle`, `uri`, `xrefs` and a per-entry `selected` index. Ops run against the
-app's live `Ordboken` + `WordActivity` and are exercised by
-`AppDriverTest` (Robolectric, word-view ops device-only; `startActivity`
-activities are not auto-created under Robolectric) and the on-device E2E.
+app's live `Ordboken` + the single `MainActivity` navigation graph and are
+exercised by `AppDriverTest` (Robolectric — the app is one activity, so the
+word-view ops run end-to-end under Robolectric) and the on-device E2E;
+`startActivity` is not involved because all routes live in one activity.
 
 ```sh
 ./gradlew :app:assembleDebug
@@ -177,16 +192,19 @@ printf '{"op":"search","query":"frente"}\n{"op":"open","query":"frente"}\n{"op":
 
 The backend starts `.MainActivity` (`am start`) so the driver has a clean task
 root; `--device` retries the connection a few times to absorb cold-start
-races. `setDict`/`setLang` clear the cross-link hook and switch in place, so
-the agent stays on the current word view while the next `search`/`open` uses
-the new dictionary (they deliberately do *not* finish the word view: a real
-back on the device lets the activity beneath restore the last word and reopen
-a `WordActivity`). `nextPage` walks the homonym entries of the current word;
-it strips any existing `__ref` from the loaded word's `uri` before adding the
-next one, or the dictionary would resolve the first `__ref` param again. Each
-`open`/`nextPage` pushes a fresh `WordActivity` onto the stack, so `back` pops
-to the *previous* word view (reporting "closed the word view") and only lands
-on the main screen ("left the word view") when the task root is `MainActivity`.
+races. `state.activity` reports the current NavHost route base name
+(`home`/`search`/`word`), not an activity class — `AppDriver.routeName`
+projects the destination's route pattern onto it. `setDict`/`setLang` clear
+the cross-link hook and switch in place, so the agent stays on the current
+word view while the next `search`/`open` uses the new dictionary (they
+deliberately do *not* pop the word destination: a real back on the device
+would restore the previous word and immediately reopen another word view).
+`nextPage` walks the homonym entries of the current word; it strips any
+existing `__ref` from the loaded word's `uri` before adding the next one, or
+the dictionary would resolve the first `__ref` param again. Each
+`open`/`nextPage` navigates a fresh `word` destination onto the root stack, so
+`back` pops to the *previous* word view (reporting "closed the word view") and
+only lands on home ("left the word view") when popping the last word.
 `AppDriver` `requireActivity()` returns the top resumed activity from a LIFO
 `ActivityTracker` (a last-resumed pointer would read null right after the
 destroy of a finished activity, since destroy callbacks run after the activity
@@ -258,10 +276,10 @@ adb -s <serial> install -r app/build/outputs/apk/debug/app-debug.apk
 adb -s <serial> shell monkey -p se.whitchurch.nordict -c android.intent.category.LAUNCHER 1   # launch
 ```
 
-The launcher activity is `se.whitchurch.nordict` / `.HistoryActivity` (it
-restores the last view — `Where.MAIN` or `Where.WORD`); the `repl --device`
-backend instead `am start`s `.MainActivity` as a clean task root. A
-physical phone typically shows up over adb-over-TLS
+The launcher activity is `se.whitchurch.nordict.MainActivity`, which hosts the
+whole app (Compose NavHost: home/search/word). A fresh install lands on the
+Home tab; an existing `lastWhere=WORD` restores the word view. A physical
+phone typically shows up over adb-over-TLS
 (e.g. `adb-RFCY10MKMMD-...._adb-tls-connect._tcp` series).
 
 To inspect the running UI without eyes on the device, the `android` CLI works
@@ -276,7 +294,7 @@ android --sdk=$ANDROID_HOME screen capture -o /tmp/out.png  # screenshot (visual
 When interacting via raw taps, read the element bounds/centers from the layout
 dump and tap with `adb shell input tap X Y`; re-dump after each action to
 confirm state changes. Beware that `adb shell input text` appends to whatever
-is already in a focused field — use the SearchView's "Clear query" (X) button
+is already in a focused field — use the search bar's "Clear" (X) trailing icon
 instead of trying to delete characters, or select-all (`input keyevent --meta
 CTRL_ON 29`) + delete.
 
@@ -386,14 +404,11 @@ JUnit), `DiccionariIntegrationTest` (`app`, Robolectric + MockWebServer).
   `renderer.js` draws all entries stacked on one page, with a nav row above
   each heading (`#hom-N` anchors) listing every entry (duplicate titles get
   RAE-style ordinals) and bolding the one that follows the row. Legacy
-  (non-JSON) dictionaries leave the list empty and keep the OS-level homograph
-  strip (`WordActivity.loadHomographs`, now skipped for `renderAsJson` words).
-  The word-view WebView sits `wrap_content` inside a `LockableNestedScrollView`
-  (`activity_word.xml`, id `scroll_view`). For `renderAsJson` words,
-  `WordActivity.loadWebView` locks the outer view and sizes the WebView to the
-  viewport (`pinWebViewToViewport`), so the WebView scrolls internally and the
-  `#hom-N` anchors jump reliably; otherwise (legacy dictionaries) the outer
-  view scrolls the whole page (`unpinWebView` unlocks both).
+  (non-JSON) dictionaries leave the list empty and keep the word screen's
+  homograph strip (skipped for `renderAsJson` words). In `WordScreen` the
+  WebView sits inside a `BoxWithConstraints` that pins it to the viewport for
+  `renderAsJson` words (internal WebView scroll, reliable `#hom-N` anchors)
+  or lets the outer `verticalScroll` own the page otherwise.
 - The `definitions`/`idioms` lists in `Word` carry plain fields only; jsoup
   `Element`s are `@Transient` and never reach the renderer.
 - `renderer.js` accepts both plain strings and structured `{text, href, plev}`

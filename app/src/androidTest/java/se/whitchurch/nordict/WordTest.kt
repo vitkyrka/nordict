@@ -26,23 +26,27 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
+/**
+ * Device-only WebView interaction tests against the unified single-activity
+ * app: the rule launches [MainActivity] with a data intent, which routes
+ * straight into the word destination (WebView). [WordViewModel.loadResource]
+ * keeps Espresso busy until the page renders.
+ */
 @RunWith(AndroidJUnit4::class)
 class WordTest {
     private lateinit var loadResource: IdlingResource
 
     @get:Rule
-    var activityScenarioRule = ActivityScenarioRule<WordActivity>(
-            Intent(ApplicationProvider.getApplicationContext(), WordActivity::class.java)
-                    .setData(Uri.parse("https://svenska.se/so/?id=18788&ref=lnr176698"))
+    var activityScenarioRule = ActivityScenarioRule<MainActivity>(
+        Intent(ApplicationProvider.getApplicationContext(), MainActivity::class.java)
+            .setData(Uri.parse("https://svenska.se/so/?id=18788&ref=lnr176698"))
     )
 
     @Before
     fun registerIdlingResource() {
         Intents.init()
-        activityScenarioRule.scenario.onActivity {
-            loadResource = it.loadResource
-            IdlingRegistry.getInstance().register(loadResource)
-        }
+        loadResource = WordViewModel.loadResource
+        IdlingRegistry.getInstance().register(loadResource)
     }
 
     @After
@@ -54,16 +58,16 @@ class WordTest {
     @Test
     fun linkExactMatch() {
         onWebView()
-                .withElement(findElement(Locator.XPATH, "//*[text()='lantegendom']"))
-                .perform(webClick())
+            .withElement(findElement(Locator.XPATH, "//*[text()='lantegendom']"))
+            .perform(webClick())
         intended(hasData(hasToString(startsWith("https://svenska.se/so/?sok=lantegendom"))))
     }
 
     @Test
     fun linkAmbiguous() {
         onWebView()
-                .withElement(findElement(Locator.XPATH, "//*[text()='fast']"))
-                .perform(webClick())
+            .withElement(findElement(Locator.XPATH, "//*[text()='fast']"))
+            .perform(webClick())
         onView(withText("fast")).check(matches(isDisplayed()))
     }
 }

@@ -11,9 +11,9 @@ import se.whitchurch.nordict.AgentOps
 import se.whitchurch.nordict.AgentResult
 import se.whitchurch.nordict.AgentState
 import se.whitchurch.nordict.ExactMatch
+import se.whitchurch.nordict.MainActivity
 import se.whitchurch.nordict.Ordboken
 import se.whitchurch.nordict.Word
-import se.whitchurch.nordict.WordActivity
 import se.whitchurch.nordict.toSearchResultData
 import se.whitchurch.nordict.wordResultOf
 import java.util.concurrent.CountDownLatch
@@ -23,8 +23,13 @@ import java.util.concurrent.TimeUnit
  * Executes agent commands against the live app. Runs on a background thread
  * (the agent server's connection thread): UI launches are marshalled onto the
  * main looper via [onMain], while searches and page loads are awaited by
- * polling [Ordboken.currentWord] and the tracked activity — the app's own
- * async tasks do the heavy lifting.
+ * polling [Ordboken.currentWord] and the navigation destination — the app's
+ * own coroutines do the heavy lifting.
+ *
+ * The app is a single-[MainActivity] Compose navigation graph (`home`,
+ * `search`, `word` routed through `NavHostController`), so `open`/`openUri`/
+ * `nextPage` navigate a word destination and `back` pops one destination.
+ * `state.activity` reports the current route rather than an activity class.
  */
 class AppDriver(private val app: android.app.Application) {
 
@@ -33,9 +38,9 @@ class AppDriver(private val app: android.app.Application) {
 
     private fun ordboken(): Ordboken = Ordboken.getInstance(app)
 
-    private fun requireActivity(): AppCompatActivity {
-        val activity = tracker.current as? AppCompatActivity
-            ?: throw IllegalStateException("no activity resumed — launch the app first")
+    private fun requireMainActivity(): MainActivity {
+        val activity = tracker.current as? MainActivity
+            ?: throw IllegalStateException("no MainActivity resumed — launch the app first")
         return activity
     }
 
@@ -94,7 +99,7 @@ class AppDriver(private val app: android.app.Application) {
 
     private fun openUri(op: String, uri: Uri, title: String): AgentResult {
         onMain {
-            Ordboken.startWordActivity(requireActivity(), title, uri)
+            requireMainActivity().navigateToWord(uri, title)
         }
         val word = waitForOpen(uri.toString().toHttpUrlOrNull())
         return wordResult(op, word)
@@ -128,47 +133,26 @@ class AppDriver(private val app: android.app.Application) {
             .addQueryParameter("__ref", next.ref)
             .build()
         onMain {
-            Ordboken.startWordActivity(requireActivity(), next.mTitle, Uri.parse(pageUri.toString()))
+            requireMainActivity().navigateToWord(Uri.parse(pageUri.toString()), next.mTitle)
         }
         val opened = waitForOpen(pageUri)
         return wordResult(AgentOps.NEXT_PAGE, opened)
     }
 
     private fun opBack(command: AgentCommand): AgentResult {
-        val finished = onMain {
-            val activity = requireActivity()
-            if (activity is WordActivity) {
-                activity.finish()
-                activity
-            } else {
-                null
-            }
-        }
-        if (finished != null) {
-            // The destroy runs on the next main-loop pass; wait for it so the
-            // snapshot reflects the resumed activity beneath (the previous
-            // word view, or MainActivity) rather than the finishing one.
-            // Tolerate the timeout: under Robolectric a finished scenario
-            // activity is never destroyed, and on a device the destroy
-            // normally lands within one loop pass.
-            try {
-                await({ tracker.current !== finished }, timeoutMs = 3_000)
-            } catch (e: IllegalStateException) {
-                // ignore: fall through to the snapshot below
-            }
+        val poppedFrom = onMain {
+            val nav = requireMainActivity().navController ?: return@onMain null
+            val route = nav.currentDestination?.route
+            if (route == null || !nav.popBackStack()) null else route
         }
         val word = ordboken().currentWord
         return AgentResult(
             ok = true,
             op = AgentOps.BACK,
-            message = if (finished != null) {
-                if (tracker.current is WordActivity) {
-                    "back: closed the word view"
-                } else {
-                    "back: left the word view"
-                }
-            } else {
-                "back: not on a word view"
+            message = when {
+                poppedFrom == null -> "back: no destination to pop"
+                routeName(poppedFrom) == "word" -> "back: closed the word view"
+                else -> "back: left the word view"
             },
             state = snapshot(),
             word = word?.let { wordResultOf(it) }
@@ -194,13 +178,13 @@ class AppDriver(private val app: android.app.Application) {
 
     /**
      * Runs a dictionary/language switch on the main thread. Switching while a
-     * [WordActivity] is up would otherwise fire the cross-link hook and
+     * word destination is up would otherwise fire the cross-link hook and
      * navigate to the new dictionary, so the hook is cleared first and the
      * switch happens in place: the agent stays on the current word view, but
      * the active dictionary/language (and the next `search`/`open`) is the
-     * new one. We deliberately do *not* finish the word view — on a real
-     * device the HistoryActivity behind it restores the last word and
-     * immediately reopens a WordActivity, so the view would never go away.
+     * new one. We deliberately do *not* pop the word destination — popping
+     * would restore the previous word and immediately reopen another word
+     * view, so the view would never go away.
      */
     private fun switchOp(op: String, switch: () -> Pair<Boolean, String>): AgentResult {
         val result = onMain {
@@ -214,10 +198,19 @@ class AppDriver(private val app: android.app.Application) {
         }
     }
 
+    /** Project route patterns (e.g. `word?uri={uri}&title={title}`) onto their base names. */
+    private fun routeName(route: String): String = when {
+        route == "home" -> "home"
+        route.startsWith("search?") -> "search"
+        route.startsWith("word?") -> "word"
+        else -> route.substringBefore('?')
+    }
+
     private fun snapshot(): AgentState {
         val word = ordboken().currentWord
+        val route = (tracker.current as? MainActivity)?.navController?.currentDestination?.route
         return AgentState(
-            activity = tracker.current?.javaClass?.simpleName ?: "",
+            activity = route?.let { routeName(it) } ?: (tracker.current?.javaClass?.simpleName ?: ""),
             dict = ordboken().currentDictionary.tag,
             lang = ordboken().currentDictionary.lang,
             word = word?.let { wordResultOf(it) }
@@ -232,7 +225,7 @@ class AppDriver(private val app: android.app.Application) {
      * Polls until the app has loaded the word served from [request] (host and
      * path must match, and if the request carries a `__ref`, that ref must be
      * among the loaded word's xrefs). The word JSON is available as soon as
-     * the app's word task finishes, so this doubles as the "render" barrier.
+     * the word ViewModel finishes, so this doubles as the "render" barrier.
      */
     private fun waitForOpen(request: HttpUrl?, timeoutMs: Int = 30_000): Word {
         if (request == null) {

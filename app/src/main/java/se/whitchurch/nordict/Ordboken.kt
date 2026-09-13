@@ -1,17 +1,16 @@
 package se.whitchurch.nordict
 
 import android.annotation.SuppressLint
-import android.app.TaskStackBuilder
 import android.content.Context
-import android.content.Intent
 import android.content.SharedPreferences
 import android.net.ConnectivityManager
 import android.net.Uri
 import android.util.LruCache
 import android.util.Pair
-import android.view.MenuItem
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.NavUtils
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import okhttp3.Cache
 import okhttp3.CacheControl
 import okhttp3.OkHttpClient
@@ -37,7 +36,9 @@ class Ordboken private constructor(
     val currentLang: String
         get() = currentDictionary.lang
 
-    var currentIndex = 0
+    // Compose-observable so the nav rows and the search suggestions recompose
+    // when the dictionary (or its per-language selection) changes.
+    var currentIndex by mutableStateOf(0)
 
     private var dictionaries: Array<Dictionary>
     lateinit var dictMap: Map<String, Dictionary>
@@ -210,22 +211,6 @@ class Ordboken private constructor(
         mPrefs.edit().putInt("dictIndex_$lang", index).apply()
     }
 
-    fun onOptionsItemSelected(activity: AppCompatActivity, item: MenuItem): Boolean {
-        if (item.itemId == android.R.id.home) {
-            val upIntent = NavUtils.getParentActivityIntent(activity)
-            if (NavUtils.shouldUpRecreateTask(activity, upIntent!!)) {
-                TaskStackBuilder.create(activity)
-                    .addNextIntentWithParentStack(upIntent)
-                    .startActivities()
-            } else {
-                NavUtils.navigateUpFromSameTask(activity)
-            }
-            return true
-        }
-
-        return false
-    }
-
     fun setLastView(where: Where, what: String) {
         lastWhere = where
         lastWhat = what
@@ -285,20 +270,6 @@ class Ordboken private constructor(
 
         fun reset() {
             sInstance = null
-        }
-
-        fun startWordActivity(activity: AppCompatActivity, word: String, uri: Uri) {
-            val intent = Intent(activity, WordActivity::class.java).apply {
-                data = uri
-                flags = Intent.FLAG_ACTIVITY_NO_ANIMATION
-                putExtra("title", word)
-            }
-
-            activity.startActivity(intent)
-        }
-
-        fun startWordActivity(activity: AppCompatActivity, word: String, url: String) {
-            startWordActivity(activity, word, Uri.parse(url))
         }
     }
 }
