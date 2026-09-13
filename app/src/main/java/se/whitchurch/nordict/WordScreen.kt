@@ -17,7 +17,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
@@ -553,78 +553,84 @@ fun WordScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val maxH = maxHeight
-            val scrollState = rememberScrollState()
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth()
+        ) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val maxH = maxHeight
+                val scrollState = rememberScrollState()
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState, enabled = !vm.pinToViewport)
-            ) {
-                // Legacy homograph strip (JSON dictionaries render their own).
-                if (word != null && !word.renderAsJson && word.mHomographs.isNotEmpty()) {
-                    Column {
-                        word.mHomographs.forEach { homograph ->
-                            val isCurrent = homograph.uri == word.uri
-                            Text(
-                                text = (if (isCurrent) "▶ " else "  ") + homograph.mSummary,
-                                fontSize = 15.sp,
-                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        onOpenUri(homograph.uri.toAndroidUri(), homograph.mSummary)
-                                    }
-                                    .padding(start = 20.dp, top = 10.dp, end = 0.dp, bottom = 10.dp)
-                            )
-                        }
-                    }
-                }
-
-                AndroidView(
-                    factory = { ctx ->
-                        val webView = vm.createWebView(ctx)
-                        // A fast fetch (or a recreated destination) can have the
-                        // word ready before/while the WebView is created; render
-                        // it here too (idempotent via the loaded-Uri guard).
-                        vm.maybeLoadWord()
-                        webView
-                    },
-                    modifier = if (vm.pinToViewport) {
-                        Modifier
-                            .fillMaxWidth()
-                            .height(maxH)
-                    } else {
-                        Modifier.fillMaxWidth()
-                    }
-                )
-            }
-
-            if (vm.uiStatus !is WordUiStatus.Hidden) {
-                Box(
+                Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(MaterialTheme.colorScheme.background),
-                    contentAlignment = Alignment.Center
+                        .verticalScroll(scrollState, enabled = !vm.pinToViewport)
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        val s = vm.uiStatus
-                        if (s is WordUiStatus.Loading) {
-                            LoadingIndicator(modifier = Modifier.padding(bottom = 16.dp))
-                            Text(
-                                context.getString(R.string.loading),
-                                textAlign = TextAlign.Center
-                            )
-                        } else if (s is WordUiStatus.Error) {
-                            Text(
-                                text = context.getString(s.textRes),
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.padding(bottom = 16.dp)
-                            )
-                            Button(onClick = { vm.fetchWord() }) {
-                                Text(context.getString(R.string.tryagain))
+                    // Legacy homograph strip (JSON dictionaries render their own).
+                    if (word != null && !word.renderAsJson && word.mHomographs.isNotEmpty()) {
+                        Column {
+                            word.mHomographs.forEach { homograph ->
+                                val isCurrent = homograph.uri == word.uri
+                                Text(
+                                    text = (if (isCurrent) "▶ " else "  ") + homograph.mSummary,
+                                    fontSize = 15.sp,
+                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable {
+                                            onOpenUri(homograph.uri.toAndroidUri(), homograph.mSummary)
+                                        }
+                                        .padding(start = 20.dp, top = 10.dp, end = 0.dp, bottom = 10.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    AndroidView(
+                        factory = { ctx ->
+                            val webView = vm.createWebView(ctx)
+                            // A fast fetch (or a recreated destination) can have the
+                            // word ready before/while the WebView is created; render
+                            // it here too (idempotent via the loaded-Uri guard).
+                            vm.maybeLoadWord()
+                            webView
+                        },
+                        modifier = if (vm.pinToViewport) {
+                            Modifier
+                                .fillMaxWidth()
+                                .height(maxH)
+                        } else {
+                            Modifier.fillMaxWidth()
+                        }
+                    )
+                }
+
+                if (vm.uiStatus !is WordUiStatus.Hidden) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(MaterialTheme.colorScheme.background),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            val s = vm.uiStatus
+                            if (s is WordUiStatus.Loading) {
+                                LoadingIndicator(modifier = Modifier.padding(bottom = 16.dp))
+                                Text(
+                                    context.getString(R.string.loading),
+                                    textAlign = TextAlign.Center
+                                )
+                            } else if (s is WordUiStatus.Error) {
+                                Text(
+                                    text = context.getString(s.textRes),
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                )
+                                Button(onClick = { vm.fetchWord() }) {
+                                    Text(context.getString(R.string.tryagain))
+                                }
                             }
                         }
                     }
@@ -632,109 +638,110 @@ fun WordScreen(
             }
         }
 
-        // Floating horizontal toolbar + FAB (Material 3 expressive).
+        // Docked word action bar: it takes layout space below the content
+        // (nothing ever scrolls behind it), so the last lines stay visible.
+        // The Anki-card FAB is folded in as a regular action.
         if (word != null) {
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
+            Surface(
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 3.dp,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Surface(
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 6.dp,
-                    shape = RoundedCornerShape(28.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        IconButton(onClick = { vm.toggleStar() }) {
+                    IconButton(onClick = { vm.toggleStar() }) {
+                        Icon(
+                            if (vm.mStarred) Icons.Filled.Star else Icons.Filled.StarBorder,
+                            contentDescription = context.getString(
+                                if (vm.mStarred) R.string.remove_bookmark else R.string.add_bookmark
+                            ),
+                            tint = if (vm.mStarred) NordictStarAmber else Color.Unspecified
+                        )
+                    }
+                    IconButton(onClick = {
+                        vm.mWord?.audio?.let { audio -> vm.playAudio(audio) }
+                    }) {
+                        Icon(
+                            painterResource(R.drawable.play),
+                            contentDescription = context.getString(R.string.menu_play_audio)
+                        )
+                    }
+                    Box {
+                        var menuExpanded by remember { mutableStateOf(false) }
+                        IconButton(onClick = { menuExpanded = true }) {
                             Icon(
-                                if (vm.mStarred) Icons.Filled.Star else Icons.Filled.StarBorder,
-                                contentDescription = context.getString(
-                                    if (vm.mStarred) R.string.remove_bookmark else R.string.add_bookmark
-                                ),
-                                tint = if (vm.mStarred) NordictStarAmber else Color.Unspecified
+                                Icons.Filled.MoreVert,
+                                contentDescription = context.getString(R.string.menu_more)
                             )
                         }
-                        IconButton(onClick = {
-                            vm.mWord?.audio?.let { audio -> vm.playAudio(audio) }
-                        }) {
-                            Icon(
-                                painterResource(R.drawable.play),
-                                contentDescription = context.getString(R.string.menu_play_audio)
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(context.getString(R.string.open_in_browser)) },
+                                leadingIcon = {
+                                    Icon(Icons.Filled.OpenInNew, contentDescription = null)
+                                },
+                                onClick = {
+                                    vm.mWord?.uri?.let { url ->
+                                        onOpenExternal(url.toAndroidUri())
+                                    }
+                                    menuExpanded = false
+                                }
                             )
-                        }
-                        Box {
-                            var menuExpanded by remember { mutableStateOf(false) }
-                            IconButton(onClick = { menuExpanded = true }) {
-                                Icon(
-                                    Icons.Filled.MoreVert,
-                                    contentDescription = context.getString(R.string.menu_more)
-                                )
-                            }
-                            DropdownMenu(
-                                expanded = menuExpanded,
-                                onDismissRequest = { menuExpanded = false }
-                            ) {
-                                DropdownMenuItem(
-                                    text = { Text(context.getString(R.string.open_in_browser)) },
-                                    leadingIcon = {
-                                        Icon(Icons.Filled.OpenInNew, contentDescription = null)
-                                    },
-                                    onClick = {
-                                        vm.mWord?.uri?.let { url ->
-                                            onOpenExternal(url.toAndroidUri())
-                                        }
-                                        menuExpanded = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(context.getString(R.string.menu_autoplay)) },
-                                    leadingIcon = {
-                                        Icon(
-                                            painterResource(
-                                                if (vm.autoPlay) R.drawable.autoplay_on
-                                                else R.drawable.autoplay_off
-                                            ),
-                                            contentDescription = null,
-                                            tint = if (vm.autoPlay) MaterialTheme.colorScheme.primary
-                                            else Color.Unspecified
-                                        )
-                                    },
-                                    onClick = {
-                                        vm.autoPlay = !vm.autoPlay
-                                        ordboken.mPrefs.edit()
-                                            .putBoolean("autoPlay", vm.autoPlay).apply()
-                                        menuExpanded = false
-                                    }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(context.getString(R.string.menu_reset_zoom)) },
-                                    leadingIcon = {
-                                        Icon(Icons.Filled.ZoomIn, contentDescription = null)
-                                    },
-                                    onClick = {
-                                        vm.resetZoom()
-                                        menuExpanded = false
-                                    }
-                                )
-                            }
+                            DropdownMenuItem(
+                                text = { Text(context.getString(R.string.menu_autoplay)) },
+                                leadingIcon = {
+                                    Icon(
+                                        painterResource(
+                                            if (vm.autoPlay) R.drawable.autoplay_on
+                                            else R.drawable.autoplay_off
+                                        ),
+                                        contentDescription = null,
+                                        tint = if (vm.autoPlay) MaterialTheme.colorScheme.primary
+                                        else Color.Unspecified
+                                    )
+                                },
+                                onClick = {
+                                    vm.autoPlay = !vm.autoPlay
+                                    ordboken.mPrefs.edit()
+                                        .putBoolean("autoPlay", vm.autoPlay).apply()
+                                    menuExpanded = false
+                                }
+                            )
+                            DropdownMenuItem(
+                                text = { Text(context.getString(R.string.menu_reset_zoom)) },
+                                leadingIcon = {
+                                    Icon(Icons.Filled.ZoomIn, contentDescription = null)
+                                },
+                                onClick = {
+                                    vm.resetZoom()
+                                    menuExpanded = false
+                                }
+                            )
                         }
                     }
-                }
 
-                FloatingActionButton(
-                    onClick = { vm.share() },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer
-                ) {
-                    Icon(
-                        painterResource(R.drawable.add_card),
-                        contentDescription = context.getString(R.string.menu_add_card)
-                    )
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    FilledTonalIconButton(
+                        onClick = { vm.share() },
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    ) {
+                        Icon(
+                            painterResource(R.drawable.add_card),
+                            contentDescription = context.getString(R.string.menu_add_card)
+                        )
+                    }
                 }
             }
         }
