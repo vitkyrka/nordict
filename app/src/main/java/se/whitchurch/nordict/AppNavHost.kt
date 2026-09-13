@@ -46,7 +46,7 @@ fun searchRoute(query: String): String =
 /**
  * The single-activity app shell: one globally visible MD3 [SearchBar] (with
  * debounced live suggestions from [Ordboken.search]) and the
- * [DictionaryNav] rows above a Navigation-Compose [NavHost] with three
+ * [DictionaryNav] row above a Navigation-Compose [NavHost] with three
  * destinations — home (history/bookmarks), search results, and the word view.
  */
 @OptIn(ExperimentalMaterial3Api::class)

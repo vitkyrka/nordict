@@ -7,10 +7,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,10 +34,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * The two-row language/dictionary selector that used to live in the action
+ * The single-row language/dictionary selector that used to live in the action
  * bar. Reads the live [Ordboken] state and switches through
  * [Ordboken.setLanguage] / [Ordboken.setCurrentDictionary] (the same path the
  * agent driver uses).
+ *
+ * Renders one row: a flag button (current language) with a [DropdownMenu] for
+ * the less frequent language switch, followed by the horizontally scrolling
+ * dictionary chips of the selected language.
  */
 @Composable
 fun DictionaryNav(
@@ -37,33 +49,52 @@ fun DictionaryNav(
     modifier: Modifier = Modifier
 ) {
     val currentLang = ordboken.currentLang
+    var langMenuExpanded by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Language row: one flag-only button per language.
-        val langScroll = rememberScrollState()
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(langScroll)
-                .selectableGroup(),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            for (lang in ordboken.availableLanguages) {
-                val selected = lang == currentLang
-                NavChoice(
-                    selected = selected,
-                    onClick = { ordboken.setLanguage(lang) },
-                    contentDescription = lang,
-                    modifier = Modifier.padding(vertical = 2.dp)
-                ) {
-                    Image(
-                        painter = painterResource(ordboken.langFlag(lang)),
-                        contentDescription = null,
-                        modifier = Modifier.size(24.dp),
-                        contentScale = ContentScale.Fit
+        // Language dropdown: one flag button that opens the language list.
+        Box {
+            NavChoice(
+                selected = true,
+                onClick = { langMenuExpanded = true },
+                contentDescription = currentLang
+            ) {
+                Image(
+                    painter = painterResource(ordboken.langFlag(currentLang)),
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp),
+                    contentScale = ContentScale.Fit
+                )
+                Icon(
+                    imageVector = Icons.Filled.ArrowDropDown,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            DropdownMenu(
+                expanded = langMenuExpanded,
+                onDismissRequest = { langMenuExpanded = false }
+            ) {
+                for (lang in ordboken.availableLanguages) {
+                    DropdownMenuItem(
+                        text = { Text(lang) },
+                        onClick = {
+                            langMenuExpanded = false
+                            ordboken.setLanguage(lang)
+                        },
+                        leadingIcon = {
+                            Image(
+                                painter = painterResource(ordboken.langFlag(lang)),
+                                contentDescription = null,
+                                modifier = Modifier.size(24.dp),
+                                contentScale = ContentScale.Fit
+                            )
+                        }
                     )
                 }
             }
@@ -74,7 +105,7 @@ fun DictionaryNav(
         val dictScroll = rememberScrollState()
         Row(
             modifier = Modifier
-                .fillMaxWidth()
+                .weight(1f)
                 .horizontalScroll(dictScroll)
                 .selectableGroup(),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -129,7 +160,7 @@ private fun NavChoice(
             modifier = Modifier
                 .padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             content()
         }
