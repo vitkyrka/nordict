@@ -8,5 +8,5 @@ class CatalaCastellaDictionary(
     baseUrl: String = "https://www.diccionari.cat"
 ) : DiccionariDictionary(
     client, "CA-ES", "diccionari-ca-es", true,
-    "diccionari_ca_es_", "diccionari-catala-castella", baseUrl
+    "diccionari_ca_es_", "diccionari-catala-castella", "catala-castella", baseUrl
 )

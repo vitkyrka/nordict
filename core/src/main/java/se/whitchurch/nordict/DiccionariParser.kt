@@ -48,7 +48,20 @@ class DiccionariParser {
         // The autocomplete label carries the entry title either in a
         // `.field--name-field-display-title` div (ca-es, ca-en) or, for GDLC,
         // in the `.field--name-field-lemma-` field (`<orth>`).
-        fun parseSearch(body: String, uriOf: (path: String) -> HttpUrl): List<SearchResult> {
+        //
+        // Two item shapes flow through the payload:
+        //  - indexed entries carry their `url` (e.g. "/catala-castella/taula")
+        //    and a title extracted from the `label` article;
+        //  - prefix-completion suggestions (what turns "rebutja" into the
+        //    "rebutjar" completion) carry no `url`; the completed word is the
+        //    item `value`. Its destination is this dictionary's entry URL
+        //    space (`/<entryPath>/<slugified value>`), which `uriOf` resolves.
+        //    Items that merely echo the query back (no suffix span) are skipped.
+        fun parseSearch(
+            body: String,
+            entryPath: String,
+            uriOf: (path: String) -> HttpUrl
+        ): List<SearchResult> {
             val results = ArrayList<SearchResult>()
             try {
                 val array = JsonParser.parseString(body)
@@ -56,14 +69,25 @@ class DiccionariParser {
                 array.asJsonArray.forEach { element ->
                     if (!element.isJsonObject) return@forEach
                     val obj = element.asJsonObject
-                    // The trailing autocomplete item is raw user input; it
-                    // carries no URL, so it never becomes a search result.
-                    val url = obj.get("url")?.takeIf { it.isJsonPrimitive }?.asString ?: return@forEach
-                    if (url.isEmpty()) return@forEach
-                    val label = obj.get("label")?.takeIf { it.isJsonPrimitive }?.asString ?: return@forEach
-                    val title = titleFromLabel(label)
-                    if (title.isEmpty()) return@forEach
-                    results.add(SearchResult(title, uriOf(url)))
+                    val label = obj.get("label")?.takeIf { it.isJsonPrimitive }?.asString
+                        ?: return@forEach
+                    val url = obj.get("url")?.takeIf { it.isJsonPrimitive }?.asString ?: ""
+                    if (url.isNotEmpty()) {
+                        val title = titleFromLabel(label)
+                        if (title.isEmpty()) return@forEach
+                        results.add(SearchResult(title, uriOf(url)))
+                    } else {
+                        val value = normalize(obj.get("value")?.takeIf { it.isJsonPrimitive }?.asString ?: "")
+                        if (value.isEmpty()) return@forEach
+                        // A suggestion with no suffix span is just the query
+                        // echoed back (e.g. the DIDAC "cap" trailer), not a
+                        // completion; it has no reliable destination.
+                        if (Jsoup.parse(label).selectFirst(".autocomplete-suggestion-suggestion-suffix") == null) {
+                            return@forEach
+                        }
+                        if (entryPath.isEmpty()) return@forEach
+                        results.add(SearchResult(value, uriOf("/$entryPath/${slug(value)}")))
+                    }
                 }
             } catch (_: Exception) {
             }
@@ -74,6 +98,15 @@ class DiccionariParser {
             val article = Jsoup.parse(label)
             return cleanTitle(article.selectFirst(".field--name-field-display-title"))
                 .ifEmpty { cleanTitle(article.selectFirst(".field--name-field-lemma-")) }
+        }
+
+        // diccionari.cat entry slugs drop punctuation and diacritics ("Cap
+        // Verd" becomes "cap-verd", "taülalla" becomes "taulalla"), the same
+        // normalization the app applies when resolving a word URI.
+        private fun slug(s: String): String {
+            val nfd = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+            return nfd.replace(Regex("""[\p{Mn}]"""), "").lowercase()
+                .replace(Regex("""[^a-z0-9]+"""), "-").trim('-')
         }
 
         /**

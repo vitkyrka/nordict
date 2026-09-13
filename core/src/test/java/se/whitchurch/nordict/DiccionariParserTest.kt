@@ -236,7 +236,10 @@ class DiccionariParserTest {
 
     @Test
     fun testParseSearch() {
-        val results = DiccionariParser.parseSearch(File("../testdata/gdlc-search.json").readText()) { path ->
+        val results = DiccionariParser.parseSearch(
+            File("../testdata/gdlc-search.json").readText(),
+            "GDLC"
+        ) { path ->
             httpUrl("https://www.diccionari.cat$path")
         }
         assertThat(results).hasSize(10)
@@ -246,24 +249,40 @@ class DiccionariParserTest {
         assertThat(results[0].uri.toString()).isEqualTo("https://www.diccionari.cat/GDLC/cap")
         assertThat(results[1].uri.toString()).isEqualTo("https://www.diccionari.cat/GDLC/cap1")
 
-        val caEs = DiccionariParser.parseSearch(File("../testdata/ca-es-search.json").readText()) { path ->
+        // The autocomplete payload mixes indexed entries (with a URL) and
+        // prefix-completion suggestions (no URL): "taula" is the indexed
+        // entry; "taulalla", "tauladora", "taulaplom" and "taulat" are
+        // completions resolved into this dictionary's entry URL space. The
+        // query-echo trailer ("taula", no suffix span) is dropped.
+        val caEs = DiccionariParser.parseSearch(
+            File("../testdata/ca-es-search.json").readText(),
+            "catala-castella"
+        ) { path ->
             httpUrl("https://www.diccionari.cat$path")
         }
-        assertThat(caEs).hasSize(1)
-        assertThat(caEs[0].mTitle).isEqualTo("taula")
+        assertThat(caEs).hasSize(5)
+        assertThat(caEs.map { it.mTitle }).isEqualTo(
+            listOf("taula", "taulalla", "tauladora", "taulaplom", "taulat")
+        )
         assertThat(caEs[0].uri.toString()).isEqualTo("https://www.diccionari.cat/catala-castella/taula")
+        assertThat(caEs[3].uri.toString()).isEqualTo("https://www.diccionari.cat/catala-castella/taulaplom")
 
-        val caEn = DiccionariParser.parseSearch(File("../testdata/ca-en-search.json").readText()) { path ->
+        val caEn = DiccionariParser.parseSearch(
+            File("../testdata/ca-en-search.json").readText(),
+            "catala-angles"
+        ) { path ->
             httpUrl("https://www.diccionari.cat$path")
         }
-        assertThat(caEn).hasSize(1)
-        assertThat(caEn[0].mTitle).isEqualTo("taula")
+        assertThat(caEn).hasSize(6)
+        assertThat(caEn.map { it.mTitle }).isEqualTo(
+            listOf("taula", "tauladora", "taulada", "taulalla", "taulaplom", "taulat")
+        )
         assertThat(caEn[0].uri.toString()).isEqualTo("https://www.diccionari.cat/catala-angles/taula")
     }
 
     @Test
     fun testParseSearchToleratesNonArrayBodies() {
-        val results = DiccionariParser.parseSearch("{}") { path ->
+        val results = DiccionariParser.parseSearch("{}", "catala-castella") { path ->
             httpUrl("https://www.diccionari.cat$path")
         }
         assertThat(results).isEmpty()

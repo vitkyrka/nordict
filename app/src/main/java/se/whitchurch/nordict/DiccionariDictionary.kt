@@ -10,7 +10,9 @@ import okhttp3.Request
  * beyond DIDAC — the monolingual GDLC and the bilingual catala-castella
  * (CA-ES) and catala-angles (CA-EN) — served by the shared [DiccionariParser].
  * Each subclass only supplies the Drupal node class, the autocomplete block
- * key and the `/cerca/…` search-view path.
+ * key, the `/cerca/…` search-view path, and the entry URL path prefix
+ * ([entryPath], e.g. "catala-castella", used to resolve autocomplete
+ * completion words into entry URLs).
  */
 abstract class DiccionariDictionary(
     client: OkHttpClient,
@@ -19,6 +21,7 @@ abstract class DiccionariDictionary(
     private val bilingual: Boolean,
     private val autocompleteKey: String,
     private val cercaPath: String,
+    private val entryPath: String,
     private val baseUrl: String = "https://www.diccionari.cat"
 ) : Dictionary(client) {
     override val flag: Int = R.drawable.flag_ca
@@ -49,9 +52,10 @@ abstract class DiccionariDictionary(
         val body = fetchJson(uriBuilder.build().toString())
         if (body.isEmpty()) return emptyList()
 
-        // The autocomplete payload only carries entry paths ("/catala-castella/cap1");
-        // resolve them against the base site.
-        return DiccionariParser.parseSearch(body) { path ->
+        // The autocomplete payload carries entry paths ("/catala-castella/cap1")
+        // and bare completion words ("rebutjar" from "rebutja"); both resolve
+        // against the base site.
+        return DiccionariParser.parseSearch(body, entryPath) { path ->
             Uri.parse("$baseUrl$path").toHttpUrl()
         }
     }

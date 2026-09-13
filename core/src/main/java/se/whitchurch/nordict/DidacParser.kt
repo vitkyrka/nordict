@@ -30,7 +30,11 @@ class DidacParser {
     companion object {
 
         /** diccionari.cat DIDAC autocomplete search responses. */
-        fun parseSearch(body: String, uriOf: (path: String) -> HttpUrl): List<SearchResult> {
+        fun parseSearch(
+            body: String,
+            entryPath: String = "didac",
+            uriOf: (path: String) -> HttpUrl
+        ): List<SearchResult> {
             val results = ArrayList<SearchResult>()
             try {
                 val array = JsonParser.parseString(body)
@@ -38,18 +42,21 @@ class DidacParser {
                 array.asJsonArray.forEach { element ->
                     if (!element.isJsonObject) return@forEach
                     val obj = element.asJsonObject
-                    // The trailing autocomplete item is the raw user input; it
-                    // carries no URL, so it never becomes a search result.
-                    val url = obj.get("url")?.takeIf { it.isJsonPrimitive }?.asString ?: return@forEach
-                    if (url.isEmpty()) return@forEach
-                    val title = obj.get("label")?.takeIf { it.isJsonPrimitive }
-                        ?.asString
-                        ?.let { label ->
-                            cleanTitle(Jsoup.parse(label).selectFirst(".field--name-field-display-title"))
+                    val label = obj.get("label")?.takeIf { it.isJsonPrimitive }?.asString
+                        ?: return@forEach
+                    val url = obj.get("url")?.takeIf { it.isJsonPrimitive }?.asString ?: ""
+                    if (url.isNotEmpty()) {
+                        val title = cleanTitle(Jsoup.parse(label).selectFirst(".field--name-field-display-title"))
+                        if (title.isEmpty()) return@forEach
+                        results.add(SearchResult(title, uriOf(url)))
+                    } else {
+                        val value = normalize(obj.get("value")?.takeIf { it.isJsonPrimitive }?.asString ?: "")
+                        if (value.isEmpty()) return@forEach
+                        if (Jsoup.parse(label).selectFirst(".autocomplete-suggestion-suggestion-suffix") == null) {
+                            return@forEach
                         }
-                        ?: ""
-                    if (title.isEmpty()) return@forEach
-                    results.add(SearchResult(title, uriOf(url)))
+                        results.add(SearchResult(value, uriOf("/$entryPath/${slug(value)}")))
+                    }
                 }
             } catch (_: Exception) {
             }
@@ -326,5 +333,11 @@ class DidacParser {
         }
 
         private fun normalize(text: String): String = text.replace(Regex("\\s+"), " ").trim()
+
+        private fun slug(s: String): String {
+            val nfd = java.text.Normalizer.normalize(s, java.text.Normalizer.Form.NFD)
+            return nfd.replace(Regex("""[\p{Mn}]"""), "").lowercase()
+                .replace(Regex("""[^a-z0-9]+"""), "-").trim('-')
+        }
     }
 }

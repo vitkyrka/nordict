@@ -114,9 +114,12 @@ class DiccionariIntegrationTest {
 
         val results = dict.search("taula")
 
-        assertThat(results).hasSize(1)
+        assertThat(results).hasSize(5)
         assertThat(results[0].mTitle).isEqualTo("taula")
         assertThat(results[0].uri.toString()).contains("/catala-castella/taula")
+        // Prefix completions from the autocomplete resolve to entry URLs.
+        assertThat(results[4].mTitle).isEqualTo("taulat")
+        assertThat(results[4].uri.toString()).contains("/catala-castella/taulat")
 
         val request = server.takeRequest()
         assertThat(request.path).contains("/search_api_autocomplete/diccionari_ca_es_")
@@ -180,9 +183,12 @@ class DiccionariIntegrationTest {
 
         val results = dict.search("taula")
 
-        assertThat(results).hasSize(1)
+        assertThat(results).hasSize(6)
         assertThat(results[0].mTitle).isEqualTo("taula")
         assertThat(results[0].uri.toString()).contains("/catala-angles/taula")
+        // Prefix completions from the autocomplete resolve to entry URLs.
+        assertThat(results[5].mTitle).isEqualTo("taulat")
+        assertThat(results[5].uri.toString()).contains("/catala-angles/taulat")
 
         val request = server.takeRequest()
         assertThat(request.path).contains("/search_api_autocomplete/diccionari_ca_en")

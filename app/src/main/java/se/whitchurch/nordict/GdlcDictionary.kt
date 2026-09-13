@@ -8,5 +8,5 @@ class GdlcDictionary(
     baseUrl: String = "https://www.diccionari.cat"
 ) : DiccionariDictionary(
     client, "GDLC", "diccionari-gdlc", false,
-    "diccionari_gdlc", "gran-diccionari-de-la-llengua-catalana", baseUrl
+    "diccionari_gdlc", "gran-diccionari-de-la-llengua-catalana", "GDLC", baseUrl
 )

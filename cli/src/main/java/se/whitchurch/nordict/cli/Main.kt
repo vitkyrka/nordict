@@ -73,13 +73,15 @@ class Main {
             .build()
 
     // One GDLC/CA-ES/CA-EN release: the cerca view name, the autocomplete
-    // block key, the Drupal node class, and the bilingual flag all differ.
+    // block key, the Drupal node class, the entry URL path prefix, and the
+    // bilingual flag all differ.
     private fun diccionariDict(
         alias: String,
         dictTag: String,
         cerca: String,
         autocompleteKey: String,
         nodeClass: String,
+        entryPath: String,
         bilingual: Boolean
     ) = Dict(
         aliases = listOf(alias),
@@ -89,7 +91,7 @@ class Main {
         searchUrl = { query -> diccionariAutocomplete(autocompleteKey, query) },
         parse = { page, uri -> DiccionariParser.parse(page, uri, dictTag, nodeClass, bilingual) },
         searchResults = { body ->
-            DiccionariParser.parseSearch(body) { path -> "https://www.diccionari.cat$path".toHttpUrlOrNull()!! }
+            DiccionariParser.parseSearch(body, entryPath) { path -> "https://www.diccionari.cat$path".toHttpUrlOrNull()!! }
         }
     )
 
@@ -135,9 +137,9 @@ class Main {
                 DidacParser.parseSearch(body) { path -> "https://www.diccionari.cat$path".toHttpUrlOrNull()!! }
             }
         ),
-        diccionariDict("gdlc", "GDLC", "gran-diccionari-de-la-llengua-catalana", "diccionari_gdlc", "diccionari-gdlc", false),
-        diccionariDict("ca-es", "CA-ES", "diccionari-catala-castella", "diccionari_ca_es_", "diccionari-ca-es", true),
-        diccionariDict("ca-en", "CA-EN", "diccionari-catala-angles", "diccionari_ca_en", "diccionari-ca-en", true)
+        diccionariDict("gdlc", "GDLC", "gran-diccionari-de-la-llengua-catalana", "diccionari_gdlc", "diccionari-gdlc", "GDLC", false),
+        diccionariDict("ca-es", "CA-ES", "diccionari-catala-castella", "diccionari_ca_es_", "diccionari-ca-es", "catala-castella", true),
+        diccionariDict("ca-en", "CA-EN", "diccionari-catala-angles", "diccionari_ca_en", "diccionari-ca-en", "catala-angles", true)
     )
 
     fun run(args: Array<String>): Int {

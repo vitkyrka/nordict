@@ -8,5 +8,5 @@ class CatalaAnglesDictionary(
     baseUrl: String = "https://www.diccionari.cat"
 ) : DiccionariDictionary(
     client, "CA-EN", "diccionari-ca-en", true,
-    "diccionari_ca_en", "diccionari-catala-angles", baseUrl
+    "diccionari_ca_en", "diccionari-catala-angles", "catala-angles", baseUrl
 )

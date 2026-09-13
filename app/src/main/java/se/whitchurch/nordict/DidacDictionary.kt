@@ -35,8 +35,9 @@ class DidacDictionary(client: OkHttpClient, private val baseUrl: String = "https
         val body = fetchJson(uriBuilder.build().toString())
         if (body.isEmpty()) return emptyList()
 
-        // The autocomplete payload only carries entry paths ("/didac/cap1");
-        // resolve them against the base site.
+        // The autocomplete payload carries entry paths ("/didac/cap1") and
+        // bare completion words ("rebutjar" from "rebutja"); both resolve
+        // against the base site.
         return DidacParser.parseSearch(body) { path ->
             Uri.parse("$baseUrl$path").toHttpUrl()
         }
