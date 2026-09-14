@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.NorthWest
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -192,7 +193,49 @@ fun NordictApp(
                 }
             }
         ) {
-            if (suggestions.isEmpty()) {
+            val currentWord = ordboken.currentWord
+            if (searchQuery.isBlank() && currentWord != null) {
+                // Artificial first suggestion with an empty search bar: the
+                // current word. The trailing north-west arrow fills the word
+                // into the search field for easy manual editing (as the legacy
+                // SearchView's query-refinement arrow did); tapping the row
+                // itself reopens the word, like any other suggestion.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { openWord(currentWord.uri.toAndroidUri(), currentWord.mTitle) }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = currentWord.searchHeadword,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (currentWord.dictionary.isNotEmpty()) {
+                            Text(
+                                text = currentWord.dictionary,
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                    IconButton(
+                        onClick = { searchQuery = currentWord.searchHeadword }
+                    ) {
+                        Icon(
+                            Icons.Filled.NorthWest,
+                            contentDescription = context.getString(R.string.search_fill_current_word),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            } else if (suggestions.isEmpty()) {
                 Text(
                     text = context.getString(R.string.no_results),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

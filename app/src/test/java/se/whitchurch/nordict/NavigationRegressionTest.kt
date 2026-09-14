@@ -7,10 +7,15 @@ import android.os.Handler
 import android.os.Looper
 import android.webkit.WebView
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.AnnotatedString
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
@@ -441,6 +446,39 @@ class NavigationRegressionTest {
         composeRule.onNodeWithText(app!!.getString(R.string.no_results)).assertDoesNotExist()
         assertThat(composeRule.activity.navController?.currentDestination?.route)
             .isEqualTo("home")
+    }
+
+    @Test
+    fun emptySearchShowsCurrentWordWithAFillArrow() {
+        awaitNav()
+
+        // Load a word so Ordboken has a "current word" to offer.
+        est.enqueue(MockResponse().setBody(estFrente()))
+        openWord(est, "/frente")
+        val headword = ordboken().currentWord!!.searchHeadword
+
+        // Expanding the search bar with an empty query shows the current word
+        // as the first artificial suggestion (the legacy SearchView behavior).
+        composeRule.onNode(hasSetTextAction())
+            .performSemanticsAction(SemanticsActions.RequestFocus)
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(headword).assertExists()
+
+        // The north-west arrow fills the current word into the search field so
+        // it can be edited manually instead of re-searching from scratch.
+        dle.enqueue(MockResponse().setBody("""["frente|frente"]"""))
+        composeRule
+            .onNodeWithContentDescription(
+                app!!.getString(R.string.search_fill_current_word)
+            )
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitForIdle()
+        composeRule.onNode(hasSetTextAction()).assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.EditableText,
+                AnnotatedString(headword)
+            )
+        )
     }
 
     // ---------- Zoom persistence (regression: the Compose conversion moved the
