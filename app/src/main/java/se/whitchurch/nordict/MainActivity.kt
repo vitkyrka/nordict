@@ -10,10 +10,12 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavHostController
+import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import se.whitchurch.nordict.Ordboken.Where
 import se.whitchurch.nordict.ui.theme.NordictTheme
 
@@ -69,14 +71,23 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContent {
-            NordictTheme {
-                Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    NordictApp(
-                        ordboken = ordboken,
-                        initialRoute = initialRoute,
-                        initialQuery = initialQuery,
-                        onNavController = { navController = it }
-                    )
+            // The activity implements NavigationEventDispatcherOwner; provide it
+            // explicitly so the NavHost's event handler resolves it through the
+            // CompositionLocal (the view-tree fallback alone is unreliable under
+            // Robolectric).
+            CompositionLocalProvider(LocalNavigationEventDispatcherOwner provides this) {
+                NordictTheme {
+                    Surface(
+                        modifier = Modifier.fillMaxSize(),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        NordictApp(
+                            ordboken = ordboken,
+                            initialRoute = initialRoute,
+                            initialQuery = initialQuery,
+                            onNavController = { navController = it }
+                        )
+                    }
                 }
             }
         }

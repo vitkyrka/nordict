@@ -6,13 +6,14 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.NorthWest
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -31,6 +32,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 const val HOME_ROUTE = "home"
@@ -69,12 +71,18 @@ fun NordictApp(
     val navController = rememberNavController()
     val context = LocalContext.current
 
-    var searchQuery by rememberSaveable { mutableStateOf(initialQuery) }
-    var searchActive by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val searchBarState = rememberSearchBarState()
+    // The TextFieldState owns the field's text and caret (unlike the legacy
+    // String-based SearchBar, whose inferred selection jumped back to the
+    // start on a programmatic fill). It is itself saved/restored across a
+    // process recreation via its own rememberSaveable saver.
+    val textFieldState = rememberTextFieldState(initialText = initialQuery)
+    val searchQuery = textFieldState.text.toString()
     var suggestions by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
 
     fun openWord(uri: Uri, title: String) {
-        searchActive = false
+        scope.launch { searchBarState.animateToCollapsed() }
         navController.navigate(wordRoute(uri.toString(), title))
     }
 
@@ -82,7 +90,7 @@ fun NordictApp(
     // the merged multi-dict page addressed by a `sources` JSON param; the
     // route also keeps the first source's uri for the back-stack/persistence.
     fun openSources(result: SearchResult) {
-        searchActive = false
+        scope.launch { searchBarState.animateToCollapsed() }
         val sources = result.sources
         if (sources.isEmpty()) {
             openWord(result.uri.toAndroidUri(), result.mTitle)
@@ -115,7 +123,7 @@ fun NordictApp(
     }
 
     fun runSearch(query: String) {
-        searchActive = false
+        scope.launch { searchBarState.animateToCollapsed() }
         navController.navigate(searchRoute(query)) { launchSingleTop = true }
     }
 
@@ -165,14 +173,13 @@ fun NordictApp(
         suggestions = withContext(Dispatchers.IO) { ordboken.search(searchQuery, 50) }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        // Global search header.
-        SearchBar(
-            query = searchQuery,
-            onQueryChange = { searchQuery = it },
+    // The search field shared by the collapsed bar and the expanded fullscreen
+    // sheet, so the caret position set when filling a word sticks in both.
+    val inputField: @Composable () -> Unit = {
+        SearchBarDefaults.InputField(
+            textFieldState = textFieldState,
+            searchBarState = searchBarState,
             onSearch = { runSearch(it) },
-            active = searchActive,
-            onActiveChange = { searchActive = it },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
@@ -188,99 +195,19 @@ fun NordictApp(
                     Icon(
                         Icons.Filled.Clear,
                         contentDescription = null,
-                        modifier = Modifier.clickable { searchQuery = "" }
+                        modifier = Modifier.clickable { textFieldState.setTextAndPlaceCursorAtEnd("") }
                     )
                 }
             }
-        ) {
-            val currentWord = ordboken.currentWord
-            if (searchQuery.isBlank() && currentWord != null) {
-                // Artificial first suggestion with an empty search bar: the
-                // current word. The trailing north-west arrow fills the word
-                // into the search field for easy manual editing (as the legacy
-                // SearchView's query-refinement arrow did); tapping the row
-                // itself reopens the word, like any other suggestion.
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { openWord(currentWord.uri.toAndroidUri(), currentWord.mTitle) }
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = currentWord.searchHeadword,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (currentWord.dictionary.isNotEmpty()) {
-                            Text(
-                                text = currentWord.dictionary,
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.primary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                    IconButton(
-                        onClick = { searchQuery = currentWord.searchHeadword }
-                    ) {
-                        Icon(
-                            Icons.Filled.NorthWest,
-                            contentDescription = context.getString(R.string.search_fill_current_word),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-            } else if (suggestions.isEmpty()) {
-                Text(
-                    text = context.getString(R.string.no_results),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp)
-                )
-            } else {
-                suggestions.forEach { result ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { openSources(result) }
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = result.mTitle,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            if (result.dicts.isNotEmpty()) {
-                                Text(
-                                    text = result.dicts.joinToString(" · "),
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            if (result.mSummary.isNotEmpty()) {
-                                Text(
-                                    text = result.mSummary,
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        )
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        // Global search header.
+        SearchBar(
+            state = searchBarState,
+            inputField = inputField
+        )
 
         DictionaryNav(ordboken = ordboken, modifier = Modifier.padding(horizontal = 8.dp))
 
@@ -331,8 +258,8 @@ fun NordictApp(
                             context.startActivity(browserIntent)
                         },
                         onFillSearch = { query ->
-                            searchQuery = query
-                            searchActive = true
+                            textFieldState.setTextAndPlaceCursorAtEnd(query)
+                            scope.launch { searchBarState.animateToExpanded() }
                         },
                         onReplaceSources = { result -> replaceSources(result) },
                         onReplaceWord = { uri, title -> replaceWord(uri, title) }
@@ -342,9 +269,108 @@ fun NordictApp(
         }
     }
 
+    // Fullscreen expanded search sheet: the same input field plus the
+    // suggestions content in a dialog layered over everything, driven by the
+    // shared SearchBarState.
+    ExpandedFullScreenSearchBar(
+        state = searchBarState,
+        inputField = inputField
+    ) {
+        val currentWord = ordboken.currentWord
+        if (searchQuery.isBlank() && currentWord != null) {
+            // Artificial first suggestion with an empty search bar: the
+            // current word. The trailing north-west arrow fills the word
+            // into the search field for easy manual editing (as the legacy
+            // SearchView's query-refinement arrow did), placing the caret at
+            // the end so a backspace strips trailing suffixes; tapping the
+            // row itself reopens the word, like any other suggestion.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { openWord(currentWord.uri.toAndroidUri(), currentWord.mTitle) }
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = currentWord.searchHeadword,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (currentWord.dictionary.isNotEmpty()) {
+                        Text(
+                            text = currentWord.dictionary,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.primary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                IconButton(
+                    onClick = { textFieldState.setTextAndPlaceCursorAtEnd(currentWord.searchHeadword) }
+                ) {
+                    Icon(
+                        Icons.Filled.NorthWest,
+                        contentDescription = context.getString(R.string.search_fill_current_word),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        } else if (suggestions.isEmpty()) {
+            Text(
+                text = context.getString(R.string.no_results),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(16.dp)
+            )
+        } else {
+            suggestions.forEach { result ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { openSources(result) }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = result.mTitle,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Medium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        if (result.dicts.isNotEmpty()) {
+                            Text(
+                                text = result.dicts.joinToString(" · "),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (result.mSummary.isNotEmpty()) {
+                            Text(
+                                text = result.mSummary,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Pressing back while the search overlay is expanded only dismisses the
     // overlay (the legacy search screen in MainActivity did the same); it must
     // not pop the destination underneath it. Registered after the NavHost so
     // it takes precedence over the NavHost's own back handler while enabled.
-    BackHandler(enabled = searchActive) { searchActive = false }
+    BackHandler(enabled = searchBarState.currentValue != SearchBarValue.Collapsed) {
+        scope.launch { searchBarState.animateToCollapsed() }
+    }
 }

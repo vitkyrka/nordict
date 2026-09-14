@@ -15,7 +15,9 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextRange
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
@@ -433,10 +435,14 @@ class NavigationRegressionTest {
         awaitNav()
 
         // Expanding the search bar shows the (empty) suggestions panel. The M3
-        // SearchBar activates on field focus, and Robolectric does not grant
-        // focus from a synthetic click, so drive the activation explicitly.
+        // 1.4 SearchBar's InputField expands on touch input (focus-based
+        // expansion is gated on touch mode, which Robolectric reports as
+        // keyboard mode), so drive the expansion with a synthetic touch tap.
         composeRule.onNode(hasSetTextAction())
-            .performSemanticsAction(SemanticsActions.RequestFocus)
+            .performTouchInput {
+                down(center)
+                up()
+            }
         composeRule.waitForIdle()
         composeRule.onNodeWithText(app!!.getString(R.string.no_results)).assertExists()
 
@@ -459,8 +465,12 @@ class NavigationRegressionTest {
 
         // Expanding the search bar with an empty query shows the current word
         // as the first artificial suggestion (the legacy SearchView behavior).
+        // Expand via a synthetic touch tap (see the back-collapse test).
         composeRule.onNode(hasSetTextAction())
-            .performSemanticsAction(SemanticsActions.RequestFocus)
+            .performTouchInput {
+                down(center)
+                up()
+            }
         composeRule.waitForIdle()
         composeRule.onNodeWithText(headword).assertExists()
 
@@ -473,10 +483,23 @@ class NavigationRegressionTest {
             )
             .performSemanticsAction(SemanticsActions.OnClick)
         composeRule.waitForIdle()
-        composeRule.onNode(hasSetTextAction()).assert(
+        // The expanded fullscreen sheet renders its own copy of the input
+        // field on top of the (still composed) collapsed bar's, so match the
+        // editable field by collection; both share the same TextFieldState.
+        composeRule.onAllNodes(hasSetTextAction())[0].assert(
             SemanticsMatcher.expectValue(
                 SemanticsProperties.EditableText,
                 AnnotatedString(headword)
+            )
+        )
+        // The caret must land after the filled word so a backspace strips a
+        // trailing suffix ("frente a" → "frente") instead of eating the
+        // headword itself: the regression this test pins (the legacy
+        // String-based SearchBar kept the caret at the start on fill).
+        composeRule.onAllNodes(hasSetTextAction())[0].assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.TextSelectionRange,
+                TextRange(headword.length)
             )
         )
     }
