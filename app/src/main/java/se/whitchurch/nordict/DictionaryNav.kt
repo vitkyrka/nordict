@@ -45,10 +45,9 @@ import androidx.compose.ui.zIndex
  * [Ordboken] state and switches through [Ordboken.setCurrentDictionary] /
  * [Ordboken.toggleDictionary] (the same path the agent driver uses).
  *
- * Renders only the horizontally scrolling dictionary chips of the selected
- * language — the language switcher (flag dropdown + one-tap swap button) lives
- * in the top bar ([LanguageMenu] / [SwapLangButton]) so the dict chips get the
- * whole row.
+ * Renders one row: the language switcher (flag dropdown [LanguageMenu] plus the
+ * one-tap swap button [SwapLangButton]) pinned left, followed by the
+ * horizontally scrolling dictionary chips of the selected language.
  *
  * Languages whose dictionaries can combine ([Dictionary.supportsCombining])
  * render multi-select [FilterChip] toggles: tapping toggles a dictionary
@@ -71,6 +70,7 @@ fun DictionaryNav(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        LanguageTopBar(ordboken = ordboken)
         if (ordboken.hasCombiningForLang(currentLang)) {
             CombiningDictRow(ordboken = ordboken, modifier = Modifier.weight(1f))
         } else {
@@ -80,9 +80,9 @@ fun DictionaryNav(
 }
 
 /**
- * The compact top-bar language switcher rendered left of the global search
- * bar: the flag dropdown ([LanguageMenu], the full language list) plus the
- * one-tap swap button ([SwapLangButton], back to the last-used language).
+ * The language switcher leading the dictionary row: the flag dropdown
+ * ([LanguageMenu], the full language list) plus the one-tap swap button
+ * ([SwapLangButton], back to the last-used language).
  */
 @Composable
 fun LanguageTopBar(ordboken: Ordboken) {
