@@ -98,6 +98,12 @@ class WordViewModel(
     var onOpenExternal: ((Uri) -> Unit)? = null
     var onFillSearch: ((String) -> Unit)? = null
 
+    // Pop-then-push navigation for the selection-reload path: replacing the
+    // current word destination keeps the back stack free of the pre-switch
+    // word instead of stacking a redundant copy of it.
+    var onReplaceSources: ((SearchResult) -> Unit)? = null
+    var onReplaceWord: ((Uri, String) -> Unit)? = null
+
     var mWord: Word? by mutableStateOf(null)
     var autoPlay: Boolean by mutableStateOf(false)
     var pinToViewport: Boolean by mutableStateOf(false)
@@ -125,11 +131,11 @@ class WordViewModel(
     // (which have no fetch in flight) get their own balanced increment.
     private var fetchPending = false
 
-    // True while a dictionary switch is waiting for this word to finish
-    // fetching. A quick same-language switch can land on a destination whose
-    // word is still loading (the cross-link hook of the previous switch pushed
-    // it), and maybeSwitchDict() bails on a null word; the switch is retried
-    // from fetchWord() once the word — and its real search headword — arrives.
+    // True while a dictionary-selection change is waiting for this word to
+    // finish fetching. A quick change can land on a destination whose word is
+    // still loading (the change hook of the previous one pushed it), and
+    // onSelectionChanged() bails on a null word; the change is retried from
+    // fetchWord() once the word — and its real search headword — arrives.
     private var pendingDictSwitch = false
 
     // Generation number + in-flight search for the cross-dictionary switch: a
@@ -183,10 +189,10 @@ class WordViewModel(
             pageFinished = false
             webViewVisible = false
             historySave()
-            // A dictionary switch that landed while this word was being fetched
-            // (see maybeSwitchDict) is retried now that the word — and its
+            // A selection change that landed while this word was being fetched
+            // (see onSelectionChanged) is retried now that the word — and its
             // search headword — is available.
-            if (pendingDictSwitch) maybeSwitchDict()
+            if (pendingDictSwitch) onSelectionChanged()
             // The idling resource stays busy until onPageFinished decrements it.
         }
     }
@@ -387,53 +393,88 @@ class WordViewModel(
         }
     }
 
-    /** Cross-dictionary jump when a dictionary row is switched on a word view. */
-    fun maybeSwitchDict() {
+    /**
+     * The dictionary-selection change handler, installed on
+     * [Ordboken.onDictChanged]. Fires whenever any attribute of the selection
+     * changes while a word is on screen — a dictionary toggled in/out
+     * ([Ordboken.toggleDictionary]), the order changed
+     * ([Ordboken.setDictionaryOrder]), a combination collapsed to a single
+     * dictionary, or the language switched. Reloads the word for the new
+     * selection: the combined page when several dictionaries are active
+     * ([MultiDict.resolveExact] then [onReplaceSources]), the new single
+     * dictionary's page otherwise ([onReplaceWord]). A language switch is
+     * skipped — the incoming selection belongs to a different language than
+     * the word, so there is nothing to cross-search.
+     */
+    fun onSelectionChanged() {
         val word = mWord
-        val newDict = ordboken.currentDictionary
         if (word == null) {
-            // A quick second switch can land while this destination's word is
-            // still being fetched; remember it and retry once the word (and
-            // its real search headword) is available.
+            // A quick change can land while this destination's word is still
+            // being fetched; remember it and retry once the word (and its
+            // real search headword) is available.
             pendingDictSwitch = true
             return
         }
 
         val wordDict = ordboken.dictMap[word.dict] ?: return
 
+        val active = ordboken.activeDicts
+        val selectionLang = if (active.isNotEmpty()) active.first().lang
+        else ordboken.currentDictionary.lang
+
         // A language switch rebuilds the dictionary row and selects that
         // language's default dictionary; don't cross-search languages.
-        if (newDict.lang != wordDict.lang) return
+        if (selectionLang != wordDict.lang) return
 
         pendingDictSwitch = false
 
-        // Snapshot the requested dictionary at tap time and give this switch a
-        // generation number: the search below must target the dictionary the
-        // user tapped, not whichever happens to be selected when the search
-        // runs, and a rapid second switch supersedes the first so the older
-        // search cannot land late and push the wrong dictionary's word.
-        val requestedTag = newDict.tag
+        // Snapshot the triggering selection and give this change a generation
+        // number: the lookups below must reflect the selection the user made,
+        // not whichever happens to be active when they finish, and a rapid
+        // second change supersedes the first so an older lookup cannot land
+        // late and push the wrong selection's word.
+        val trigger = ordboken.selectionSignature
         val generation = ++switchDictGeneration
         switchDictJob?.cancel()
         loadResource.increment()
         switchDictJob = viewModelScope.launch {
             try {
+                val combined = if (active.size > 1) {
+                    withContext(Dispatchers.IO) {
+                        MultiDict.resolveExact(active, word.searchHeadword)
+                    }
+                } else emptyList()
+                // A newer change took over, or the selection was switched
+                // meanwhile (e.g. the agent's switchOp runs with the hook
+                // nulled); the newer caller will navigate, so this stale
+                // result must not.
+                if (generation != switchDictGeneration) return@launch
+                if (ordboken.selectionSignature != trigger) return@launch
+                if (combined.isNotEmpty()) {
+                    onReplaceSources?.invoke(
+                        SearchResult(
+                            mTitle = word.searchHeadword,
+                            uri = combined.first().uri,
+                            dicts = combined.map { it.tag },
+                            sources = combined
+                        )
+                    )
+                    return@launch
+                }
+                // Single selection, or a multi selection where no dictionary
+                // has the word under the new combination: reload in the
+                // selection's actual dictionary.
                 val exact = withContext(Dispatchers.IO) {
-                    val results =
-                        ordboken.dictMap[requestedTag]?.search(word.searchHeadword)
-                            ?: return@withContext SearchResult(word.searchHeadword)
+                    val results = ordboken.currentDictionary.search(word.searchHeadword)
                     ExactMatch.resolve(word.searchHeadword, results)
                         ?: SearchResult(word.searchHeadword)
                 }
-                // A newer switch took over, or the user switched the target
-                // dictionary while we were searching; the newer caller will
-                // navigate, so this stale result must not.
                 if (generation != switchDictGeneration) return@launch
-                if (ordboken.currentDictionary.tag != requestedTag) return@launch
+                if (ordboken.selectionSignature != trigger) return@launch
                 if (exact.uri.host == "fake") {
                     onFillSearch?.invoke(exact.mTitle)
                 } else {
-                    onOpenUri?.invoke(exact.uri.toAndroidUri(), exact.mTitle)
+                    onReplaceWord?.invoke(exact.uri.toAndroidUri(), exact.mTitle)
                 }
             } finally {
                 loadResource.decrement()
@@ -505,12 +546,16 @@ fun WordScreen(
     onOpenUri: (Uri, String) -> Unit,
     onOpenSources: (SearchResult) -> Unit,
     onOpenExternal: (Uri) -> Unit,
-    onFillSearch: (String) -> Unit
+    onFillSearch: (String) -> Unit,
+    onReplaceSources: (SearchResult) -> Unit,
+    onReplaceWord: (Uri, String) -> Unit
 ) {
     vm.onOpenUri = onOpenUri
     vm.onOpenSources = onOpenSources
     vm.onOpenExternal = onOpenExternal
     vm.onFillSearch = onFillSearch
+    vm.onReplaceSources = onReplaceSources
+    vm.onReplaceWord = onReplaceWord
 
     val word = vm.mWord
     val context = LocalContext.current
@@ -530,7 +575,7 @@ fun WordScreen(
     // it is reinstated on resume in case anything nulled it meanwhile, and
     // only released on disposal while this destination still owns it.
     DisposableEffect(lifecycleOwner, ordboken) {
-        val myHook: () -> Unit = { vm.maybeSwitchDict() }
+        val myHook: () -> Unit = { vm.onSelectionChanged() }
         ordboken.onDictChanged = myHook
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
@@ -755,9 +800,14 @@ fun WordRoute(
     onOpenUri: (Uri, String) -> Unit,
     onOpenSources: (SearchResult) -> Unit,
     onOpenExternal: (Uri) -> Unit,
-    onFillSearch: (String) -> Unit
+    onFillSearch: (String) -> Unit,
+    onReplaceSources: (SearchResult) -> Unit = onOpenSources,
+    onReplaceWord: (Uri, String) -> Unit = onOpenUri
 ) {
     val vm: WordViewModel = viewModel(entry)
     Log.i("word", "rendering word route for ${vm.mWord}")
-    WordScreen(vm, ordboken, onOpenUri, onOpenSources, onOpenExternal, onFillSearch)
+    WordScreen(
+        vm, ordboken, onOpenUri, onOpenSources, onOpenExternal, onFillSearch,
+        onReplaceSources, onReplaceWord
+    )
 }

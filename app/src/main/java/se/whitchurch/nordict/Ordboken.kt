@@ -82,6 +82,14 @@ class Ordboken private constructor(
 
     fun dictFlag(index: Int): Int = flags[index]
 
+    /** True when [lang] has at least one combining-capable dictionary. */
+    fun hasCombiningForLang(lang: String): Boolean =
+        combiningDictsForLang(lang).isNotEmpty()
+
+    /** [lang]'s combining-capable dictionaries, in registration order. */
+    fun combiningDictsForLang(lang: String): List<Dictionary> =
+        dictionaries.filter { it.lang == lang && it.supportsCombining }
+
     // Caller does the commit
     val prefsEditor: SharedPreferences.Editor
         @SuppressLint("CommitPrefEdits")
@@ -123,6 +131,10 @@ class Ordboken private constructor(
         currentIndex = mPrefs.getInt("currentIndex", 0)
         currentDictionary = dictionaries[currentIndex]
         currentFlag = flags[currentIndex]
+
+        // Restore this language's enabled+ordered dictionaries if a valid
+        // multi-dictionary selection was persisted for it.
+        restoreActiveDicts(currentDictionary.lang)
     }
 
     private fun defaultDictionaries(): Array<Dictionary> {
@@ -195,6 +207,7 @@ class Ordboken private constructor(
         }
         currentDictionary = dictionaries[currentIndex]
         currentFlag = flags[currentIndex]
+        restoreActiveDicts(currentDictionary.lang)
     }
 
     /**
@@ -209,6 +222,7 @@ class Ordboken private constructor(
         currentDictionary = dictionaries[index]
         currentFlag = flags[index]
         saveDictIndex(currentDictionary.lang, index)
+        saveDicts(currentDictionary.lang, listOf(currentDictionary.tag))
         onDictChanged?.invoke()
     }
 
@@ -222,13 +236,30 @@ class Ordboken private constructor(
 
     /**
      * Selects the dictionary for [lang] the way the language row does: the
-     * remember selection for that language, else its first dictionary.
+     * remember selection for that language (a stored multi-dictionary
+     * combination, else the single-dict index), else its first dictionary.
      */
     fun setLanguage(lang: String): Boolean {
         val indices = dictionaries.indices.filter { dictionaries[it].lang == lang }
         if (indices.isEmpty()) return false
         val stored = storedDictIndex(lang)
-        setCurrentDictionary(if (stored in indices) stored else indices.first())
+        val fallbackIndex = if (stored in indices) stored else indices.first()
+
+        val storedDicts = loadDicts(lang).mapNotNull { dictByTag(it) }
+        if (storedDicts.size > 1 && MultiDict.canCombine(storedDicts)) {
+            updateActiveDicts(storedDicts)
+            val first = storedDicts.first()
+            currentIndex = dictionaries.indexOfFirst { it === first }
+            currentDictionary = first
+            currentFlag = flags[currentIndex]
+            saveDictIndex(lang, currentIndex)
+        } else {
+            updateActiveDicts(emptyList())
+            currentIndex = fallbackIndex
+            currentDictionary = dictionaries[fallbackIndex]
+            currentFlag = flags[fallbackIndex]
+        }
+        onDictChanged?.invoke()
         return true
     }
 
@@ -239,18 +270,57 @@ class Ordboken private constructor(
      */
     fun setCurrentDictionaries(tags: List<String>): Boolean {
         if (tags.isEmpty()) return false
-        val picked = tags.mapNotNull { tag ->
-            dictionaries.firstOrNull { it.tag.equals(tag, ignoreCase = true) }
-        }
+        val picked = tags.mapNotNull { dictByTag(it) }
         if (picked.size != tags.size) return false
         if (picked.size == 1) return setCurrentDictionary(picked.first().tag)
         if (!MultiDict.canCombine(picked)) return false
         updateActiveDicts(picked)
-        val first = picked.first()
-        val index = dictionaries.indexOfFirst { it === first }
-        if (index >= 0) currentIndex = index
-        currentDictionary = first
+        currentIndex = dictionaries.indexOfFirst { it === picked.first() }
+        currentDictionary = picked.first()
         currentFlag = flags[currentIndex]
+        saveDictIndex(currentDictionary.lang, currentIndex)
+        saveDicts(currentDictionary.lang, tags)
+        onDictChanged?.invoke()
+        return true
+    }
+
+    /**
+     * Toggles [tag] in/out of the active selection (the UI chip handler).
+     * Toggling on appends (keeps the current order); toggling off removes.
+     * The selection never becomes empty ([DictSelection.toggle] restores
+     * the language's first combining dict). Persists and notifies.
+     */
+    fun toggleDictionary(tag: String): Boolean {
+        val dict = dictByTag(tag) ?: return false
+        val candidates = combiningDictsForLang(dict.lang).map { it.tag }
+        if (tag !in candidates) return false
+        val currentTags =
+            if (activeDicts.isNotEmpty()) activeDicts.map { it.tag }
+            else listOf(currentDictionary.tag)
+        val next = DictSelection.toggle(candidates, currentTags, tag)
+        return if (next.size <= 1) setCurrentDictionary(next.first())
+        else setCurrentDictionaries(next)
+    }
+
+    /**
+     * Reorders the active multi-dictionary selection (the drag-drop commit).
+     * [tags] must be a permutation of the current selection; the order is
+     * persisted and [onDictChanged] fires once.
+     */
+    fun setDictionaryOrder(tags: List<String>): Boolean {
+        if (activeDicts.isEmpty()) return false
+        val currentTags = activeDicts.map { it.tag }
+        if (tags.size != currentTags.size || tags.toSet() != currentTags.toSet()) {
+            return false
+        }
+        val picked = tags.mapNotNull { dictByTag(it) }
+        if (picked.size != tags.size || !MultiDict.canCombine(picked)) return false
+        updateActiveDicts(picked)
+        currentIndex = dictionaries.indexOfFirst { it === picked.first() }
+        currentDictionary = picked.first()
+        currentFlag = flags[currentIndex]
+        saveDictIndex(currentDictionary.lang, currentIndex)
+        saveDicts(currentDictionary.lang, tags)
         onDictChanged?.invoke()
         return true
     }
@@ -259,10 +329,51 @@ class Ordboken private constructor(
         if (activeDicts != dicts) activeDicts = dicts
     }
 
+    private fun restoreActiveDicts(lang: String) {
+        val stored = loadDicts(lang).mapNotNull { dictByTag(it) }
+        // A single persisted tag is just the normal single-dictionary state
+        // (saved by [setCurrentDictionary]); only a real combination restores
+        // as multi-dict.
+        if (stored.size > 1 && MultiDict.canCombine(stored)) {
+            updateActiveDicts(stored)
+            val first = stored.first()
+            currentIndex = dictionaries.indexOfFirst { it === first }
+            currentDictionary = first
+            currentFlag = flags[currentIndex]
+        } else {
+            updateActiveDicts(emptyList())
+            // Restore the language's remembered single dictionary (the global
+            // currentIndex may still point at another language on cold start).
+            val idx = storedDictIndex(lang)
+            if (idx in dictionaries.indices && dictionaries[idx].lang == lang) {
+                currentIndex = idx
+                currentDictionary = dictionaries[idx]
+                currentFlag = flags[idx]
+            }
+        }
+    }
+
+    private fun dictByTag(tag: String): Dictionary? =
+        dictionaries.firstOrNull { it.tag.equals(tag, ignoreCase = true) }
+
     private fun storedDictIndex(lang: String): Int = mPrefs.getInt("dictIndex_$lang", -1)
 
     private fun saveDictIndex(lang: String, index: Int) {
         mPrefs.edit().putInt("dictIndex_$lang", index).apply()
+    }
+
+    /** Reads [lang]'s persisted enabled+ordered combining tags. */
+    private fun loadDicts(lang: String): List<String> {
+        val raw = mPrefs.getString("dicts_$lang", "") ?: ""
+        if (raw.isBlank()) return emptyList()
+        return raw.split(",").map { it.trim() }.filter { tag ->
+            val dict = dictByTag(tag)
+            dict != null && dict.lang == lang && dict.supportsCombining
+        }
+    }
+
+    private fun saveDicts(lang: String, tags: List<String>) {
+        mPrefs.edit().putString("dicts_$lang", tags.joinToString(",")).apply()
     }
 
     fun setLastView(where: Where, what: String) {

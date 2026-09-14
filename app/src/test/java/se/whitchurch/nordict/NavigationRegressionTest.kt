@@ -241,12 +241,14 @@ class NavigationRegressionTest {
     }
 
     @Test
-    fun backAfterDictSwitchReloadsTheOriginalWordIntoItsWebview() {
+    fun backAfterDictSwitchExitsToTheDestinationNotTheStaleWord() {
         awaitNav()
 
         // Open the DLE word form of "frente", then switch to EST (same
         // language): the cross-link hook searches EST for the headword, finds
-        // the unique exact match, and pushes the EST word view on top.
+        // the unique exact match, and reloads the word under the new dict. The
+        // reload is a pop-then-push (replace), so the pre-switch DLE
+        // destination is consumed, not stacked.
         dle.enqueue(MockResponse().setBody(dleFrente()))
         openWord(dle, "/frente")
         assertThat(ordboken().currentWord?.dict).isEqualTo("DLE")
@@ -259,20 +261,101 @@ class NavigationRegressionTest {
             w != null && w.dict == "EST" && w.uri.toString() == est.url("/frente").toString()
         }
 
-        // Back to the DLE word: the recreated WebView must re-render it.
+        // Back from the switched word lands on the previous destination
+        // (home): the DLE word was replaced, not left underneath for back to
+        // resurrect.
         onMain { composeRule.activity.navController?.popBackStack() }
-        awaitCondition(message = "back restores the DLE word") {
+        awaitCondition(message = "back exits to the previous destination") {
+            composeRule.activity.navController?.currentDestination?.route == "home"
+        }
+        assertThat(ordboken().currentWord?.dict).isEqualTo("EST")
+    }
+
+    @Test
+    fun togglingCombinedSelectionReloadsTheWordIntoTheCombinedPage() {
+        awaitNav()
+
+        // Open the DLE word form of "frente".
+        dle.enqueue(MockResponse().setBody(dleFrente()))
+        openWord(dle, "/frente")
+        assertThat(ordboken().currentWord?.dict).isEqualTo("DLE")
+        assertThat(ordboken().activeDicts).isEmpty()
+
+        // Toggle EST on: the selection hook resolves the headword in both
+        // dictionaries, then fetches and merges the two pages.
+        dle.enqueue(MockResponse().setBody("""["frente|frente"]"""))
+        est.enqueue(MockResponse().setBody("""["frente|frente"]"""))
+        dle.enqueue(MockResponse().setBody(dleFrente()))
+        est.enqueue(MockResponse().setBody(estFrente()))
+        onMain { ordboken().toggleDictionary("EST") }
+
+        awaitCondition(message = "word reloads as the combined DLE+EST page") {
             val w = ordboken().currentWord
-            w != null && w.dict == "DLE" && w.uri.toString() == dle.url("/frente").toString()
+            w != null && w.mHomonymEntries.map { it.ref } == listOf("DLE::1", "EST::1")
         }
-        awaitCondition(message = "DLE word page is rendered again") {
-            topWordViewModel()?.webViewLoaded == true
+        assertThat(ordboken().selectionSignature).isEqualTo("DLE,EST")
+    }
+
+    @Test
+    fun reorderingCombinedSelectionReloadsInNewOrder() {
+        awaitNav()
+
+        dle.enqueue(MockResponse().setBody(dleFrente()))
+        openWord(dle, "/frente")
+
+        // First switch into combined DLE+EST.
+        dle.enqueue(MockResponse().setBody("""["frente|frente"]"""))
+        est.enqueue(MockResponse().setBody("""["frente|frente"]"""))
+        dle.enqueue(MockResponse().setBody(dleFrente()))
+        est.enqueue(MockResponse().setBody(estFrente()))
+        onMain { ordboken().toggleDictionary("EST") }
+        awaitCondition(message = "combined page with DLE first") {
+            ordboken().currentWord?.mHomonymEntries?.map { it.ref } == listOf("DLE::1", "EST::1")
         }
-        // The reload actually repopulated the WebView, not a blank view.
-        assertThat(topWordViewModel()?.mWord?.uri?.toString())
-            .isEqualTo(dle.url("/frente").toString())
-        assertThat(composeRule.activity.navController?.currentBackStackEntry
-            ?.destination?.route?.startsWith("word?")).isTrue()
+
+        // Reorder so EST comes first: the whole combined page reloads in the
+        // new dictionary order.
+        est.enqueue(MockResponse().setBody("""["frente|frente"]"""))
+        dle.enqueue(MockResponse().setBody("""["frente|frente"]"""))
+        est.enqueue(MockResponse().setBody(estFrente()))
+        dle.enqueue(MockResponse().setBody(dleFrente()))
+        onMain { ordboken().setDictionaryOrder(listOf("EST", "DLE")) }
+
+        awaitCondition(message = "combined page reloads with EST first") {
+            ordboken().currentWord?.mHomonymEntries?.map { it.ref } == listOf("EST::1", "DLE::1")
+        }
+        assertThat(ordboken().selectionSignature).isEqualTo("EST,DLE")
+    }
+
+    @Test
+    fun collapsingCombinedSelectionReloadsInSingleDict() {
+        awaitNav()
+
+        dle.enqueue(MockResponse().setBody(dleFrente()))
+        openWord(dle, "/frente")
+
+        // Switch into combined DLE+EST.
+        dle.enqueue(MockResponse().setBody("""["frente|frente"]"""))
+        est.enqueue(MockResponse().setBody("""["frente|frente"]"""))
+        dle.enqueue(MockResponse().setBody(dleFrente()))
+        est.enqueue(MockResponse().setBody(estFrente()))
+        onMain { ordboken().toggleDictionary("EST") }
+        awaitCondition(message = "combined page with DLE first") {
+            ordboken().currentWord?.mHomonymEntries?.map { it.ref } == listOf("DLE::1", "EST::1")
+        }
+
+        // Collapse back to a single dictionary: the word reloads as the plain
+        // EST article under the chosen dictionary.
+        est.enqueue(MockResponse().setBody("""["frente|frente"]"""))
+        est.enqueue(MockResponse().setBody(estFrente()))
+        onMain { ordboken().setCurrentDictionary("est") }
+
+        awaitCondition(message = "word reloads in single EST after the collapse") {
+            val w = ordboken().currentWord
+            w != null && w.dict == "EST" && w.uri.toString() == est.url("/frente").toString()
+        }
+        assertThat(ordboken().activeDicts).isEmpty()
+        assertThat(ordboken().selectionSignature).isEqualTo("EST")
     }
 
     @Test

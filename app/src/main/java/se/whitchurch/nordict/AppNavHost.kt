@@ -96,6 +96,19 @@ fun NordictApp(
         )
     }
 
+    // The selection-reload path: swapping dictionaries on a word view must not
+    // stack a redundant pre-switch word destination, so the current word is
+    // popped before the reloaded one is pushed.
+    fun replaceWord(uri: Uri, title: String) {
+        navController.popBackStack()
+        openWord(uri, title)
+    }
+
+    fun replaceSources(result: SearchResult) {
+        navController.popBackStack()
+        openSources(result)
+    }
+
     fun openWordUrl(rawUrl: String, title: String) {
         openWord(Uri.parse(rawUrl), title)
     }
@@ -277,7 +290,9 @@ fun NordictApp(
                         onFillSearch = { query ->
                             searchQuery = query
                             searchActive = true
-                        }
+                        },
+                        onReplaceSources = { result -> replaceSources(result) },
+                        onReplaceWord = { uri, title -> replaceWord(uri, title) }
                     )
                 }
             }
