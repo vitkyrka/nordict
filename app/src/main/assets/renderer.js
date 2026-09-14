@@ -133,6 +133,15 @@ const template = (word) => {
         ? [...defs, ...idioms].sort(compareSenses)
         : defs;
 
+    // Collins bilingual entries number each sense themselves with a
+    // `.sensenum` marker inside the gloss HTML and carry no `senseNumber`, so
+    // their <ol> must not be auto-numbered. A combined multi-dictionary page
+    // labels every entry with its dictionary tag too (e.g. "DLE"/"EST") for
+    // the sub-heading, which is a label, not a bilingual flag: entries without
+    // inline sense markers keep the <ol>'s numbering.
+    const hasSensenum = (senses) => senses.some(s =>
+        (s.glosses || []).some(g => (g.definition || '').indexOf('sensenum') !== -1));
+
     return `
     <article>
         <header>
@@ -149,7 +158,7 @@ const template = (word) => {
             ${word.etymology ? `<div class="etymology">${word.etymology}</div>` : ''}
         </header>
         ${senses.length > 0 ? `
-            <ol class="definitions${word.dictionary ? ' bilingual' : ''}${senses.some(s => s.senseNumber) ? ' sense-numbered' : ''}">
+            <ol class="definitions${hasSensenum(senses) ? ' bilingual' : ''}${senses.some(s => s.senseNumber) ? ' sense-numbered' : ''}">
                 ${senses.map(s => s.idiom ? renderIdiomBlock(s) : renderDefinitionBlock(s)).join('')}
             </ol>
         ` : ''}

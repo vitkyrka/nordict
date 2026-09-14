@@ -397,6 +397,47 @@ test('homonym entries render their own dictionary label and morphology', () => {
     expect($('.pronunciation').length).toBe(2);
 });
 
+test('combined DLE/EST entries keep the <ol> numbering (labels are not bilingual flags)', () => {
+    const dle = (title, ref) => ({ ...entry(title, ref), dictionary: 'DLE' });
+    const combined = homonymWord(
+        [dle('frente', '1'), entry('frente', 'EST::1')],
+        ['DLE::1']
+    );
+
+    renderWord(combined);
+
+    // Both entries carry a dictionary sub-heading…
+    expect($('.dictionary-label').length).toBe(2);
+    expect($('.dictionary-label').text()).toBe('DLEEST');
+    // …but neither is treated as a Collins-style auto-numbered article, so
+    // the <ol> keeps its browser numbering and no senseNumber markers are printed.
+    expect($('.definitions').length).toBe(2);
+    expect($('.definitions').hasClass('bilingual')).toBe(false);
+    expect($('.definitions').hasClass('sense-numbered')).toBe(false);
+    expect($('.sense-number').length).toBe(0);
+});
+
+test('single-entry combined word without sensenum content keeps the <ol> numbering', () => {
+    // The app serializes Word.combined: a single resolved entry is presented
+    // as a plain article whose `dictionary` is the source label.
+    const word = {
+        mTitle: 'frente',
+        dictionary: 'EST',
+        xrefs: ['EST::1'],
+        mHomonymEntries: [entry('frente', 'EST::1')],
+        definitions: entry('frente', 'EST::1').definitions,
+        idioms: []
+    };
+
+    renderWord(word);
+
+    // Renders as one article with its label…
+    expect($('article').length).toBe(1);
+    expect($('.dictionary-label').text()).toBe('EST');
+    // …and the definitions stay browser-numbered.
+    expect($('.definitions').hasClass('bilingual')).toBe(false);
+});
+
 test('renders conjugation and participle in header', () => {
     const word = {
         mTitle: 'morir',
@@ -838,7 +879,7 @@ test('renders dictionary label for bilingual word', () => {
                 pos: 'feminine noun',
                 grammar: 'feminine noun',
                 glosses: [
-                    { definition: '<span lang="en-gb" class="cit type-translation"><span class="quote">forehead</span></span>', examples: [] }
+                    { definition: '<span class="sensenum bluebold">1.&nbsp;</span><span lang="en-gb" class="cit type-translation"><span class="quote">forehead</span></span>', examples: [] }
                 ],
                 idioms: [{ headword: 'frente a frente', translation: '<span class="quote">face to face</span>', examples: [] }],
                 phrases: [{ headword: 'al frente', translation: '<span class="quote">at the front</span>', examples: [] }]
