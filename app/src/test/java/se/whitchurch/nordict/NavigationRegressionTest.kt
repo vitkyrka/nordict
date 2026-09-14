@@ -455,6 +455,38 @@ class NavigationRegressionTest {
     }
 
     @Test
+    fun backWhileSearchIsOpenKeepsTheWordDestination() {
+        awaitNav()
+
+        // Open a word, then expand the search overlay: the current word is
+        // offered as the first artificial suggestion with its fill arrow.
+        est.enqueue(MockResponse().setBody(estFrente()))
+        openWord(est, "/frente")
+        composeRule.onNode(hasSetTextAction())
+            .performTouchInput {
+                down(center)
+                up()
+            }
+        composeRule.waitForIdle()
+        composeRule
+            .onNodeWithContentDescription(app!!.getString(R.string.search_fill_current_word))
+            .assertExists()
+
+        // Back collapses the overlay only. Regression for the M3 1.4
+        // fullscreen-search dialog, which swallowed the system back button
+        // (its Dialog.cancel() was overridden to a no-op); the in-window
+        // overlay lets the key reach the activity's dispatcher and the
+        // overlay's own BackHandler, which must beat the word destination's.
+        composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        composeRule.waitForIdle()
+        composeRule
+            .onNodeWithContentDescription(app!!.getString(R.string.search_fill_current_word))
+            .assertDoesNotExist()
+        assertThat(composeRule.activity.navController?.currentDestination?.route)
+            .startsWith("word?")
+    }
+
+    @Test
     fun emptySearchShowsCurrentWordWithAFillArrow() {
         awaitNav()
 

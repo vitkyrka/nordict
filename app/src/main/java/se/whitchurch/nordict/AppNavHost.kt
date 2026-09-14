@@ -6,8 +6,10 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.NorthWest
@@ -16,7 +18,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -202,6 +207,7 @@ fun NordictApp(
         )
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize()) {
         // Global search header.
         SearchBar(
@@ -268,97 +274,127 @@ fun NordictApp(
             }
         }
     }
+    }
 
-    // Fullscreen expanded search sheet: the same input field plus the
-    // suggestions content in a dialog layered over everything, driven by the
-    // shared SearchBarState.
-    ExpandedFullScreenSearchBar(
-        state = searchBarState,
-        inputField = inputField
-    ) {
-        val currentWord = ordboken.currentWord
-        if (searchQuery.isBlank() && currentWord != null) {
-            // Artificial first suggestion with an empty search bar: the
-            // current word. The trailing north-west arrow fills the word
-            // into the search field for easy manual editing (as the legacy
-            // SearchView's query-refinement arrow did), placing the caret at
-            // the end so a backspace strips trailing suffixes; tapping the
-            // row itself reopens the word, like any other suggestion.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { openWord(currentWord.uri.toAndroidUri(), currentWord.mTitle) }
-                    .padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = currentWord.searchHeadword,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Medium,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (currentWord.dictionary.isNotEmpty()) {
-                        Text(
-                            text = currentWord.dictionary,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                }
-                IconButton(
-                    onClick = { textFieldState.setTextAndPlaceCursorAtEnd(currentWord.searchHeadword) }
-                ) {
-                    Icon(
-                        Icons.Filled.NorthWest,
-                        contentDescription = context.getString(R.string.search_fill_current_word),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
+    // Fullscreen expanded search sheet, drawn as an in-window overlay rather
+    // than a dialog: the M3 1.4 fullscreen dialog swallows the system back
+    // button (its DialogWrapper overrides cancel() to a no-op and only
+    // dismisses on predictive-back gestures), so KEYCODE_BACK would do
+    // nothing while the sheet was open. Inside this activity's own window the
+    // BackHandler below receives the key and collapses the sheet without
+    // popping the destination underneath it.
+    if (searchBarState.currentValue != SearchBarValue.Collapsed) {
+        val sheetFieldFocus = remember { FocusRequester() }
+        LaunchedEffect(searchBarState.currentValue) {
+            if (searchBarState.currentValue != SearchBarValue.Collapsed) {
+                sheetFieldFocus.requestFocus()
             }
-        } else if (suggestions.isEmpty()) {
-            Text(
-                text = context.getString(R.string.no_results),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(16.dp)
-            )
-        } else {
-            suggestions.forEach { result ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { openSources(result) }
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = result.mTitle,
-                            fontSize = 16.sp,
-                            fontWeight = FontWeight.Medium,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        if (result.dicts.isNotEmpty()) {
+        }
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = SearchBarDefaults.TonalElevation,
+            shadowElevation = SearchBarDefaults.ShadowElevation
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .imePadding()
+                    .verticalScroll(rememberScrollState())
+            ) {
+                // Single focusable copy of the field lives in the sheet while
+                // it is open, so the caret/selection is visible in the window
+                // that owns it (the collapsed bar's copy is behind the sheet).
+                Box(modifier = Modifier.focusRequester(sheetFieldFocus)) {
+                    inputField()
+                }
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+                val currentWord = ordboken.currentWord
+                if (searchQuery.isBlank() && currentWord != null) {
+                    // Artificial first suggestion with an empty search bar: the
+                    // current word. The trailing north-west arrow fills the word
+                    // into the search field for easy manual editing (as the legacy
+                    // SearchView's query-refinement arrow did), placing the caret
+                    // at the end so a backspace strips trailing suffixes; tapping
+                    // the row itself reopens the word, like any other suggestion.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { openWord(currentWord.uri.toAndroidUri(), currentWord.mTitle) }
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = result.dicts.joinToString(" · "),
-                                fontSize = 11.sp,
-                                color = MaterialTheme.colorScheme.primary,
+                                text = currentWord.searchHeadword,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Medium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
+                            )
+                            if (currentWord.dictionary.isNotEmpty()) {
+                                Text(
+                                    text = currentWord.dictionary,
+                                    fontSize = 11.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                        IconButton(
+                            onClick = { textFieldState.setTextAndPlaceCursorAtEnd(currentWord.searchHeadword) }
+                        ) {
+                            Icon(
+                                Icons.Filled.NorthWest,
+                                contentDescription = context.getString(R.string.search_fill_current_word),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        if (result.mSummary.isNotEmpty()) {
-                            Text(
-                                text = result.mSummary,
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                    }
+                } else if (suggestions.isEmpty()) {
+                    Text(
+                        text = context.getString(R.string.no_results),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                } else {
+                    suggestions.forEach { result ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { openSources(result) }
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = result.mTitle,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                if (result.dicts.isNotEmpty()) {
+                                    Text(
+                                        text = result.dicts.joinToString(" · "),
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                if (result.mSummary.isNotEmpty()) {
+                                    Text(
+                                        text = result.mSummary,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -370,7 +406,9 @@ fun NordictApp(
     // overlay (the legacy search screen in MainActivity did the same); it must
     // not pop the destination underneath it. Registered after the NavHost so
     // it takes precedence over the NavHost's own back handler while enabled.
+    val focusManager = LocalFocusManager.current
     BackHandler(enabled = searchBarState.currentValue != SearchBarValue.Collapsed) {
+        focusManager.clearFocus()
         scope.launch { searchBarState.animateToCollapsed() }
     }
 }
