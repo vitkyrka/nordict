@@ -32,6 +32,7 @@ object AgentOps {
     const val BACK = "back"
     const val SET_DICT = "setDict"
     const val SET_LANG = "setLang"
+    const val SWAP_LANG = "swapLang"
     const val STATE = "state"
     const val QUIT = "quit"
 }

@@ -41,6 +41,11 @@ class Ordboken private constructor(
     // when the dictionary (or its per-language selection) changes.
     var currentIndex by mutableStateOf(0)
 
+    // The last language the user was on (the target of the one-tap swap
+    // button). Persisted; seeded to the first language != the current one on a
+    // fresh install so the swap affordance is immediately usable.
+    var lastLang by mutableStateOf<String?>(null)
+
     // The active multi-dictionary selection (empty = a single dictionary, the
     // normal state, driven by [currentDictionary]). Set by the agent driver
     // (or a future multi-select UI); any single-dict switch — a nav chip, a
@@ -99,6 +104,7 @@ class Ordboken private constructor(
             ed.putString("lastWhere", lastWhere!!.toString())
             ed.putString("lastWhat", lastWhat)
             ed.putInt("currentIndex", currentIndex)
+            ed.putString("lastLang", lastLang)
 
             return ed
         }
@@ -131,6 +137,18 @@ class Ordboken private constructor(
         currentIndex = mPrefs.getInt("currentIndex", 0)
         currentDictionary = dictionaries[currentIndex]
         currentFlag = flags[currentIndex]
+
+        // A fresh install has no last language yet: seed it to the first
+        // registered language other than the current one (usually dk against
+        // the default se start) so the swap button is usable right away.
+        lastLang = mPrefs.getString("lastLang", null)
+        if (lastLang == null) {
+            val seed = languages.firstOrNull { it != currentDictionary.lang }
+            if (seed != null) {
+                lastLang = seed
+                mPrefs.edit().putString("lastLang", seed).apply()
+            }
+        }
 
         // Restore this language's enabled+ordered dictionaries if a valid
         // multi-dictionary selection was persisted for it.
@@ -242,6 +260,7 @@ class Ordboken private constructor(
     fun setLanguage(lang: String): Boolean {
         val indices = dictionaries.indices.filter { dictionaries[it].lang == lang }
         if (indices.isEmpty()) return false
+        val previous = currentDictionary.lang
         val stored = storedDictIndex(lang)
         val fallbackIndex = if (stored in indices) stored else indices.first()
 
@@ -259,8 +278,26 @@ class Ordboken private constructor(
             currentDictionary = dictionaries[fallbackIndex]
             currentFlag = flags[fallbackIndex]
         }
+        // The language really changed: remember the one we left so the swap
+        // button can bounce back to it (a no-op switch keeps lastLang).
+        if (previous != lang) {
+            lastLang = previous
+            mPrefs.edit().putString("lastLang", previous).apply()
+        }
         onDictChanged?.invoke()
         return true
+    }
+
+    /**
+     * The one-tap language change the swap button drives: jumps to the
+     * previously active language ([lastLang]) and flips [lastLang] to the one
+     * just left, so repeated taps toggle between exactly two languages.
+     * Returns false when there is no other language to swap to.
+     */
+    fun swapLang(): Boolean {
+        val target = lastLang ?: return false
+        if (target == currentDictionary.lang) return false
+        return setLanguage(target)
     }
 
     /**

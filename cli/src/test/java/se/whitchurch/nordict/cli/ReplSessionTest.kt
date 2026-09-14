@@ -178,6 +178,37 @@ class ReplSessionTest {
     }
 
     @Test
+    fun swapLangReturnsToThePreviousLanguage() {
+        val r = runScript(
+            driver(),
+            """{"op":"setLang","lang":"ca"}""",
+            """{"op":"swapLang"}""",
+            """{"op":"swapLang"}"""
+        )
+
+        ok(r[0])
+        assertThat(r[0].state?.dict).isEqualTo("DIDAC")
+
+        ok(r[1])
+        assertThat(r[1].state?.dict).isEqualTo("DLE")
+        assertThat(r[1].state?.lang).isEqualTo("es")
+
+        ok(r[2])
+        assertThat(r[2].state?.dict).isEqualTo("DIDAC")
+        assertThat(r[2].state?.lang).isEqualTo("ca")
+    }
+
+    @Test
+    fun swapLangWithoutHistoryErrors() {
+        val r = runScript(
+            driver(),
+            """{"op":"swapLang"}"""
+        )
+        assertThat(r[0].ok).isFalse()
+        assertThat(r[0].error).contains("no last language to swap to")
+    }
+
+    @Test
     fun unknownDictAndSecretOpsError() {
         val r = runScript(
             driver(),

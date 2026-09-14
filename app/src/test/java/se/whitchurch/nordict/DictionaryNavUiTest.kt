@@ -66,6 +66,18 @@ class DictionaryNavUiTest {
         }
     }
 
+    private fun setTopBar() {
+        composeRule.setContent {
+            MaterialTheme {
+                LanguageTopBar(ordboken = Ordboken.getInstance(app))
+            }
+        }
+    }
+
+    /** The swap-to-last-language button labelled for [lang]. */
+    private fun swapButton(lang: String) =
+        composeRule.onNodeWithContentDescription("Byt till $lang")
+
     /** The clickable chip node whose text is [tag]. */
     private fun chip(tag: String) =
         composeRule.onNode(hasClickAction() and (hasText(tag) or hasAnyDescendant(hasText(tag))))
@@ -160,5 +172,36 @@ class DictionaryNavUiTest {
         composeRule.onNodeWithText("EST").assertExists()
         composeRule.onAllNodes(hasClickAction() and hasText("GDLC"))
             .fetchSemanticsNodes().let { assertThat(it).isEmpty() }
+    }
+
+    @Test
+    fun swapButtonShowsLastLangAndSwapsBackAndForth() {
+        // Seeded with [es, ca, se]: fresh current language is es, so lastLang
+        // is ca and the swap button reads "Byt till ca".
+        setTopBar()
+        swapButton("ca").assertExists().performClick()
+        composeRule.waitForIdle()
+
+        assertThat(ordboken.currentDictionary.lang).isEqualTo("ca")
+        assertThat(ordboken.lastLang).isEqualTo("es")
+
+        swapButton("es").assertExists().performClick()
+        composeRule.waitForIdle()
+
+        assertThat(ordboken.currentDictionary.lang).isEqualTo("es")
+        assertThat(ordboken.lastLang).isEqualTo("ca")
+    }
+
+    @Test
+    fun swapButtonHiddenWithoutASecondLanguage() {
+        // The setUp seed persists "lastLang"=ca, so clear prefs before
+        // reseeding a single-language Ordboken: it must have no swap target.
+        Ordboken.reset()
+        app.getSharedPreferences("ordboken", android.content.Context.MODE_PRIVATE)
+            .edit().clear().commit()
+        ordboken = Ordboken.getInstance(app, client, arrayOf(dle(), est()))
+        setTopBar()
+        composeRule.onNodeWithContentDescription("Byt till ca").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Byt till es").assertDoesNotExist()
     }
 }

@@ -165,73 +165,82 @@ fun NordictApp(
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Global search header.
-        SearchBar(
-            query = searchQuery,
-            onQueryChange = { searchQuery = it },
-            onSearch = { runSearch(it) },
-            active = searchActive,
-            onActiveChange = { searchActive = it },
+        // Global search header: the language switcher (flag dropdown + one-tap
+        // swap) sits left of the search bar so the dictionary nav row below can
+        // devote all of its width to the dictionary chips.
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
-            placeholder = { Text(context.getString(R.string.search_hint)) },
-            leadingIcon = {
-                Icon(
-                    Icons.Filled.Search,
-                    contentDescription = context.getString(R.string.menu_search)
-                )
-            },
-            trailingIcon = {
-                if (searchQuery.isNotEmpty()) {
-                    Icon(
-                        Icons.Filled.Clear,
-                        contentDescription = null,
-                        modifier = Modifier.clickable { searchQuery = "" }
-                    )
-                }
-            }
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (suggestions.isEmpty()) {
-                Text(
-                    text = context.getString(R.string.no_results),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(16.dp)
-                )
-            } else {
-                suggestions.forEach { result ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { openSources(result) }
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = result.mTitle,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            if (result.dicts.isNotEmpty()) {
+            LanguageTopBar(ordboken = ordboken)
+            SearchBar(
+                query = searchQuery,
+                onQueryChange = { searchQuery = it },
+                onSearch = { runSearch(it) },
+                active = searchActive,
+                onActiveChange = { searchActive = it },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text(context.getString(R.string.search_hint)) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Filled.Search,
+                        contentDescription = context.getString(R.string.menu_search)
+                    )
+                },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        Icon(
+                            Icons.Filled.Clear,
+                            contentDescription = null,
+                            modifier = Modifier.clickable { searchQuery = "" }
+                        )
+                    }
+                }
+            ) {
+                if (suggestions.isEmpty()) {
+                    Text(
+                        text = context.getString(R.string.no_results),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp)
+                    )
+                } else {
+                    suggestions.forEach { result ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { openSources(result) }
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = result.dicts.joinToString(" · "),
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.primary,
+                                    text = result.mTitle,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                            }
-                            if (result.mSummary.isNotEmpty()) {
-                                Text(
-                                    text = result.mSummary,
-                                    fontSize = 13.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                if (result.dicts.isNotEmpty()) {
+                                    Text(
+                                        text = result.dicts.joinToString(" · "),
+                                        fontSize = 11.sp,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                                if (result.mSummary.isNotEmpty()) {
+                                    Text(
+                                        text = result.mSummary,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
                     }

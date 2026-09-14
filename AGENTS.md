@@ -198,7 +198,7 @@ output to the JS renderer for a browser preview:
 The debug build ships a loopback agent server (`app/src/debug/.../AgentServer`,
 `AgentProtocol.PORT = 42837`) bound to `127.0.0.1` on the device; the CLI's
 `repl` subcommand drives it. Each input line is one JSON `AgentCommand`
-(`{"op": "search"|"open"|"openUri"|"nextPage"|"back"|"setDict"|"setLang"|"state"|"quit",
+(`{"op": "search"|"open"|"openUri"|"nextPage"|"back"|"setDict"|"setLang"|"swapLang"|"state"|"quit",
 "query"?, "uri"?, "tag"?, "lang"?}`); each produces exactly one JSON
 `AgentResult` (`ok`, `error`, optional `state`/`word`), in order, over a
 persistent session until EOF or `quit`. `"word"` carries the loaded word's

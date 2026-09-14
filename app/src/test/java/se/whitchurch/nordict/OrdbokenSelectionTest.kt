@@ -202,4 +202,79 @@ class OrdbokenSelectionTest {
         assertThat(ord.hasCombiningForLang("ca")).isTrue()
         assertThat(ord.hasCombiningForLang("se")).isFalse()
     }
+
+    @Test
+    fun freshInstallSeedsLastLangToTheFirstOtherLanguage() {
+        val ord = ordboken()
+        // Languages are [es, ca, se] and the fresh current language is es.
+        assertThat(ord.lastLang).isEqualTo("ca")
+    }
+
+    @Test
+    fun setLanguageRecordsTheLanguageLeftAsLastLang() {
+        val ord = ordboken()
+        assertThat(ord.lastLang).isEqualTo("ca")
+
+        ord.setLanguage("se")
+        assertThat(ord.currentDictionary.tag).isEqualTo("SO")
+        assertThat(ord.lastLang).isEqualTo("es")
+
+        ord.setLanguage("ca")
+        assertThat(ord.currentDictionary.tag).isEqualTo("DIDAC")
+        assertThat(ord.lastLang).isEqualTo("se")
+
+        // A no-op switch to the current language does not clobber lastLang.
+        ord.setLanguage("ca")
+        assertThat(ord.lastLang).isEqualTo("se")
+    }
+
+    @Test
+    fun swapLangTogglesBetweenTwoLanguages() {
+        val ord = ordboken()
+        assertThat(ord.swapLang()).isTrue()
+        assertThat(ord.currentDictionary.lang).isEqualTo("ca")
+        assertThat(ord.currentDictionary.tag).isEqualTo("DIDAC")
+        assertThat(ord.lastLang).isEqualTo("es")
+
+        assertThat(ord.swapLang()).isTrue()
+        assertThat(ord.currentDictionary.lang).isEqualTo("es")
+        assertThat(ord.currentDictionary.tag).isEqualTo("DLE")
+        assertThat(ord.lastLang).isEqualTo("ca")
+    }
+
+    @Test
+    fun lastLangSurvivesRestart() {
+        val ord = ordboken()
+        ord.swapLang() // es -> ca; lastLang becomes es
+        ord.prefsEditor.commit() // the real app persists the state on pause
+
+        val restored = restart()
+        assertThat(restored.currentDictionary.lang).isEqualTo("ca")
+        assertThat(restored.currentDictionary.tag).isEqualTo("DIDAC")
+        assertThat(restored.lastLang).isEqualTo("es")
+
+        // The restored pair keeps toggling: the next swap goes back to es.
+        assertThat(restored.swapLang()).isTrue()
+        assertThat(restored.currentDictionary.lang).isEqualTo("es")
+        assertThat(restored.currentDictionary.tag).isEqualTo("DLE")
+    }
+
+    @Test
+    fun dictSwitchesDoNotClobberLastLang() {
+        val ord = ordboken()
+        assertThat(ord.lastLang).isEqualTo("ca")
+
+        ord.setCurrentDictionary("est")
+        assertThat(ord.lastLang).isEqualTo("ca")
+        ord.toggleDictionary("EST")
+        assertThat(ord.lastLang).isEqualTo("ca")
+    }
+
+    @Test
+    fun swapLangRequiresASecondLanguage() {
+        // Only one language registered: nothing to swap to and no seed.
+        val ord = ordboken(arrayOf(DleDictionary(client), EstDictionary(client)))
+        assertThat(ord.lastLang).isNull()
+        assertThat(ord.swapLang()).isFalse()
+    }
 }

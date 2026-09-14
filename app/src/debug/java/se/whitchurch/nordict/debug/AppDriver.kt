@@ -55,6 +55,7 @@ class AppDriver(private val app: android.app.Application) {
                 AgentOps.BACK -> opBack(command)
                 AgentOps.SET_DICT -> opSetDict(command)
                 AgentOps.SET_LANG -> opSetLang(command)
+                AgentOps.SWAP_LANG -> opSwapLang(command)
                 AgentOps.STATE -> AgentResult(ok = true, op = command.op, state = snapshot())
                 else -> AgentResult.error(command.op, "unknown op '${command.op}'")
             }
@@ -206,6 +207,14 @@ class AppDriver(private val app: android.app.Application) {
             val ok = ordboken().setLanguage(lang)
             ok to (if (ok) "language is now ${ordboken().currentDictionary.lang} (${ordboken().currentDictionary.tag})"
             else "unknown language '$lang'")
+        }
+    }
+
+    private fun opSwapLang(command: AgentCommand): AgentResult {
+        return switchOp(AgentOps.SWAP_LANG) {
+            val ok = ordboken().swapLang()
+            ok to (if (ok) "language swapped to ${ordboken().currentDictionary.lang} (${ordboken().currentDictionary.tag})"
+            else "no last language to swap to")
         }
     }
 

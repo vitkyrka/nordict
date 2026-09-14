@@ -19,6 +19,7 @@
     <string name="menu_play_audio">Spela upp ljud</string>
     <string name="menu_autoplay">Automatisk ljuduppspelning</string>
     <string name="menu_more">Fler alternativ</string>
+    <string name="swap_to">Byt till %1$s</string>
     <string name="delete">Ta bort</string>
     <string name="delete_all">Ta bort alla</string>
     <string name="title_activity_card">CardActivity</string>

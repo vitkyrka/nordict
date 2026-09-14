@@ -24,6 +24,7 @@ import se.whitchurch.nordict.AgentOps
 import se.whitchurch.nordict.AgentResult
 import se.whitchurch.nordict.DleDictionary
 import se.whitchurch.nordict.EstDictionary
+import se.whitchurch.nordict.GdlcDictionary
 import se.whitchurch.nordict.MainActivity
 import se.whitchurch.nordict.Ordboken
 import java.io.File
@@ -195,6 +196,46 @@ class AppDriverTest {
         val ca = drive(AgentCommand(op = AgentOps.SET_LANG, lang = "ca"))
         assertThat(ca.ok).isFalse()
         assertThat(ca.error).contains("unknown language 'ca'")
+    }
+
+    @Test
+    fun swapLangWithoutASecondLanguageErrors() {
+        // The seeded app has only es dictionaries, so there is nothing to swap
+        // to. swapLang drives only Ordboken, so no activity launch is needed.
+        val swap = drive(AgentCommand(op = AgentOps.SWAP_LANG))
+        assertThat(swap.ok).isFalse()
+        assertThat(swap.error).contains("no last language to swap to")
+    }
+
+    @Test
+    fun swapLangSwitchesBackToTheLastLanguage() {
+        Ordboken.reset()
+        val client = OkHttpClient()
+        Ordboken.getInstance(
+            app!!, client,
+            arrayOf(
+                DleDictionary(client),
+                GdlcDictionary(client)
+            )
+        )
+        driver = AppDriver(app!!)
+
+        // setLang("ca") leaves es behind, so the swap targets es and flips the
+        // remembered language each time (es <-> ca toggle).
+        val ca = drive(AgentCommand(op = AgentOps.SET_LANG, lang = "ca"))
+        assertThat(ca.ok).isTrue()
+        assertThat(ca.state?.lang).isEqualTo("ca")
+
+        val back = drive(AgentCommand(op = AgentOps.SWAP_LANG))
+        assertThat(back.ok).isTrue()
+        assertThat(back.message).contains("language swapped to es")
+        assertThat(back.state?.lang).isEqualTo("es")
+        assertThat(back.state?.dict).isEqualTo("DLE")
+
+        val again = drive(AgentCommand(op = AgentOps.SWAP_LANG))
+        assertThat(again.ok).isTrue()
+        assertThat(again.state?.lang).isEqualTo("ca")
+        assertThat(again.state?.dict).isEqualTo("GDLC")
     }
 
     @Test

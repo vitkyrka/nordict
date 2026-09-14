@@ -10,6 +10,7 @@ import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.SyncAlt
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -28,6 +29,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -39,14 +41,14 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 
 /**
- * The single-row language/dictionary selector that used to live in the action
- * bar. Reads the live [Ordboken] state and switches through
- * [Ordboken.setLanguage] / [Ordboken.setCurrentDictionary] (the same path the
- * agent driver uses).
+ * The single-row dictionary selector for the current language. Reads the live
+ * [Ordboken] state and switches through [Ordboken.setCurrentDictionary] /
+ * [Ordboken.toggleDictionary] (the same path the agent driver uses).
  *
- * Renders one row: a flag button (current language) with a [DropdownMenu] for
- * the less frequent language switch, followed by the horizontally scrolling
- * dictionary chips of the selected language.
+ * Renders only the horizontally scrolling dictionary chips of the selected
+ * language — the language switcher (flag dropdown + one-tap swap button) lives
+ * in the top bar ([LanguageMenu] / [SwapLangButton]) so the dict chips get the
+ * whole row.
  *
  * Languages whose dictionaries can combine ([Dictionary.supportsCombining])
  * render multi-select [FilterChip] toggles: tapping toggles a dictionary
@@ -63,62 +65,120 @@ fun DictionaryNav(
     // var), so reading it here recomposes the row after a switch.
     val currentIndex = ordboken.currentIndex
     val currentLang = ordboken.currentLang
-    var langMenuExpanded by remember { mutableStateOf(false) }
 
     Row(
         modifier = modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Language dropdown: one flag button that opens the language list.
-        Box {
-            NavChoice(
-                selected = true,
-                onClick = { langMenuExpanded = true },
-                contentDescription = currentLang
-            ) {
-                Image(
-                    painter = painterResource(ordboken.langFlag(currentLang)),
-                    contentDescription = null,
-                    modifier = Modifier.size(24.dp),
-                    contentScale = ContentScale.Fit
-                )
-                Icon(
-                    imageVector = Icons.Filled.ArrowDropDown,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            DropdownMenu(
-                expanded = langMenuExpanded,
-                onDismissRequest = { langMenuExpanded = false }
-            ) {
-                for (lang in ordboken.availableLanguages) {
-                    DropdownMenuItem(
-                        text = { Text(lang) },
-                        onClick = {
-                            langMenuExpanded = false
-                            ordboken.setLanguage(lang)
-                        },
-                        leadingIcon = {
-                            Image(
-                                painter = painterResource(ordboken.langFlag(lang)),
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp),
-                                contentScale = ContentScale.Fit
-                            )
-                        }
-                    )
-                }
-            }
-        }
-
         if (ordboken.hasCombiningForLang(currentLang)) {
             CombiningDictRow(ordboken = ordboken, modifier = Modifier.weight(1f))
         } else {
             SingleDictRow(ordboken = ordboken, modifier = Modifier.weight(1f))
         }
+    }
+}
+
+/**
+ * The compact top-bar language switcher rendered left of the global search
+ * bar: the flag dropdown ([LanguageMenu], the full language list) plus the
+ * one-tap swap button ([SwapLangButton], back to the last-used language).
+ */
+@Composable
+fun LanguageTopBar(ordboken: Ordboken) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        LanguageMenu(ordboken)
+        SwapLangButton(ordboken)
+    }
+}
+
+/**
+ * The current-language flag button that opens the [DropdownMenu] with every
+ * language. A language choice goes through [Ordboken.setLanguage], which also
+ * records it as the new [Ordboken.lastLang] for the swap button.
+ */
+@Composable
+fun LanguageMenu(ordboken: Ordboken) {
+    // currentIndex is the snapshot state every switch writes; reading it here
+    // recomposes the flag when the language changes.
+    val currentIndex = ordboken.currentIndex
+    val currentLang = ordboken.currentLang
+    var langMenuExpanded by remember { mutableStateOf(false) }
+
+    Box {
+        NavChoice(
+            selected = true,
+            onClick = { langMenuExpanded = true },
+            contentDescription = currentLang
+        ) {
+            Image(
+                painter = painterResource(ordboken.langFlag(currentLang)),
+                contentDescription = null,
+                modifier = Modifier.size(24.dp),
+                contentScale = ContentScale.Fit
+            )
+            Icon(
+                imageVector = Icons.Filled.ArrowDropDown,
+                contentDescription = null,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+
+        DropdownMenu(
+            expanded = langMenuExpanded,
+            onDismissRequest = { langMenuExpanded = false }
+        ) {
+            for (lang in ordboken.availableLanguages) {
+                DropdownMenuItem(
+                    text = { Text(lang) },
+                    onClick = {
+                        langMenuExpanded = false
+                        ordboken.setLanguage(lang)
+                    },
+                    leadingIcon = {
+                        Image(
+                            painter = painterResource(ordboken.langFlag(lang)),
+                            contentDescription = null,
+                            modifier = Modifier.size(24.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The one-tap language swap: shows the last-used language's flag
+ * ([Ordboken.lastLang]) with a swap glyph; tapping jumps to it through
+ * [Ordboken.swapLang], which flips [Ordboken.lastLang] to the language just
+ * left so repeated taps toggle between exactly two languages. Hidden until
+ * there is another language to swap to.
+ */
+@Composable
+fun SwapLangButton(ordboken: Ordboken) {
+    val lastLang = ordboken.lastLang
+    if (lastLang == null || lastLang == ordboken.currentLang) return
+    NavChoice(
+        selected = false,
+        onClick = { ordboken.swapLang() },
+        contentDescription = stringResource(R.string.swap_to, lastLang)
+    ) {
+        Image(
+            painter = painterResource(ordboken.langFlag(lastLang)),
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            contentScale = ContentScale.Fit
+        )
+        Icon(
+            imageVector = Icons.Filled.SyncAlt,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp)
+        )
     }
 }
 

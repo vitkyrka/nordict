@@ -56,6 +56,7 @@ class HeadlessAgentDriver(
 ) : AgentBackend {
 
     private val selection = mutableListOf(dictionaries.first())
+    private var lastLang: String? = null
     private var combinedPage: Word? = null
     private var currentPage: List<Word> = emptyList()
     private var selectedIdx: Int = 0
@@ -81,6 +82,7 @@ class HeadlessAgentDriver(
                 AgentOps.BACK -> opBack(command)
                 AgentOps.SET_DICT -> opSetDict(command)
                 AgentOps.SET_LANG -> opSetLang(command)
+                AgentOps.SWAP_LANG -> opSwapLang(command)
                 AgentOps.STATE -> AgentResult(ok = true, op = command.op, state = snapshot())
                 else -> AgentResult.error(command.op, "unknown op '${command.op}'")
             }
@@ -266,17 +268,37 @@ class HeadlessAgentDriver(
 
     private fun opSetLang(command: AgentCommand): AgentResult {
         val lang = command.require("lang", command.lang)
+        return switchToLang(AgentOps.SET_LANG, lang)
+    }
+
+    private fun opSwapLang(command: AgentCommand): AgentResult {
+        val target = lastLang
+            ?: return AgentResult.error(AgentOps.SWAP_LANG, "no last language to swap to (set a language first)")
+        if (target == selection.first().lang) {
+            return AgentResult.error(AgentOps.SWAP_LANG, "no last language to swap to")
+        }
+        return switchToLang(AgentOps.SWAP_LANG, target)
+    }
+
+    /**
+     * The shared `setLang`/`swapLang` path: switches the selection to [lang]'s
+     * first dictionary and remembers the language just left as [lastLang]
+     * (mirroring [Ordboken.setLanguage] / [Ordboken.swapLang]).
+     */
+    private fun switchToLang(op: String, lang: String): AgentResult {
         val dict = dictionaries.firstOrNull { it.lang == lang }
             ?: return AgentResult.error(
-                AgentOps.SET_LANG,
+                op,
                 "unknown language '$lang' — known: ${dictionaries.map { it.lang }.distinct().joinToString(", ")}"
             )
+        val previous = selection.first().lang
         selection.clear()
         selection.add(dict)
         clearLoaded()
+        if (previous != lang) lastLang = previous
         return AgentResult(
             ok = true,
-            op = AgentOps.SET_LANG,
+            op = op,
             message = "language is now ${dict.lang} (${dict.tag})",
             state = snapshot()
         )
