@@ -1,7 +1,6 @@
 package se.whitchurch.nordict.debug
 
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.os.Looper
 import androidx.compose.runtime.snapshots.Snapshot
@@ -24,6 +23,8 @@ import org.robolectric.annotation.Config
 import se.whitchurch.nordict.AgentCommand
 import se.whitchurch.nordict.AgentOps
 import se.whitchurch.nordict.AgentResult
+import se.whitchurch.nordict.AnkiApi
+import se.whitchurch.nordict.CardActivity
 import se.whitchurch.nordict.DleDictionary
 import se.whitchurch.nordict.EstDictionary
 import se.whitchurch.nordict.GdlcDictionary
@@ -422,6 +423,143 @@ class AppDriverTest {
         // Popping the word destination lands back on Home.
         val state = drive(AgentCommand(op = AgentOps.STATE))
         assertThat(state.state?.activity).isEqualTo("home")
+    }
+
+    // ---------------------------------------------------------------------------
+    // Fake AnkiApi
+    // ---------------------------------------------------------------------------
+
+    private class RecordingAnkiApi : AnkiApi {
+        val createdDecks = mutableListOf<String>()
+        val createdModels = mutableListOf<String>()
+        var addedNotes = mutableListOf<Long>()
+        var addedFields = mutableListOf<Array<String>>()
+
+        override fun deckList(): Map<Long, String>? = mapOf(99L to "Existing")
+        override fun modelList(): Map<Long, String>? = null
+        override fun addNewDeck(name: String): Long? { createdDecks.add(name); return 100L }
+        override fun addNewCustomModel(
+            name: String,
+            fields: Array<String>,
+            cardNames: Array<String>,
+            questionFormats: Array<String>,
+            answerFormats: Array<String>,
+            css: String?,
+            did: Long?,
+            usn: Int?
+        ): Long? { createdModels.add(name); return 200L }
+        override fun addNote(modelId: Long, deckId: Long, fields: Array<String>, tags: Set<String>?): Long? {
+            val id = 42L + addedNotes.size
+            addedNotes.add(id)
+            addedFields.add(fields)
+            return id
+        }
+    }
+
+    private fun seedAndOpenWord(
+        tag: String = "dle",
+        path: String = "/frente",
+        htmlFile: String = "../testdata/dle.html",
+        enqueueTwice: Boolean = false
+    ): String {
+        val html = File(htmlFile).readText()
+        server.enqueue(MockResponse().setBody(html))
+        if (enqueueTwice) server.enqueue(MockResponse().setBody(html))
+        launchMain()
+        val open = drive(AgentCommand(op = AgentOps.OPEN_URI, uri = server.url(path).toString()))
+        assertThat(open.ok).isTrue()
+        return htmlFile
+    }
+
+    /**
+     * Brings the card screen up for the current word, exactly like the FAB /
+     * the agent's `openCards` op. Under Robolectric a runtime `startActivity`
+     * never resumes a second activity, so the test pre-launches CardActivity
+     * through [ActivityScenario] and then drives `openCards`, whose await is
+     * satisfied by the already-resumed card screen (the op's redundant
+     * relaunch is a no-op).
+     */
+    private fun launchCardActivity(): ActivityScenario<CardActivity> =
+        ActivityScenario.launch(CardActivity::class.java).also {
+            shadowOf(Looper.getMainLooper()).runToEndOfTasks()
+            assertThat(trackedActivity()).isInstanceOf(CardActivity::class.java)
+        }
+
+    @Test
+    fun openCardsLaunchesCardActivity() {
+        seedAndOpenWord()
+        launchCardActivity()
+        val result = drive(AgentCommand(op = AgentOps.OPEN_CARDS))
+        assertThat(result.ok).isTrue()
+        assertThat(result.state?.activity).isEqualTo("CardActivity")
+    }
+
+    @Test
+    fun openCardsWithoutWordErrors() {
+        launchMain()
+        val result = drive(AgentCommand(op = AgentOps.OPEN_CARDS))
+        assertThat(result.ok).isFalse()
+        assertThat(result.error).contains("no word loaded")
+    }
+
+    @Test
+    fun createCardWithFakeApiAndReturnsNoteId() {
+        val fake = RecordingAnkiApi()
+        CardActivity.debugAnkiApi = fake
+        seedAndOpenWord()
+        launchCardActivity()
+
+        val open = drive(AgentCommand(op = AgentOps.OPEN_CARDS))
+        assertThat(open.ok).isTrue()
+        assertThat(open.state?.activity).isEqualTo("CardActivity")
+
+        val created = drive(AgentCommand(op = AgentOps.CREATE_CARD))
+        assertThat(created.ok).isTrue()
+        assertThat(created.message).contains("card created")
+        assertThat(created.message).contains("note id 42")
+
+        // Back field is the 4th element (index 3) in the encoded note fields.
+        assertThat(fake.addedFields).hasSize(1)
+        assertThat(fake.addedFields[0][3]).isNotEmpty()
+    }
+
+    @Test
+    fun createCardWithExplicitIndex() {
+        val fake = RecordingAnkiApi()
+        CardActivity.debugAnkiApi = fake
+        seedAndOpenWord()
+        launchCardActivity()
+
+        // The DLE fixture proposes 7 definitions + 7 idioms, so index 2 is the
+        // 3rd definition.
+        val created = drive(AgentCommand(op = AgentOps.CREATE_CARD, index = 2))
+        assertThat(created.ok).isTrue()
+        assertThat(created.message).contains("note id 42")
+    }
+
+    @Test
+    fun createCardWithoutCardActivityErrors() {
+        seedAndOpenWord()
+        val result = drive(AgentCommand(op = AgentOps.CREATE_CARD))
+        assertThat(result.ok).isFalse()
+        assertThat(result.error).contains("no card screen up")
+    }
+
+    @Test
+    fun backClosesTheCardScreen() {
+        seedAndOpenWord()
+        launchCardActivity()
+        assertThat(trackedActivity()).isInstanceOf(CardActivity::class.java)
+
+        // Under Robolectric finish() marks the activity finishing without ever
+        // destroying the scenario-managed instance, so assert the driver took
+        // the card-screen branch (immediate isFinishing await) rather than the
+        // tracker teardown. On-device the destroy + MainActivity re-resume
+        // follow a frame later.
+        val back = drive(AgentCommand(op = AgentOps.BACK))
+        assertThat(back.ok).isTrue()
+        assertThat(back.message).contains("closed the card screen")
+        assertThat(back.state?.activity).isEqualTo("CardActivity")
     }
 
     private fun trackedActivity(): android.app.Activity? =

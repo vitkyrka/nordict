@@ -198,15 +198,27 @@ output to the JS renderer for a browser preview:
 The debug build ships a loopback agent server (`app/src/debug/.../AgentServer`,
 `AgentProtocol.PORT = 42837`) bound to `127.0.0.1` on the device; the CLI's
 `repl` subcommand drives it. Each input line is one JSON `AgentCommand`
-(`{"op": "search"|"open"|"openUri"|"nextPage"|"back"|"setDict"|"setLang"|"swapLang"|"state"|"quit",
-"query"?, "uri"?, "tag"?, "lang"?}`); each produces exactly one JSON
+(`{"op": "search"|"open"|"openUri"|"nextPage"|"back"|"openCards"|"createCard"|"setDict"|"setLang"|"swapLang"|"state"|"quit",
+"query"?, "uri"?, "tag"?, "lang"?, "index"?}`); each produces exactly one JSON
 `AgentResult` (`ok`, `error`, optional `state`/`word`), in order, over a
 persistent session until EOF or `quit`. `"word"` carries the loaded word's
 `mTitle`, `uri`, `xrefs` and a per-entry `selected` index. Ops run against the
 app's live `Ordboken` + the single `MainActivity` navigation graph and are
 exercised by `AppDriverTest` (Robolectric — the app is one activity, so the
 word-view ops run end-to-end under Robolectric) and the on-device E2E;
-`startActivity` is not involved because all routes live in one activity.
+word-view ops never involve `startActivity` because all their routes live in
+one activity.
+
+The card ops drive the AnkiDroid `CardActivity` (which *is* a separate
+activity, launched with the word view's "add card" intent): `openCards`
+launches it for the current word with `deckName = "Nordict - <dict>"` and
+waits for it to be the resumed activity; `createCard` waits for the card
+screen's async word load, then creates the card for the numbered proposal
+(`index`, zero-based over `Cards.proposals` — definitions first, then idioms,
+default the first definition) through the same `Cards.*` pipeline the Create
+button uses, reporting the new Anki note id. `debugAnkiApi`
+(`CardActivity` companion) lets tests/CLI inject a fake `AnkiApi` instead of
+touching a real AnkiDroid.
 
 ```sh
 ./gradlew :app:assembleDebug
@@ -459,6 +471,8 @@ JUnit), `DiccionariIntegrationTest` (`app`, Robolectric + MockWebServer).
 
 When asked to implement something, in the todo steps always include these:
 
+- Extend agent interface if applicable for easier agentic test
+- Add automated tests (core and/or UI)
 - Deploy and verify on an emulator if running (android-cli / adb)
 - Commit 
 - Deploy (for manual verification by user) on any device if connected to android-cli / adb

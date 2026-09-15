@@ -64,6 +64,27 @@ class AgentProtocolTest {
     }
 
     @Test
+    fun createCardCommandRoundTripsIndex() {
+        val cmd = AgentCommand(op = AgentOps.CREATE_CARD, index = 2)
+        assertThat(gson.toJson(cmd)).isEqualTo("{\"op\":\"createCard\",\"index\":2}")
+        val parsed = gson.fromJson(gson.toJson(cmd), AgentCommand::class.java)
+        assertThat(parsed.index).isEqualTo(2)
+        assertThat(parsed).isEqualTo(cmd)
+
+        // No index field parses to null (first proposal).
+        val noIndex = gson.fromJson("""{"op":"createCard"}""", AgentCommand::class.java)
+        assertThat(noIndex.index).isNull()
+        assertThat(noIndex).isEqualTo(AgentCommand(op = AgentOps.CREATE_CARD))
+    }
+
+    @Test
+    fun openCardsCommandRoundTrips() {
+        val cmd = AgentCommand(op = AgentOps.OPEN_CARDS)
+        assertThat(gson.toJson(cmd)).isEqualTo("{\"op\":\"openCards\"}")
+        assertThat(gson.fromJson(gson.toJson(cmd), AgentCommand::class.java)).isEqualTo(cmd)
+    }
+
+    @Test
     fun selectionTagsPreferTagsOverCommaTag() {
         val cmd = AgentCommand(op = AgentOps.SET_DICT, tag = "DLE,SO", tags = listOf("DLE", "EST"))
         assertThat(cmd.selectionTags()).containsExactly("DLE", "EST").inOrder()

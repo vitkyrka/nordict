@@ -30,6 +30,8 @@ object AgentOps {
     const val OPEN_URI = "openUri"
     const val NEXT_PAGE = "nextPage"
     const val BACK = "back"
+    const val OPEN_CARDS = "openCards"
+    const val CREATE_CARD = "createCard"
     const val SET_DICT = "setDict"
     const val SET_LANG = "setLang"
     const val SWAP_LANG = "swapLang"
@@ -50,7 +52,10 @@ data class AgentCommand(
     val lang: String? = null,
     // A multi-dictionary selection for `setDict` (ordered). When present it
     // wins over `tag`; a comma-separated `tag` ("DLE,EST") also works.
-    val tags: List<String>? = null
+    val tags: List<String>? = null,
+    // The card proposal to create with `createCard` (a zero-based index into
+    // `Cards.proposals`: definitions first, then idioms, in page order).
+    val index: Int? = null
 ) {
     /** Returns the named argument or throws a clear protocol error. */
     fun require(name: String, value: String?): String =

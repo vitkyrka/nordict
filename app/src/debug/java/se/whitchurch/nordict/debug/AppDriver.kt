@@ -10,6 +10,7 @@ import se.whitchurch.nordict.AgentCommand
 import se.whitchurch.nordict.AgentOps
 import se.whitchurch.nordict.AgentResult
 import se.whitchurch.nordict.AgentState
+import se.whitchurch.nordict.CardActivity
 import se.whitchurch.nordict.ExactMatch
 import se.whitchurch.nordict.MainActivity
 import se.whitchurch.nordict.MultiDict
@@ -53,6 +54,8 @@ class AppDriver(private val app: android.app.Application) {
                 AgentOps.OPEN_URI -> opOpenUri(command)
                 AgentOps.NEXT_PAGE -> opNextPage(command)
                 AgentOps.BACK -> opBack(command)
+                AgentOps.OPEN_CARDS -> opOpenCards(command)
+                AgentOps.CREATE_CARD -> opCreateCard(command)
                 AgentOps.SET_DICT -> opSetDict(command)
                 AgentOps.SET_LANG -> opSetLang(command)
                 AgentOps.SWAP_LANG -> opSwapLang(command)
@@ -96,6 +99,7 @@ class AppDriver(private val app: android.app.Application) {
             // fetch always builds a fresh instance (no single-uri word cache),
             // so wait for that fetch rather than a previously loaded same-uri
             // combined word sitting in Ordboken.currentWord.
+            closeCardScreenIfUp()
             onMain {
                 requireMainActivity().navigateToSources(exact.sources, exact.mTitle, null)
             }
@@ -119,6 +123,7 @@ class AppDriver(private val app: android.app.Application) {
     }
 
     private fun openUri(op: String, uri: Uri, title: String): AgentResult {
+        closeCardScreenIfUp()
         onMain {
             requireMainActivity().navigateToWord(uri, title)
         }
@@ -164,6 +169,7 @@ class AppDriver(private val app: android.app.Application) {
             .removeAllQueryParameters("__ref")
             .addQueryParameter("__ref", next.ref)
             .build()
+        closeCardScreenIfUp()
         onMain {
             requireMainActivity().navigateToWord(Uri.parse(pageUri.toString()), next.mTitle)
         }
@@ -172,6 +178,23 @@ class AppDriver(private val app: android.app.Application) {
     }
 
     private fun opBack(command: AgentCommand): AgentResult {
+        // Close the card screen first if it's open (mirrors its back arrow):
+        // the word view it floats above still owns the loaded word.
+        val cardScreen = tracker.current
+        if (cardScreen?.javaClass?.simpleName == "CardActivity") {
+            val card = cardScreen as CardActivity
+            onMain { card.finish() }
+            // finish() sets isFinishing synchronously; the destroy lags a
+            // frame (forever under Robolectric's scenario controller), so
+            // wait for the flag, not the tracker teardown.
+            await({ card.isFinishing }, 10_000)
+            return AgentResult(
+                ok = true,
+                op = AgentOps.BACK,
+                message = "back: closed the card screen",
+                state = snapshot()
+            )
+        }
         val poppedFrom = onMain {
             val nav = requireMainActivity().navController ?: return@onMain null
             val route = nav.currentDestination?.route
@@ -189,6 +212,69 @@ class AppDriver(private val app: android.app.Application) {
             state = snapshot(),
             word = word?.let { wordResultOf(it) }
         )
+    }
+
+    /**
+     * Opens the card screen for the current word, exactly like the word
+     * view's "add card" action: the same `CardActivity` intent (deck name
+     * `"Nordict - <dict>"`). The page CSS is left as the last value in
+     * [Ordboken.currentCss] — the WebView `getCSS()` call happens on the FAB
+     * path only — so the agent path is headless-friendly while the cards
+     * produced are structurally identical.
+     */
+    private fun opOpenCards(command: AgentCommand): AgentResult {
+        val word = ordboken().currentWord
+            ?: return AgentResult.error(AgentOps.OPEN_CARDS, "no word loaded — open a word first")
+        if (tracker.current == null) {
+            return AgentResult.error(AgentOps.OPEN_CARDS, "no activity resumed")
+        }
+        val intent = android.content.Intent(app, CardActivity::class.java).apply {
+            addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            putExtra("deckName", "Nordict - ${word.dict}")
+        }
+        onMain { app.startActivity(intent) }
+        await({
+            tracker.current?.javaClass?.simpleName == "CardActivity"
+        }, 10_000)
+        return AgentResult(ok = true, op = AgentOps.OPEN_CARDS, state = snapshot())
+    }
+
+    /** Creates the card for proposal [index] on the open card screen. */
+    private fun opCreateCard(command: AgentCommand): AgentResult {
+        val activity = tracker.current
+        if (activity?.javaClass?.simpleName != "CardActivity") {
+            return AgentResult.error(
+                AgentOps.CREATE_CARD,
+                "no card screen up — call openCards first (resumed activity is '${activity?.javaClass?.simpleName}')"
+            )
+        }
+        val card = activity as CardActivity
+        // The word/audio load task populates mWord asynchronously on open.
+        await({ card.isCardReady() }, 10_000)
+        val id = onMain { card.agentCreateCard(command.index) }
+        return if (id != null) {
+            AgentResult(
+                ok = true,
+                op = AgentOps.CREATE_CARD,
+                message = "card created (note id $id)",
+                state = snapshot()
+            )
+        } else {
+            AgentResult.error(
+                AgentOps.CREATE_CARD,
+                "card creation failed (no proposal, word not loaded yet, or AnkiDroid unreachable)"
+            )
+        }
+    }
+
+    /** Closes the card screen if it's still up, so main-activity routes run. */
+    private fun closeCardScreenIfUp() {
+        val cardScreen = tracker.current
+        if (cardScreen?.javaClass?.simpleName == "CardActivity") {
+            val card = cardScreen as CardActivity
+            onMain { card.finish() }
+            await({ card.isFinishing }, 10_000)
+        }
     }
 
     private fun opSetDict(command: AgentCommand): AgentResult {

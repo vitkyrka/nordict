@@ -75,7 +75,8 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
             }
         }
 
-        anki = AnkiClient(AnkiDroidApi(this))
+        anki = AnkiClient(debugAnkiApi ?: AnkiDroidApi(this))
+        debugAnkiApi = null
 
         deckName =
             getPreferences(Context.MODE_PRIVATE)?.getString("deckName", "Nordict") ?: "Nordict"
@@ -428,7 +429,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         examples: List<String>,
         images: List<String>,
         audio: String
-    ) {
+    ): Long? {
         val deck = deckName
         val id = anki.createCard(deck, text, examples, images, audio)
 
@@ -452,6 +453,40 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
 
         if (mLeftCards <= 0) {
             finish()
+        }
+
+        return id
+    }
+
+    /**
+     * True once the async word/audio load task has finished populating the
+     * card screen ([mWord] is set, so proposals are available). Used by the
+     * agent driver to wait out the load before creating a card.
+     */
+    fun isCardReady(): Boolean = mWord != null
+
+    /**
+     * Creates the card for proposal [index] (default the first definition)
+     * through the same pipeline the Create button drives, and returns the new
+     * Anki note id (null on failure). Used by the agent REPL and tests.
+     */
+    fun agentCreateCard(index: Int?): Long? {
+        val word = mWord ?: return null
+        val proposal = Cards.proposals(word).getOrNull(index ?: 0) ?: return null
+        val audio = mAudio.elementAtOrElse(0) { _ -> "" }
+        return when (proposal) {
+            is CardProposal.Definition -> createCard(
+                Cards.definitionBack(word, listOf(proposal.definition), ordboken.currentCss),
+                Cards.examples(word, listOf(proposal.definition), emptyList()),
+                emptyList(),
+                audio
+            )
+            is CardProposal.Idiom -> createCard(
+                Cards.idiomBack(proposal.idiom),
+                Cards.idiomExamples(proposal.idiom),
+                emptyList(),
+                ""
+            )
         }
     }
 
@@ -540,5 +575,11 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
     companion object {
         private const val IMAGE_PICKER_REQUEST = 0
         private const val CAMERA_REQUEST = 2
+
+        // Test/debug seam: a fallback AnkiApi consumed (once) on the next
+        // `onCreate` so Robolectric tests and the agent can drive card
+        // creation against a fake instead of the AnkiDroid content provider.
+        @Volatile
+        var debugAnkiApi: AnkiApi? = null
     }
 }
