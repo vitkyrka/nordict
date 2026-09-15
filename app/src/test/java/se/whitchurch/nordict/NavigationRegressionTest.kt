@@ -2,6 +2,7 @@ package se.whitchurch.nordict
 
 import android.app.Application
 import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
@@ -16,6 +17,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
@@ -366,6 +368,47 @@ class NavigationRegressionTest {
         }
         assertThat(ordboken().activeDicts).isEmpty()
         assertThat(ordboken().selectionSignature).isEqualTo("EST")
+    }
+
+    @Test
+    fun openInBrowserOnACombinedPageLaunchesEveryDictionary() {
+        awaitNav()
+
+        // Open the merged DLE+EST page directly (bypass the search: the word
+        // route is addressed by its sources probe list).
+        dle.enqueue(MockResponse().setBody(dleFrente()))
+        est.enqueue(MockResponse().setBody(estFrente()))
+        onMain {
+            composeRule.activity.navigateToSources(
+                listOf(
+                    CombSource("DLE", dle.url("/frente")),
+                    CombSource("EST", est.url("/frente"))
+                ),
+                "frente",
+                null
+            )
+        }
+        awaitCondition(message = "combined page with DLE first") {
+            ordboken().currentWord?.mHomonymEntries?.map { it.ref } == listOf("DLE::1", "EST::1")
+        }
+
+        // "Open in browser" from the word action-bar menu.
+        composeRule.onNodeWithContentDescription(app!!.getString(R.string.menu_more))
+            .performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(app!!.getString(R.string.open_in_browser))
+            .performClick()
+        composeRule.waitForIdle()
+
+        // One external browser intent per selected dictionary (it used to open
+        // only the single word's uri — the first source).
+        val browserUris = mutableListOf<String>()
+        while (true) {
+            val intent = shadowOf(composeRule.activity).nextStartedActivity ?: break
+            if (intent.action == Intent.ACTION_VIEW) browserUris.add(intent.data!!.toString())
+        }
+        assertThat(browserUris)
+            .containsExactly(dle.url("/frente").toString(), est.url("/frente").toString())
     }
 
     @Test

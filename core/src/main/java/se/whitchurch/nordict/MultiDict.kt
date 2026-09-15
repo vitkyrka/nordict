@@ -242,6 +242,17 @@ object MultiDict {
         }
     }
 
+    /**
+     * The source page URIs a loaded word's "open in browser" action should
+     * launch: every selected dictionary's page for a combined word (in
+     * selection order), or the single page for a plain word. Combined words
+     * keep their probes in the route's [sources] — their own `uri` is just the
+     * first dictionary's — so the menu action must go through here rather than
+     * [Word.uri].
+     */
+    fun externalUris(word: Word, sources: List<CombSource>): List<HttpUrl> =
+        if (sources.isNotEmpty()) sources.map { it.uri } else listOf(word.uri)
+
     // ---- Route wire codec (the word destination's `sources` argument) ----
 
     /** Serializes [sources] for the word route (`[tag, uri, summary]` objects). */

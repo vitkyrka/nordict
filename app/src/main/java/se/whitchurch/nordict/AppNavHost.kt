@@ -269,9 +269,11 @@ fun NordictApp(
                         ordboken = ordboken,
                         onOpenUri = { uri, title -> openWord(uri, title) },
                         onOpenSources = { result -> openSources(result) },
-                        onOpenExternal = { uri ->
-                            val browserIntent = Intent(Intent.ACTION_VIEW, uri)
-                            context.startActivity(browserIntent)
+                        onOpenExternal = { uris ->
+                            uris.forEach { uri ->
+                                val browserIntent = Intent(Intent.ACTION_VIEW, uri)
+                                context.startActivity(browserIntent)
+                            }
                         },
                         onFillSearch = { query ->
                             textFieldState.setTextAndPlaceCursorAtEnd(query)

@@ -83,7 +83,7 @@ class WordViewModel(
     // A combined (multi-dictionary) word carries the probe dictionaries'
     // `sources` JSON and an optional namespaced ref (`"DLE::2"`) instead of a
     // plain single-dictionary uri. Empty sources = a normal single word.
-    private val sources: List<CombSource> =
+    val sources: List<CombSource> =
         MultiDict.sourcesFromJson(savedStateHandle.get<String>("sources") ?: "")
     private val ref: String? = savedStateHandle.get<String>("ref")?.takeIf { it.isNotEmpty() }
 
@@ -95,7 +95,7 @@ class WordViewModel(
     // Wiring from the composing screen (reassigned on every recomposition).
     var onOpenUri: ((Uri, String) -> Unit)? = null
     var onOpenSources: ((SearchResult) -> Unit)? = null
-    var onOpenExternal: ((Uri) -> Unit)? = null
+    var onOpenExternal: ((List<Uri>) -> Unit)? = null
     var onFillSearch: ((String) -> Unit)? = null
 
     // Pop-then-push navigation for the selection-reload path: replacing the
@@ -283,7 +283,7 @@ class WordViewModel(
                         onOpenUri?.invoke(Uri.parse(url), "")
                     }
                     url.contains("https://ordnet.dk/korpusdk/qconc") -> {
-                        onOpenExternal?.invoke(Uri.parse(url))
+                        onOpenExternal?.invoke(listOf(Uri.parse(url)))
                     }
                     url.contains("/so/?id=") -> {
                         onOpenUri?.invoke(
@@ -545,7 +545,7 @@ fun WordScreen(
     ordboken: Ordboken,
     onOpenUri: (Uri, String) -> Unit,
     onOpenSources: (SearchResult) -> Unit,
-    onOpenExternal: (Uri) -> Unit,
+    onOpenExternal: (List<Uri>) -> Unit,
     onFillSearch: (String) -> Unit,
     onReplaceSources: (SearchResult) -> Unit,
     onReplaceWord: (Uri, String) -> Unit
@@ -732,8 +732,11 @@ fun WordScreen(
                                     Icon(Icons.Filled.OpenInNew, contentDescription = null)
                                 },
                                 onClick = {
-                                    vm.mWord?.uri?.let { url ->
-                                        onOpenExternal(url.toAndroidUri())
+                                    vm.mWord?.let { w ->
+                                        onOpenExternal(
+                                            MultiDict.externalUris(w, vm.sources)
+                                                .map { it.toAndroidUri() }
+                                        )
                                     }
                                     menuExpanded = false
                                 }
@@ -799,7 +802,7 @@ fun WordRoute(
     ordboken: Ordboken,
     onOpenUri: (Uri, String) -> Unit,
     onOpenSources: (SearchResult) -> Unit,
-    onOpenExternal: (Uri) -> Unit,
+    onOpenExternal: (List<Uri>) -> Unit,
     onFillSearch: (String) -> Unit,
     onReplaceSources: (SearchResult) -> Unit = onOpenSources,
     onReplaceWord: (Uri, String) -> Unit = onOpenUri

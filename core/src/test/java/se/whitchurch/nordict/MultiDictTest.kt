@@ -188,6 +188,32 @@ class MultiDictTest {
     }
 
     @Test
+    fun externalUrisOpensEverySelectedDictionary() {
+        val sources = listOf(
+            CombSource("DLE", server.url("/frente")),
+            CombSource("EST", server.url("/diccionario-estudiante/frente"))
+        )
+        val combined = MultiDict.fetch(lookups(), sources, headword = "frente")!!
+
+        // The combined word's own uri is only the first source's page; the
+        // "open in browser" action must launch every selected dictionary.
+        assertThat(combined.uri.toString()).contains("/frente")
+        assertThat(MultiDict.externalUris(combined, sources).map { it.toString() })
+            .containsExactly(
+                server.url("/frente").toString(),
+                server.url("/diccionario-estudiante/frente").toString()
+            ).inOrder()
+    }
+
+    @Test
+    fun externalUrisFallsBackToTheSingleWordUri() {
+        val word = dle.get(server.url("/frente"))!!
+
+        assertThat(MultiDict.externalUris(word, emptyList()))
+            .containsExactly(word.uri)
+    }
+
+    @Test
     fun refsAndLabels() {
         assertThat(MultiDict.refOf("DLE", "3")).isEqualTo("DLE::3")
         assertThat(MultiDict.isCombinedRef("DLE::3")).isTrue()
