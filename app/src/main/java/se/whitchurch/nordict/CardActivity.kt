@@ -40,9 +40,9 @@ import se.whitchurch.nordict.ui.theme.NordictTheme
 class CardActivity : androidx.appcompat.app.AppCompatActivity() {
     private lateinit var ordboken: Ordboken
     private var mWord: Word? by mutableStateOf(null)
-    private lateinit var anki: Anki
+    private lateinit var anki: AnkiClient
     private val imagesMap = mutableStateMapOf<String, List<String>>()
-    private var currentDefinition: Word.Definition? = null
+    private var currentCardId: String? = null
     private var mAudio: List<String> by mutableStateOf(emptyList())
     private var mDictImages: ArrayList<String> = ArrayList()
     private val selectedDefinitions = mutableStateListOf<Word.Definition>()
@@ -75,7 +75,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
             }
         }
 
-        anki = Anki(this)
+        anki = AnkiClient(AnkiDroidApi(this))
 
         deckName =
             getPreferences(Context.MODE_PRIVATE)?.getString("deckName", "Nordict") ?: "Nordict"
@@ -146,30 +146,33 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 return
             }
 
-            val defCards = word.definitions.filterNot { it in hiddenDefs }
-            val idiomCards = word.idioms.filterNot { it in hiddenIdioms }
+            val proposalCards = Cards.proposals(word).filterNot { p ->
+                when (p) {
+                    is CardProposal.Definition -> p.definition in hiddenDefs
+                    is CardProposal.Idiom -> p.idiom in hiddenIdioms
+                }
+            }
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(10.dp)
             ) {
-                items(defCards) { definition ->
-                    DefinitionCard(
-                        word = word,
-                        definition = definition,
-                        audio = audio,
-                        onCreate = { hideDefinitions ->
-                            hiddenDefs = hiddenDefs + hideDefinitions
-                            selectedDefinitions.removeAll(hideDefinitions.toSet())
-                        }
-                    )
-                }
-                items(idiomCards) { idiom ->
-                    IdiomCard(
-                        word = word,
-                        idiom = idiom,
-                        onCreate = { hiddenIdioms = hiddenIdioms + idiom }
-                    )
+                items(proposalCards) { proposal ->
+                    when (proposal) {
+                        is CardProposal.Definition -> DefinitionCard(
+                            word = word,
+                            proposal = proposal,
+                            audio = audio,
+                            onCreate = { hideDefinitions ->
+                                hiddenDefs = hiddenDefs + hideDefinitions
+                                selectedDefinitions.removeAll(hideDefinitions.toSet())
+                            }
+                        )
+                        is CardProposal.Idiom -> IdiomCard(
+                            proposal = proposal,
+                            onCreate = { hiddenIdioms = hiddenIdioms + proposal.idiom }
+                        )
+                    }
                 }
             }
         }
@@ -178,15 +181,16 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
     @Composable
     fun DefinitionCard(
         word: Word,
-        definition: Word.Definition,
+        proposal: CardProposal.Definition,
         audio: List<String>,
         onCreate: (List<Word.Definition>) -> Unit
     ) {
-        val title = definition.title ?: word.mTitle
+        val definition = proposal.definition
+        val title = proposal.title
         val extraExamples = remember { mutableStateListOf<String>() }
         val audioIdx = remember { mutableIntStateOf(0) }
         val merged = remember { mutableStateOf(false) }
-        val images = imagesMap[definition.definition].orEmpty()
+        val images = imagesMap[proposal.id].orEmpty()
 
         Card(
             modifier = Modifier
@@ -205,7 +209,8 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                val examplesText = definition.examples + extraExamples
+                val examplesText = definition.glosses.flatMap { it.examples }
+                    .ifEmpty { definition.examples } + extraExamples
                 if (examplesText.isNotEmpty()) {
                     Text(
                         text = "• " + examplesText.joinToString(separator = "\n• "),
@@ -273,17 +278,10 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                         val effectiveDefs =
                             if (selectedDefinitions.isEmpty()) listOf(definition)
                             else selectedDefinitions.toList()
-                        val imagesForCard = imagesMap[definition.definition].orEmpty()
-                        var cardExamples = ArrayList<String>()
-                        effectiveDefs.forEach {
-                            cardExamples.addAll(it.examples)
-                        }
-                        cardExamples.addAll(extraExamples)
-                        if (cardExamples.isEmpty()) {
-                            cardExamples = arrayListOf(title)
-                        }
+                        val imagesForCard = imagesMap[proposal.id].orEmpty()
+                        val cardExamples = Cards.examples(word, effectiveDefs, extraExamples)
                         createCard(
-                            word.getPage(effectiveDefs, ordboken.currentCss),
+                            Cards.definitionBack(word, effectiveDefs, ordboken.currentCss),
                             cardExamples,
                             imagesForCard,
                             audio.elementAtOrElse(audioIdx.intValue) { _ -> "" }
@@ -299,7 +297,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                         Intent(this@CardActivity, ImagePicker::class.java).also {
                             it.putExtra(Intent.EXTRA_TEXT, title)
                             it.putExtra("dictionaryImages", mDictImages)
-                            currentDefinition = definition
+                            currentCardId = proposal.id
                             ordboken.images = ArrayList()
                             startActivityForResult(it, IMAGE_PICKER_REQUEST)
                         }
@@ -310,7 +308,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                     TextButton(onClick = {
                         Intent(this@CardActivity, CameraActivity::class.java).also {
                             it.putExtra(Intent.EXTRA_TEXT, title)
-                            currentDefinition = definition
+                            currentCardId = proposal.id
                             ordboken.images = ArrayList()
                             startActivityForResult(it, CAMERA_REQUEST)
                         }
@@ -331,7 +329,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                     }
 
                     TextButton(onClick = {
-                        imagesMap[definition.definition] = emptyList()
+                        imagesMap[proposal.id] = emptyList()
                         extraExamples.clear()
                     }) {
                         Icon(painterResource(R.drawable.ic_clear), contentDescription = null, modifier = Modifier.size(16.dp))
@@ -373,10 +371,10 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
 
     @Composable
     fun IdiomCard(
-        word: Word,
-        idiom: Word.Idiom,
+        proposal: CardProposal.Idiom,
         onCreate: () -> Unit
     ) {
+        val idiom = proposal.idiom
         Card(
             modifier = Modifier
                 .fillMaxWidth()
@@ -398,11 +396,12 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 }
                 Row(modifier = Modifier.padding(top = 4.dp)) {
                     TextButton(onClick = {
-                        val text = """<strong>${idiom.idiom}</strong><p>${idiom.definition}"""
-                        val examples =
-                            if (idiom.examples.isEmpty()) arrayListOf(idiom.idiom)
-                            else idiom.examples
-                        createCard(text, examples, ArrayList(), "")
+                        createCard(
+                            Cards.idiomBack(idiom),
+                            Cards.idiomExamples(idiom),
+                            ArrayList(),
+                            ""
+                        )
                         onCreate()
                     }) {
                         Icon(painterResource(R.drawable.ic_done), contentDescription = null, modifier = Modifier.size(16.dp))
@@ -529,10 +528,10 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         super.onActivityResult(requestCode, resultCode, data)
         when (requestCode) {
             IMAGE_PICKER_REQUEST, CAMERA_REQUEST -> {
-                currentDefinition?.let {
-                    val existing = imagesMap[it.definition].orEmpty().toMutableList()
+                currentCardId?.let { cardId ->
+                    val existing = imagesMap[cardId].orEmpty().toMutableList()
                     existing.addAll(ordboken.images)
-                    imagesMap[it.definition] = existing
+                    imagesMap[cardId] = existing
                 }
             }
         }
