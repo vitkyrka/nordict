@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Looper
+import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
@@ -45,16 +47,36 @@ import java.util.concurrent.TimeoutException
  * the same launched activity and are fully covered here end-to-end.
  */
 @RunWith(RobolectricTestRunner::class)
-@Config(sdk = [28])
+@Config(sdk = [28], instrumentedPackages = ["no.such.package.sandbox.isolation"])
 class AppDriverTest {
 
     private lateinit var server: MockWebServer
     private lateinit var driver: AppDriver
     private var app: android.app.Application? = null
     private lateinit var scenario: ActivityScenario<MainActivity>
+    private val composeRule = createEmptyComposeRule()
 
     @Before
     fun setUp() {
+        // The GlobalSnapshotManager's apply-loop coroutine can be stranded at
+        // a Robolectric test boundary (its dispatch is cleared from the looper
+        // queue) leaving `sent=true` permanently, which blocks all subsequent
+        // snapshot-write notifications and prevents the first compose frame
+        // from applying.  Reset the manager so ensureStarted() re-creates a
+        // fresh channel + coroutine for this test.
+        runCatching {
+            val startedField = Class.forName("androidx.compose.ui.platform.GlobalSnapshotManager")
+                .getDeclaredField("started").also { it.isAccessible = true }
+            val sentField = Class.forName("androidx.compose.ui.platform.GlobalSnapshotManager")
+                .getDeclaredField("sent").also { it.isAccessible = true }
+            startedField.set(null, java.util.concurrent.atomic.AtomicBoolean(false))
+            sentField.set(null, java.util.concurrent.atomic.AtomicBoolean(false))
+            val observers = Class.forName("androidx.compose.runtime.snapshots.SnapshotKt")
+                .getDeclaredField("globalWriteObservers").also { it.isAccessible = true }
+            @Suppress("UNCHECKED_CAST")
+            (observers.get(null) as MutableList<Any>).clear()
+        }
+
         app = ApplicationProvider.getApplicationContext<android.app.Application>()
         app!!.getSharedPreferences("ordboken", Context.MODE_PRIVATE).edit().clear().commit()
         Ordboken.reset()
@@ -94,6 +116,16 @@ class AppDriverTest {
     private fun awaitCondition(timeoutMs: Long = 15_000, condition: () -> Boolean) {
         val start = System.currentTimeMillis()
         while (System.currentTimeMillis() - start < timeoutMs) {
+            // Under Robolectric the GlobalSnapshotManager apply-loop (which
+            // normally fires Snapshot.sendApplyNotifications() on a frame) can
+            // get stranded at a test boundary, so its notifications never reach
+            // the recomposers and a freshly launched composition never applies
+            // its first frame. Drive the Compose test clock and pump the
+            // notifications directly so the awaited state (e.g. the NavHost
+            // controller) shows up reliably.
+            runCatching { composeRule.waitForIdle() }
+            runCatching { Snapshot.sendApplyNotifications() }
+            shadowOf(Looper.getMainLooper()).runToEndOfTasks()
             shadowOf(Looper.getMainLooper()).idle()
             if (condition()) return
             Thread.sleep(20)
