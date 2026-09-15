@@ -78,10 +78,11 @@ object MultiDict {
     )
 
     /**
-     * Searches [lookups] in parallel and merges the results by headword, in
-     * selection order. A headword found in several dictionaries yields one
-     * [SearchResult] whose `dicts`/`sources` carry every dictionary's tag and
-     * page (deduplicated per dictionary, first summary kept).
+     * Searches [lookups] in parallel and merges the results by headword,
+     * ignoring case, ordering the combined list alphabetically (case-folded)
+     * across all dictionaries. A headword found in several dictionaries yields
+     * one [SearchResult] whose `dicts`/`sources` carry every dictionary's tag
+     * and page (deduplicated per dictionary, first summary kept).
      */
     fun search(lookups: List<WordLookup>, query: String): List<SearchResult> =
         mergeSearch(lookups.map { lookup ->
@@ -104,15 +105,20 @@ object MultiDict {
 
     /**
      * Merges already-fetched per-dictionary [results] (tag, list) into one
-     * dictionary-tagged list, in the order the pairs were given.
+     * dictionary-tagged list. Headwords merge case-insensitively ("Trinidad"
+     * and "trinidad" are one entry, keeping the first-seen casing); the merged
+     * entries are then ordered alphabetically by title, ignoring case, so the
+     * combined list reads as one case-folded dictionary rather than per-source
+     * selection order.
      */
     fun mergeSearch(results: List<Pair<String, List<SearchResult>>>): List<SearchResult> {
         val merged = LinkedHashMap<String, MutableReadySearch>()
         for ((tag, list) in results) {
             for (r in list) {
-                val existing = merged[r.mTitle]
+                val key = r.mTitle.lowercase()
+                val existing = merged[key]
                 if (existing == null) {
-                    merged[r.mTitle] = MutableReadySearch(
+                    merged[key] = MutableReadySearch(
                         r.mTitle, r.mSummary, r.uri,
                         mutableListOf(tag), mutableListOf(CombSource(tag, r.uri, r.mSummary))
                     )
@@ -123,9 +129,11 @@ object MultiDict {
                 }
             }
         }
-        return merged.values.map {
-            SearchResult(it.title, it.summary, it.uri, it.dicts.toList(), it.sources.toList())
-        }
+        return merged.values
+            .sortedBy { it.title.lowercase() }
+            .map {
+                SearchResult(it.title, it.summary, it.uri, it.dicts.toList(), it.sources.toList())
+            }
     }
 
     /**

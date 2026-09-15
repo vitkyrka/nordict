@@ -97,14 +97,43 @@ class MultiDictTest {
         assertThat(frente.sources[0].uri.toString()).contains("/frente")
         assertThat(frente.sources[1].tag).isEqualTo("EST")
 
-        // DLE-only and EST-only results appear once, dicts single.
+        // DLE-only and EST-only results appear once, ordered alphabetically
+        // ignoring case across all dictionaries.
         assertThat(merged.map { it.mTitle })
-            .containsExactly("frente", "frentero", "frente a", "frente a frente",
-                "frente por frente", "al frente", "con la frente muy alta",
+            .containsExactly("al frente", "con la frente muy alta",
                 "dar un paso al frente", "de frente", "dos dedos de frente",
-                "en frente").inOrder()
+                "en frente", "frente", "frente a", "frente a frente",
+                "frente por frente", "frentero").inOrder()
         assertThat(merged.first { it.mTitle == "frentero" }.dicts).containsExactly("DLE")
         assertThat(merged.first { it.mTitle == "al frente" }.dicts).containsExactly("EST")
+    }
+
+    @Test
+    fun mergeSearchCombinesCaseInsensitivelyAndOrdersAlphabetically() {
+        val merged = MultiDict.mergeSearch(listOf(
+            "COLSPAN" to listOf(
+                SearchResult("Trinidad", "island", server.url("/trinidad")),
+                SearchResult("Trinidad y Tobago", "", server.url("/trinidad-y-tobago"))
+            ),
+            "EST" to listOf(
+                SearchResult("trinidad", "", server.url("/diccionario-estudiante/trinidad"))
+            ),
+            "DLE" to listOf(
+                SearchResult("trinidad", "", server.url("/dle/trinidad"))
+            )
+        ))
+
+        assertThat(merged).hasSize(2)
+        // One case-folded entry for the headword across all three dicts,
+        // keeping the first-seen casing from the selection order.
+        val trinidad = merged[0]
+        assertThat(trinidad.mTitle).isEqualTo("Trinidad")
+        assertThat(trinidad.dicts).containsExactly("COLSPAN", "EST", "DLE").inOrder()
+        assertThat(trinidad.sources).hasSize(3)
+        assertThat(trinidad.uri.toString()).contains("/trinidad")
+        // ...ordered before "Trinidad y Tobago" on a case-insensitive sort.
+        assertThat(merged.map { it.mTitle })
+            .containsExactly("Trinidad", "Trinidad y Tobago").inOrder()
     }
 
     @Test

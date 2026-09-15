@@ -43,6 +43,32 @@ class ExactMatchTest {
     }
 
     @Test
+    fun exactMatchNotFirstNavigates() {
+        val results = listOf(
+            result("al frente", "https://dict.example/al-frente"),
+            result("personal", "https://dict.example/personal"),
+            result("persona", "https://dict.example/persona"),
+            result("personaje", "https://dict.example/personaje")
+        )
+        val match = ExactMatch.resolve("persona", results)
+        assertThat(match).isNotNull()
+        assertThat(match!!.mTitle).isEqualTo("persona")
+    }
+
+    @Test
+    fun caseInsensitiveExactMatchNavigates() {
+        // A merged entry can carry a casing different from the typed query
+        // ("Trinidad" from COLSPAN merges with "trinidad" from EST/DLE).
+        val results = listOf(
+            result("Trinidad", "https://dict.example/trinidad"),
+            result("Trinidad y Tobago", "https://dict.example/trinidad-y-tobago")
+        )
+        val match = ExactMatch.resolve("trinidad", results)
+        assertThat(match).isNotNull()
+        assertThat(match!!.mTitle).isEqualTo("Trinidad")
+    }
+
+    @Test
     fun homographsShowsSuggestions() {
         val results = listOf(
             result("frente", "https://dict.example/frente"),

@@ -63,7 +63,7 @@ class ReplSessionTest {
             """{"op":"state"}""",
             """{"op":"search","query":"frente"}""",
             """{"op":"open","query":"frente"}""",
-            """{"op":"open","query":"frentero"}""",
+            """{"op":"open","query":"pirata"}""",
             """{"op":"setDict","tag":"est"}""",
             """{"op":"open","query":"frente"}"""
         )
@@ -88,7 +88,7 @@ class ReplSessionTest {
         assertThat(r[2].state?.activity).isEqualTo("WordActivity")
 
         assertThat(r[3].ok).isFalse()
-        assertThat(r[3].error).contains("no unique exact match for 'frentero'")
+        assertThat(r[3].error).contains("no unique exact match for 'pirata'")
 
         ok(r[4])
         assertThat(r[4].state?.dict).isEqualTo("EST")
@@ -270,9 +270,12 @@ class ReplSessionTest {
 
         ok(r[2])
         assertThat(r[2].results).isNotEmpty()
-        assertThat(r[2].results!![0].mTitle).isEqualTo("frente")
-        assertThat(r[2].results!![0].dicts).containsExactly("DLE", "EST").inOrder()
-        assertThat(r[2].results!![0].uri).isEqualTo("https://dle.rae.es/frente")
+        // Combined results are ordered alphabetically ignoring case: the DLE/EST
+        // shared "frente" entry is no longer first, but merges both dictionaries.
+        assertThat(r[2].results!![0].mTitle).isEqualTo("al frente")
+        val frente = r[2].results!!.first { it.mTitle == "frente" }
+        assertThat(frente.dicts).containsExactly("DLE", "EST").inOrder()
+        assertThat(frente.uri).isEqualTo("https://dle.rae.es/frente")
 
         ok(r[3])
         assertThat(r[3].word?.word?.mTitle).isEqualTo("frente")
