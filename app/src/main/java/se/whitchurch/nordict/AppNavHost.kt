@@ -199,8 +199,18 @@ fun NordictApp(
                 if (searchQuery.isNotEmpty()) {
                     Icon(
                         Icons.Filled.Clear,
-                        contentDescription = null,
-                        modifier = Modifier.clickable { textFieldState.setTextAndPlaceCursorAtEnd("") }
+                        contentDescription = context.getString(R.string.search_clear),
+                        modifier = Modifier.clickable {
+                            textFieldState.setTextAndPlaceCursorAtEnd("")
+                            // While the bar is collapsed the X doubles as a tap
+                            // on the search bar: clear and open the input
+                            // overlay with the caret in place, ready for a new
+                            // query. In the open overlay the X stays a plain
+                            // text clear.
+                            if (searchBarState.currentValue == SearchBarValue.Collapsed) {
+                                scope.launch { searchBarState.animateToExpanded() }
+                            }
+                        }
                     )
                 }
             }

@@ -8,13 +8,16 @@ import android.os.Looper
 import android.webkit.WebView
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextRange
@@ -532,6 +535,88 @@ class NavigationRegressionTest {
             SemanticsMatcher.expectValue(
                 SemanticsProperties.TextSelectionRange,
                 TextRange(headword.length)
+            )
+        )
+    }
+
+    @Test
+    fun clearButtonOnTheCollapsedBarOpensTheSearchOverlay() {
+        awaitNav()
+
+        // Produce a collapsed bar that still holds a query the way a finished
+        // search leaves it: type into the open overlay, then press back to
+        // collapse it (the M3 collapsed field itself is not editable).
+        composeRule.onNode(hasSetTextAction())
+            .performTouchInput {
+                down(center)
+                up()
+            }
+        composeRule.waitForIdle()
+        composeRule.onAllNodes(hasSetTextAction())[0].performTextInput("frente")
+        composeRule.waitForIdle()
+        composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        composeRule.waitForIdle()
+        composeRule
+            .onNodeWithContentDescription(app!!.getString(R.string.search_clear))
+            .assertExists()
+
+        // The X on the collapsed bar clears the stale query and then does what
+        // a tap anywhere else on the bar does: open the search overlay with the
+        // caret back in the field, ready for a new query.
+        composeRule
+            .onNodeWithContentDescription(app!!.getString(R.string.search_clear))
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(app!!.getString(R.string.no_results)).assertExists()
+        composeRule.onAllNodes(hasSetTextAction())[0].assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.EditableText,
+                AnnotatedString("")
+            )
+        )
+        // The overlay's copy of the field (the only focused editable node) owns
+        // the caret; the collapsed bar's copy behind it does not.
+        val focusedEditableFields = composeRule
+            .onAllNodes(hasSetTextAction())
+            .fetchSemanticsNodes()
+            .count { it.config.getOrNull(SemanticsProperties.Focused) == true }
+        assertThat(focusedEditableFields).isEqualTo(1)
+    }
+
+    @Test
+    fun clearButtonInTheOpenOverlayOnlyClearsTheText() {
+        awaitNav()
+
+        // Expand the overlay (synthetic touch tap) and type a query into it.
+        composeRule.onNode(hasSetTextAction())
+            .performTouchInput {
+                down(center)
+                up()
+            }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText(app!!.getString(R.string.no_results)).assertExists()
+        composeRule.onAllNodes(hasSetTextAction())[0].performTextInput("frente")
+        composeRule.waitForIdle()
+        assertThat(
+            composeRule.onAllNodesWithContentDescription(
+                app!!.getString(R.string.search_clear)
+            ).fetchSemanticsNodes().size
+        ).isEqualTo(2)
+
+        // The in-overlay X clears the text but keeps the overlay open (it must
+        // not collapse it back to the bare bar).
+        val clearNodes =
+            composeRule.onAllNodesWithContentDescription(app!!.getString(R.string.search_clear))
+        clearNodes[clearNodes.fetchSemanticsNodes().size - 1]
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText(app!!.getString(R.string.no_results)).assertExists()
+        composeRule.onAllNodes(hasSetTextAction())[0].assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.EditableText,
+                AnnotatedString("")
             )
         )
     }
