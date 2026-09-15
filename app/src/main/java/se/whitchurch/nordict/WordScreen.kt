@@ -27,7 +27,10 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
@@ -73,6 +76,7 @@ sealed interface WordUiStatus {
  * the SQLite history writes; navigation side effects flow out through the
  * [onOpenUri]/[onOpenExternal]/[onFillSearch] callbacks wired by [WordScreen].
  */
+@OptIn(ExperimentalMaterial3Api::class)
 class WordViewModel(
     application: android.app.Application,
     private val savedStateHandle: SavedStateHandle
@@ -111,6 +115,12 @@ class WordViewModel(
     var pageFinished: Boolean by mutableStateOf(false)
     var uiStatus: WordUiStatus by mutableStateOf(WordUiStatus.Loading)
     var webView: WebView? = null
+
+    // The word action bar's exit-always scroll behavior, wired by WordScreen
+    // on every composition. It owns the nested-scroll connection that the bar
+    // listens to; the pinned (JSON) WebView feeds it through webViewScrolled,
+    // while legacy words scroll the outer Compose column past it directly.
+    var bottomBarScrollBehavior: BottomAppBarScrollBehavior? = null
 
     /** True once [mWord] has been rendered into the current WebView (used by
      * tests to observe that a re-created WebView reloaded its page). */
@@ -314,6 +324,28 @@ class WordViewModel(
         }
 
         return webView
+    }
+
+    /**
+     * Feeds the word action bar's exit-always scroll behavior from the pinned
+     * (JSON) WebView's internal scroll [WebView.OnScrollChangeListener]. The
+     * Compose nested-scroll chain cannot see a platform WebView's scrolling,
+     * so this bridges it to the same connection the legacy words drive through
+     * their outer Compose scrollable: scrolling the page down collapses the
+     * bar, scrolling back up brings it back. A positive delta (content moved
+     * down) folds into a negative consumed offset, matching the direction the
+     * M3 behavior expects to collapse.
+     */
+    fun webViewScrolled(oldScrollY: Int, scrollY: Int) {
+        val behavior = bottomBarScrollBehavior ?: return
+        if (!pinToViewport) return
+        val delta = scrollY - oldScrollY
+        if (delta == 0) return
+        behavior.nestedScrollConnection.onPostScroll(
+            consumed = Offset(0f, -delta.toFloat()),
+            available = Offset.Zero,
+            source = NestedScrollSource.Drag,
+        )
     }
 
     fun loadWebView(word: Word) {
@@ -561,6 +593,15 @@ fun WordScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
+    // The docked word action bar uses the M3 exit-always scroll behavior: it
+    // collapses when the word content is scrolled down and reappears on a
+    // scroll back up. The connection lives on the screen's root (as the M3
+    // wiring does); the pinned JSON WebView feeds it through vm.webViewScrolled
+    // since its internal scroll is invisible to the Compose nested-scroll
+    // chain, while legacy words scroll the outer Compose column past it.
+    val bottomBarScrollBehavior = BottomAppBarDefaults.exitAlwaysScrollBehavior()
+    vm.bottomBarScrollBehavior = bottomBarScrollBehavior
+
     // Load the word page as soon as the fetch lands. The AndroidView factory
     // can run before the coroutine finishes, so a fast fetch (or a retry)
     // re-triggers this load after the WebView exists. Also keyed on the
@@ -605,107 +646,109 @@ fun WordScreen(
         }
     }
 
-    Column(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-        ) {
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                val maxH = maxHeight
-                val scrollState = rememberScrollState()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .nestedScroll(bottomBarScrollBehavior.nestedScrollConnection)
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val maxH = maxHeight
+            val scrollState = rememberScrollState()
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(scrollState, enabled = !vm.pinToViewport)
-                ) {
-                    // Legacy homograph strip (JSON dictionaries render their own).
-                    if (word != null && !word.renderAsJson && word.mHomographs.isNotEmpty()) {
-                        Column {
-                            word.mHomographs.forEach { homograph ->
-                                val isCurrent = homograph.uri == word.uri
-                                Text(
-                                    text = (if (isCurrent) "▶ " else "  ") + homograph.mSummary,
-                                    fontSize = 15.sp,
-                                    fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .clickable {
-                                            onOpenUri(homograph.uri.toAndroidUri(), homograph.mSummary)
-                                        }
-                                        .padding(start = 20.dp, top = 10.dp, end = 0.dp, bottom = 10.dp)
-                                )
-                            }
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState, enabled = !vm.pinToViewport)
+            ) {
+                // Legacy homograph strip (JSON dictionaries render their own).
+                if (word != null && !word.renderAsJson && word.mHomographs.isNotEmpty()) {
+                    Column {
+                        word.mHomographs.forEach { homograph ->
+                            val isCurrent = homograph.uri == word.uri
+                            Text(
+                                text = (if (isCurrent) "▶ " else "  ") + homograph.mSummary,
+                                fontSize = 15.sp,
+                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        onOpenUri(homograph.uri.toAndroidUri(), homograph.mSummary)
+                                    }
+                                    .padding(start = 20.dp, top = 10.dp, end = 0.dp, bottom = 10.dp)
+                            )
                         }
                     }
-
-                    AndroidView(
-                        factory = { ctx ->
-                            val webView = vm.createWebView(ctx)
-                            // A fast fetch (or a recreated destination) can have the
-                            // word ready before/while the WebView is created; render
-                            // it here too (idempotent via the loaded-Uri guard).
-                            vm.maybeLoadWord()
-                            webView
-                        },
-                        modifier = if (vm.pinToViewport) {
-                            Modifier
-                                .fillMaxWidth()
-                                .height(maxH)
-                        } else {
-                            Modifier.fillMaxWidth()
-                        }
-                    )
                 }
 
-                if (vm.uiStatus !is WordUiStatus.Hidden) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(MaterialTheme.colorScheme.background),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            val s = vm.uiStatus
-                            if (s is WordUiStatus.Loading) {
-                                LoadingIndicator(modifier = Modifier.padding(bottom = 16.dp))
-                                Text(
-                                    context.getString(R.string.loading),
-                                    textAlign = TextAlign.Center
-                                )
-                            } else if (s is WordUiStatus.Error) {
-                                Text(
-                                    text = context.getString(s.textRes),
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(bottom = 16.dp)
-                                )
-                                Button(onClick = { vm.fetchWord() }) {
-                                    Text(context.getString(R.string.tryagain))
-                                }
+                AndroidView(
+                    factory = { ctx ->
+                        val webView = vm.createWebView(ctx)
+                        // Bridge the pinned (JSON) WebView's internal
+                        // scroll into the word bar's exit-always scroll
+                        // behavior: Compose nested scroll can't see a
+                        // platform WebView, so the bar listens here.
+                        webView.setOnScrollChangeListener { _, _, scrollY, _, oldScrollY ->
+                            vm.webViewScrolled(oldScrollY, scrollY)
+                        }
+                        // A fast fetch (or a recreated destination) can have the
+                        // word ready before/while the WebView is created; render
+                        // it here too (idempotent via the loaded-Uri guard).
+                        vm.maybeLoadWord()
+                        webView
+                    },
+                    modifier = if (vm.pinToViewport) {
+                        Modifier
+                            .fillMaxWidth()
+                            .height(maxH)
+                    } else {
+                        Modifier.fillMaxWidth()
+                    }
+                )
+            }
+
+            if (vm.uiStatus !is WordUiStatus.Hidden) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.background),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        val s = vm.uiStatus
+                        if (s is WordUiStatus.Loading) {
+                            LoadingIndicator(modifier = Modifier.padding(bottom = 16.dp))
+                            Text(
+                                context.getString(R.string.loading),
+                                textAlign = TextAlign.Center
+                            )
+                        } else if (s is WordUiStatus.Error) {
+                            Text(
+                                text = context.getString(s.textRes),
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.padding(bottom = 16.dp)
+                            )
+                            Button(onClick = { vm.fetchWord() }) {
+                                Text(context.getString(R.string.tryagain))
                             }
                         }
                     }
                 }
             }
         }
-
-        // Docked word action bar: it takes layout space below the content
-        // (nothing ever scrolls behind it), so the last lines stay visible.
-        // The Anki-card FAB is folded in as a regular action.
+        // Docked word action bar: an M3 bottom app bar overlaid on the
+        // WebView, which runs behind it all the way to the screen bottom so
+        // the bar can collapse away and reveal the page's last lines.
+        // exitAlwaysScrollBehavior hides the bar when the content is scrolled
+        // down and brings it back on a scroll up; the pinned (JSON) WebView's
+        // scroll feeds it through vm.webViewScrolled, the legacy words through
+        // the outer Compose scroll. The Anki-card FAB is folded in as a
+        // regular action.
         if (word != null) {
-            Surface(
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 3.dp,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            BottomAppBar(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                scrollBehavior = bottomBarScrollBehavior,
+                content = {
                     IconButton(onClick = {
                         vm.mWord?.audio?.let { audio -> vm.playAudio(audio) }
                     }) {
@@ -789,7 +832,7 @@ fun WordScreen(
                         )
                     }
                 }
-            }
+            )
         }
     }
 }

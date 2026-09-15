@@ -11,6 +11,7 @@ import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -702,6 +703,32 @@ class NavigationRegressionTest {
         // that has already been destroyed.
         composeRule.activityRule.scenario.moveToState(Lifecycle.State.DESTROYED)
         assertThat(ordboken().mPrefs.getInt("scale", 0)).isEqualTo(150)
+    }
+
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Test
+    fun webViewScrollCollapsesTheWordBarForJsonWords() {
+        awaitNav()
+        est.enqueue(MockResponse().setBody(estFrente()))
+        openWord(est, "/frente")
+        val vm = topWordViewModel()!!
+        awaitCondition(message = "JSON word pins and wires the bar behavior") {
+            vm.bottomBarScrollBehavior != null && vm.pinToViewport
+        }
+
+        // JSON words scroll inside the pinned WebView (invisible to Compose
+        // nested scroll), so WordScreen bridges it to the bar behavior: a
+        // downward WebView scroll must collapse the bar, an upward one restore
+        // it (the size the platform scroll listener reports in real use).
+        onMain { vm.webViewScrolled(0, 800) }
+        awaitCondition(message = "scrolling the WebView down collapses the bar") {
+            vm.bottomBarScrollBehavior!!.state.heightOffset < 0f
+        }
+
+        onMain { vm.webViewScrolled(800, 0) }
+        awaitCondition(message = "scrolling the WebView back up restores the bar") {
+            vm.bottomBarScrollBehavior!!.state.heightOffset == 0f
+        }
     }
 
     @Test

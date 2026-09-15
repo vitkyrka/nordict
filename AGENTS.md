@@ -83,7 +83,14 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
   `loadWord(...)`; otherwise it keeps the original HTML fragments (`getPage()`)
   for non-JSON dictionaries. JSON words pin the WebView to the viewport
   (internal scroll, reliable `#hom-N` anchors); legacy words let the outer
-  `verticalScroll` own the page. Owns the WebView, an `ExoPlayer`, and the
+  `verticalScroll` own the page. The docked word action bar is an M3
+  `BottomAppBar` (`BottomAppBarDefaults.exitAlwaysScrollBehavior`) overlaid on
+  the WebView, which runs behind it to the screen bottom; the bar collapses on
+  a downward scroll and returns on an upward one — legacy words drive it
+  through the root `Box`'s `nestedScroll` modifier, JSON words through
+  `WordViewModel.webViewScrolled` (a `WebView.OnScrollChangeListener` bridge,
+  since the pinned WebView's internal scroll is invisible to Compose).
+  Owns the WebView, an `ExoPlayer`, and the
   oracle history SQLite writes; navigation side effects flow out through
   `onOpenUri`/`onOpenExternal`/`onFillSearch` callbacks.
 - **`<Name>Parser.kt`** — companion-object parsers that take a raw HTML page,
