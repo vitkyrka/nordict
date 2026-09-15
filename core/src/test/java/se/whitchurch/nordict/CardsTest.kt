@@ -83,16 +83,36 @@ class CardsTest {
     }
 
     @Test
-    fun proposals_combinedWord_usesBaseDefinitions() {
+    fun proposals_combinedWord_coversEverySelectedDictionary() {
         val dle = parseDleOtro()
         val est = parseEstOtro()
         val entries = MultiDict.entriesFor("DLE", dle) + MultiDict.entriesFor("EST", est)
         val combined = Word.combined(dle, "combined", entries, "otro", null)
 
+        // The combined page stacks every selected dictionary's entries, so the
+        // card screen must offer each entry's definitions and idioms (not just
+        // the base word's). Definitions first, then idioms, in page order.
         val proposals = Cards.proposals(combined)
-        assertThat(proposals).hasSize(dle.definitions.size + dle.idioms.size)
-        assertThat(proposals.filterIsInstance<CardProposal.Definition>()).hasSize(7)
-        assertThat(proposals.filterIsInstance<CardProposal.Idiom>()).hasSize(7)
+        assertThat(proposals).hasSize(dle.definitions.size + est.definitions.size + dle.idioms.size + est.idioms.size)
+        assertThat(proposals.filterIsInstance<CardProposal.Definition>())
+            .hasSize(dle.definitions.size + est.definitions.size)
+        assertThat(proposals.filterIsInstance<CardProposal.Idiom>())
+            .hasSize(dle.idioms.size + est.idioms.size)
+
+        val first = proposals.first()
+        assertThat(first.id).isEqualTo("d0")
+        assertThat(first.title).isEqualTo("otro, tra")
+
+        // Both dictionaries' fragments are reachable: an EST definition's card
+        // renders its own element, not the base (DLE) word's.
+        val estDef = est.definitions.first()
+        val estProposal = proposals.filterIsInstance<CardProposal.Definition>()
+            .first { it.definition === estDef }
+        assertThat(Cards.definitionBack(combined, listOf(estDef), ""))
+            .contains(estDef.element.outerHtml())
+
+        val estProposalIndex = proposals.indexOf(estProposal)
+        assertThat(estProposalIndex).isGreaterThan(0)
     }
 
     // ---- definition Back ----

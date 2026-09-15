@@ -42,14 +42,41 @@ object Cards {
     private val gson = Gson()
 
     /** The cards a word's card screen offers: one per definition, then one
-     * per idiom, in page order. */
+     * per idiom, in page order. Combined multi-dictionary words stack every
+     * selected dictionary's entry on one page (`mHomonymEntries` carries the
+     * whole set while the word's own `definitions`/`idioms` only hold the
+     * first entry), so their proposals flatten every entry, mirroring the
+     * page; plain words propose the loaded word's own definitions and
+     * idioms. */
     fun proposals(word: Word): List<CardProposal> {
+        val entries = word.mHomonymEntries.takeIf {
+            it.any { entry -> MultiDict.isCombinedRef(entry.ref) }
+        }
+        if (entries != null) return combinedProposals(word, entries)
+
         val out = ArrayList<CardProposal>()
         word.definitions.forEachIndexed { i, definition ->
             out.add(CardProposal.Definition("d$i", definition.title ?: word.mTitle, definition))
         }
         word.idioms.forEachIndexed { i, idiom ->
             out.add(CardProposal.Idiom("i$i", word.mTitle, idiom))
+        }
+        return out
+    }
+
+    private fun combinedProposals(word: Word, entries: List<Word.HomonymEntry>): List<CardProposal> {
+        val out = ArrayList<CardProposal>()
+        var d = 0
+        for (entry in entries) {
+            for (definition in entry.definitions) {
+                out.add(CardProposal.Definition("d${d++}", definition.title ?: entry.mTitle, definition))
+            }
+        }
+        var i = 0
+        for (entry in entries) {
+            for (idiom in entry.idioms) {
+                out.add(CardProposal.Idiom("i${i++}", entry.mTitle, idiom))
+            }
         }
         return out
     }
