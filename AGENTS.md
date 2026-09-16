@@ -218,7 +218,9 @@ one activity.
 
 The card ops drive the AnkiDroid `CardActivity` (which *is* a separate
 activity, launched with the word view's "add card" intent): `openCards`
-launches it for the current word with `deckName = "Nordict - <dict>"` and
+launches it for the current word with `deckName = "Nordict - <dict>"` for a
+single dictionary, or `"Nordict - <LANG>"` (the shared language code, e.g.
+`"Nordict - ES"`) for a combined multi-dictionary word, and
 waits for it to be the resumed activity; `createCard` waits for the card
 screen's async word load, then creates the card for the numbered proposal
 (`index`, zero-based over `Cards.proposals` — definitions first, then idioms,

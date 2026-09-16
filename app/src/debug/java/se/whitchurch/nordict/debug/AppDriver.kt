@@ -219,10 +219,11 @@ class AppDriver(private val app: android.app.Application) {
     /**
      * Opens the card screen for the current word, exactly like the word
      * view's "add card" action: the same `CardActivity` intent (deck name
-     * `"Nordict - <dict>"`). The page CSS is left as the last value in
-     * [Ordboken.currentCss] — the WebView `getCSS()` call happens on the FAB
-     * path only — so the agent path is headless-friendly while the cards
-     * produced are structurally identical.
+     * `"Nordict - <dict>"` for a single dictionary, `"Nordict - <LANG>"` for
+     * a combined multi-dictionary word). The page CSS is left as the last
+     * value in [Ordboken.currentCss] — the WebView `getCSS()` call happens
+     * on the FAB path only — so the agent path is headless-friendly while
+     * the cards produced are structurally identical.
      */
     private fun opOpenCards(command: AgentCommand): AgentResult {
         val word = ordboken().currentWord
@@ -230,9 +231,10 @@ class AppDriver(private val app: android.app.Application) {
         if (tracker.current == null) {
             return AgentResult.error(AgentOps.OPEN_CARDS, "no activity resumed")
         }
+        val deckName = onMain { topWordViewModel()?.deckName } ?: "Nordict - ${word.dict}"
         val intent = android.content.Intent(app, CardActivity::class.java).apply {
             addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            putExtra("deckName", "Nordict - ${word.dict}")
+            putExtra("deckName", deckName)
         }
         onMain { app.startActivity(intent) }
         await({

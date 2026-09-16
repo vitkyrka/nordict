@@ -117,6 +117,18 @@ class WordViewModel(
     var uiStatus: WordUiStatus by mutableStateOf(WordUiStatus.Loading)
     var webView: WebView? = null
 
+    /** Deck name for card creation: the language code (e.g. "ES") for a
+     *  combined multi-dictionary word whose deck spans every selected
+     *  dictionary, else the single dictionary's tag (e.g. "DLE"). */
+    val deckName: String
+        get() {
+            val word = mWord ?: return "Nordict"
+            if (sources.isEmpty()) return "Nordict - ${word.dict}"
+            val lang = sources.firstNotNullOfOrNull { ordboken.dictMap[it.tag]?.lang }
+            return if (lang != null) "Nordict - ${lang.uppercase()}"
+            else "Nordict - ${word.dict}"
+        }
+
     // The word action bar's exit-always scroll behavior, wired by WordScreen
     // on every composition. It owns the nested-scroll connection that the bar
     // listens to; the pinned (JSON) WebView feeds it through webViewScrolled,
@@ -587,7 +599,7 @@ class WordViewModel(
     }
 
     fun share() {
-        val word = mWord ?: return
+        if (mWord == null) return
         val webView = this.webView ?: return
         webView.evaluateJavascript("getCSS()", android.webkit.ValueCallback { json ->
             val reader = JsonReader(StringReader(json))
@@ -595,7 +607,7 @@ class WordViewModel(
             ordboken.currentCss = reader.nextString()
 
             val intent = Intent(getApplication(), CardActivity::class.java).apply {
-                putExtra("deckName", "Nordict - ${word.dict}")
+                putExtra("deckName", deckName)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             getApplication<android.app.Application>().startActivity(intent)
