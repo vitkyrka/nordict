@@ -285,7 +285,8 @@ JUnit against a MockWebServer (no Robolectric, no Android):
 ```
 
 The parser tests (`DleParserTest`, `EstParserTest`, `CollinsParserTest`,
-`ColfrenParserTest`, `LeRobertParserTest`, `LingueeParserTest`) all run in
+`ColfrenParserTest`, `LeRobertParserTest`, `LingueeParserTest`,
+`WiktionaryParserTest`) all run in
 `:core` as plain JUnit
 and read fixtures relatively as `../testdata/...` (working dir `core/`).
 App-side integration tests spin up a MockWebServer serving
@@ -304,6 +305,7 @@ UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.CollinsParse
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.ColfrenParserTest'
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.LeRobertParserTest'
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.LingueeParserTest'
+UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.WiktionaryParserTest'
 ```
 
 (or any parser test class), then review the git diff; keep the test's semantic
@@ -541,12 +543,50 @@ and `testdata/lingpt-search.json` (latin-1). `tools/download.py` supports
 `LINGPT` (`https://www.linguee.pt/portugues-ingles/traducao/<word>`) and
 writes the fixture back in latin-1.
 
+## Wiktionary (WFR, French)
+
+`Wiktionary` (`:core`) is the abstract base class for Wiktionary language
+variants, parameterized by `shortName` and an optional `baseUrl` (default
+`https://<shortName>.m.wiktionary.org`, tests use a MockWebServer).
+`FrWiktionary` is the concrete French implementation (`WFR`, `lang`/`flagCode`
+`fr`). `get(uri)` validates the host against the base host and the
+`<shortName>.m.wiktionary.org`/`.wiktionary.org` domains, strips `__ref`, and
+delegates to `WiktionaryParser.parse`.
+
+`search()` hits the Wiktionary REST API
+`/w/rest.php/v1/search/title?q=<query>&limit=10` (the mobile `.m.` host is
+rewritten to the desktop `.wiktionary.org` one) and decodes the
+`{"pages":[{"title","id"}]}` shape through the shared
+`WiktionaryParser.parseSearch(body, shortName) { id, title -> … }`; each
+result's `uri` is the `?curid=<id>` deep-link. `fullSearch` aliases `search`.
+
+`WiktionaryParser.parse` isolates the target language's `<section>` (the one
+with a `#<shortName>` span) inside `.mw-parser-output`, strips other
+languages and the `Traductions` section, de-lazies images, and reads the
+pronunciation (`span.titrepron`), etymology (`span.titreetym`), and
+definition (`span.titredef`) sub-sections. Each `span.titredef` heading (one
+POS group, e.g. "Nom commun", "Forme de verbe") becomes one `renderAsJson`
+`Word` whose `titredef` id is its `__ref` xref (e.g. `fr-nom-1`); gender comes
+from `span.ligne-de-forme` (`genderOf` maps "féminin"/"masculin" to
+`Genders`). Definitions/idioms parse each `<ol><li>`: `span.term`/`span.emploi`
+markers become `domain`/`register` (and their "(…)" prefixes are stripped from
+the gloss), nested example `<li><q>` lines become gloss examples, and
+pronunciation `<audio><source>` mp3s (transcodes only, ogg/wav dropped) fill
+`audio`. Multi-lemma pages get `mHomograph`s + `mHomonymEntries`. A
+`parseLegacy` fallback handles older HTML layouts where h3 headings hang
+directly off the first `<section>`.
+
+Tests: `WiktionaryParserTest` + `WiktionaryIntegrationTest` (both `:core`,
+plain JUnit goldens + MockWebServer — search endpoint must NOT be the mobile
+host), fixtures `testdata/wfr/table.{html,json}` and `testdata/wfr-search.json`.
+CLI: `wfr table` / `wfr table --search` (or `--dict wfr --file …` offline).
+
 ## Modernizing a legacy dictionary
 
 Legacy dictionaries (those with `renderAsJson = false`) keep original source
 HTML and don't feed the shared JSON rendering pipeline. To convert one to the
 modern schema (targets: `EstParser`, `CollinsParser`, `DleParser`,
-`LeRobertParser`, `LingueeParser`):
+`LeRobertParser`, `LingueeParser`, `WiktionaryParser`):
 
 1. **Rewrite the parser** to return `Word`s with `renderAsJson = true`:
    - Build a companion `parseSearch(body, uriOf)` so search decoding is shared
@@ -590,8 +630,8 @@ modern schema (targets: `EstParser`, `CollinsParser`, `DleParser`,
   `@Config(sdk = [28])`) when Android classes (e.g. `Uri`) are involved.
   The shared `:core` tests — `DleParserTest`, `EstParserTest`,
   `CollinsParserTest`, `DiccionariParserTest`, `LeRobertParserTest`,
-  `LingueeParserTest`, and the moved
-  `{Est,Dle,Collins,Didac,Diccionari,LeRobert,Linguee}IntegrationTest` suites
+  `LingueeParserTest`, `WiktionaryParserTest`, and the moved
+  `{Est,Dle,Collins,Didac,Diccionari,LeRobert,Linguee,Wiktionary}IntegrationTest` suites
   (MockWebServer) — are plain JUnit and run on a desktop JVM.
 - `Word` fields are read by `renderer.js` by exact JSON name; renaming fields
   in `Word.kt` requires updating the golden-schema data classes in

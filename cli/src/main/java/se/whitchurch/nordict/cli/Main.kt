@@ -17,6 +17,7 @@ import se.whitchurch.nordict.LeRobertParser
 import se.whitchurch.nordict.LingueeParser
 import se.whitchurch.nordict.SearchResult
 import se.whitchurch.nordict.SoParser
+import se.whitchurch.nordict.Wiktionary
 import se.whitchurch.nordict.WiktionaryParser
 import se.whitchurch.nordict.AgentCommand
 import se.whitchurch.nordict.AgentOps
@@ -152,23 +153,10 @@ class Main {
             emptyList()
         }
 
-    private fun wiktionarySearchResults(body: String, short: String): List<SearchResult> {
-        val results = ArrayList<SearchResult>()
-        val pages = try {
-            JsonParser.parseString(body).asJsonObject.getAsJsonArray("pages")
-        } catch (e: Exception) {
-            return results
+    private fun wiktionarySearchResults(body: String, short: String): List<SearchResult> =
+        WiktionaryParser.parseSearch(body, short) { id, _ ->
+            "https://$short.m.wiktionary.org/?curid=$id".toHttpUrlOrNull()!!
         }
-        for (el in pages) {
-            if (!el.isJsonObject) continue
-            val page = el.asJsonObject
-            val title = page.get("title")?.takeIf { it.isJsonPrimitive }?.asString ?: continue
-            val id = page.get("id")?.takeIf { it.isJsonPrimitive }?.asInt ?: continue
-            ("https://$short.m.wiktionary.org/?curid=$id").toHttpUrlOrNull()
-                ?.let { results.add(SearchResult(title, it)) }
-        }
-        return results
-    }
 
     private fun infopediaSearchResults(body: String): List<SearchResult> {
         val html = try {
@@ -677,7 +665,11 @@ class Main {
 
     private fun fetch(url: HttpUrl): String {
         val client = OkHttpClient()
-        val request = Request.Builder().url(url).build()
+        val builder = Request.Builder().url(url)
+        if (url.host.endsWith("wiktionary.org")) {
+            builder.addHeader("User-Agent", Wiktionary.USER_AGENT)
+        }
+        val request = builder.build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw RuntimeException("HTTP ${response.code} for $url")
             return response.body?.string() ?: ""
