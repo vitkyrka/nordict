@@ -133,7 +133,10 @@ class CollinsParser {
                 headword.dictionary = head.label
 
                 head.block.select("div.mini_h2 a.hwd_sound[data-src-mp3]").forEach { audio ->
-                    headword.audio.add(audio.attr("data-src-mp3"))
+                    val url = audio.attr("data-src-mp3")
+                    if (url.contains("ES-ES")) {
+                        headword.audio.add(url)
+                    }
                 }
 
                 if (head.singleHom != null) {

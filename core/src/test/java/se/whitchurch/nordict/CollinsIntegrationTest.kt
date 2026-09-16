@@ -71,7 +71,7 @@ class CollinsIntegrationTest {
         assertThat(word?.definitions?.get(0)?.glosses).hasSize(2)
         assertThat(word?.definitions?.get(0)?.glosses?.get(0)?.idioms).hasSize(1)
         assertThat(word?.definitions?.get(0)?.glosses?.get(0)?.phrases).hasSize(5)
-        assertThat(word?.audio).hasSize(2)
+        assertThat(word?.audio).hasSize(1)
     }
 
     @Test
@@ -132,6 +132,6 @@ class CollinsIntegrationTest {
         assertThat(ley?.mTitle).isEqualTo("ley")
         assertThat(ley?.dictionary).isEqualTo("Collins Spanish-English")
         assertThat(ley?.definitions?.get(0)?.pos).isEqualTo("feminine noun")
-        assertThat(ley?.audio).hasSize(2)
+        assertThat(ley?.audio).hasSize(1)
     }
 }

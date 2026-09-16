@@ -37,9 +37,8 @@ class CollinsParserTest {
         val fem = words[0]
         assertThat(fem.mTitle).isEqualTo("frente")
         assertThat(fem.dictionary).isEqualTo("Collins Spanish-English")
-        assertThat(fem.audio).hasSize(2)
-        assertThat(fem.audio[0]).contains("ES-419")
-        assertThat(fem.audio[1]).contains("ES-ES")
+        assertThat(fem.audio).hasSize(1)
+        assertThat(fem.audio[0]).contains("ES-ES")
         assertThat(fem.definitions).hasSize(1)
 
         // First main headword: feminine noun; idioms/phrases are nested in its
@@ -88,7 +87,7 @@ class CollinsParserTest {
         assertThat(fem.mHomonymEntries.map { it.mTitle })
             .containsExactly("frente", "frente", "la frente", "el frente").inOrder()
         assertThat(fem.mHomonymEntries[1].definitions[0].pos).isEqualTo("masculine noun")
-        assertThat(fem.mHomonymEntries[1].audio).hasSize(2)
+        assertThat(fem.mHomonymEntries[1].audio).hasSize(1)
         assertThat(fem.mHomonymEntries[3].dictionary).isEqualTo("Collins Easy Learning")
         // Every entry snapshot carries its own content.
         assertThat(words[2].mHomonymEntries[2].mTitle).isEqualTo("la frente")
