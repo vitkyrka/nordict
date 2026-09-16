@@ -146,7 +146,6 @@ class MultiDictTest {
         val combined = MultiDict.fetch(lookups(), sources, headword = "frente")!!
 
         assertThat(combined.mTitle).isEqualTo("frente")
-        assertThat(combined.renderAsJson).isTrue()
         assertThat(combined.dictionary).isEqualTo("DLE")
         // One entry per source page, selection order, namespaced refs.
         assertThat(combined.mHomonymEntries).hasSize(2)

@@ -14,11 +14,7 @@ import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OpenInNew
@@ -34,10 +30,8 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.Lifecycle
@@ -55,7 +49,6 @@ import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
@@ -111,7 +104,6 @@ class WordViewModel(
 
     var mWord: Word? by mutableStateOf(null)
     var autoPlay: Boolean by mutableStateOf(false)
-    var pinToViewport: Boolean by mutableStateOf(false)
     var webViewVisible: Boolean by mutableStateOf(false)
     var pageFinished: Boolean by mutableStateOf(false)
     var uiStatus: WordUiStatus by mutableStateOf(WordUiStatus.Loading)
@@ -131,18 +123,16 @@ class WordViewModel(
 
     // The word action bar's exit-always scroll behavior, wired by WordScreen
     // on every composition. It owns the nested-scroll connection that the bar
-    // listens to; the pinned (JSON) WebView feeds it through webViewScrolled,
-    // while legacy words scroll the outer Compose column past it directly.
+    // listens to; the pinned WebView feeds it through webViewScrolled.
     var bottomBarScrollBehavior: BottomAppBarScrollBehavior? = null
 
     /**
      * The scroll offset a user left this word at, kept across a covered
-     * destination so popping back can restore it. JSON words scroll inside the
-     * pinned WebView ([captureScroll] reads `WebView.getScrollY`), legacy words
-     * in the outer Compose column (the caller hands its [ScrollState] value).
-     * Captured when the destination pauses and when its composition is torn
-     * down (both fire when another word is pushed over it), re-applied once the
-     * page is rendered again.
+     * destination so popping back can restore it. Words scroll inside the
+     * pinned WebView ([captureScroll] reads `WebView.getScrollY`). Captured
+     * when the destination pauses and when its composition is torn down (both
+     * fire when another word is pushed over it), re-applied once the page is
+     * rendered again.
      */
     var savedScrollY: Int = 0
 
@@ -252,16 +242,16 @@ class WordViewModel(
      * the page back where the user left it. A covered destination is torn down
      * (and its WebView re-created fresh), so without this the scroll silently
      * resets to the top when the word is re-entered. */
-    fun captureScroll(composeScrollY: Int) {
-        savedScrollY = if (pinToViewport) webView?.scrollY ?: 0 else composeScrollY
+    fun captureScroll() {
+        savedScrollY = webView?.scrollY ?: 0
     }
 
-    /** Re-applies [savedScrollY] to a freshly loaded pinned WebView (JSON words
+    /** Re-applies [savedScrollY] to a freshly loaded pinned WebView (words
      * scroll inside the viewport WebView, so the Compose column cannot do it).
      * Called from `onPageFinished`, once the rendered content actually has a
      * scrollable extent. */
     fun restoreWebViewScroll() {
-        if (pinToViewport && savedScrollY > 0) {
+        if (savedScrollY > 0) {
             val view = webView ?: return
             view.post { view.scrollTo(0, savedScrollY) }
         }
@@ -373,17 +363,16 @@ class WordViewModel(
 
     /**
      * Feeds the word action bar's exit-always scroll behavior from the pinned
-     * (JSON) WebView's internal scroll [WebView.OnScrollChangeListener]. The
-     * Compose nested-scroll chain cannot see a platform WebView's scrolling,
-     * so this bridges it to the same connection the legacy words drive through
-     * their outer Compose scrollable: scrolling the page down collapses the
-     * bar, scrolling back up brings it back. A positive delta (content moved
-     * down) folds into a negative consumed offset, matching the direction the
-     * M3 behavior expects to collapse.
+     * WebView's internal scroll [WebView.OnScrollChangeListener]. The Compose
+     * nested-scroll chain cannot see a platform WebView's scrolling, so this
+     * bridges it to the same connection the words drive through their outer
+     * Compose scrollable: scrolling the page down collapses the bar, scrolling
+     * back up brings it back. A positive delta (content moved down) folds into
+     * a negative consumed offset, matching the direction the M3 behavior
+     * expects to collapse.
      */
     fun webViewScrolled(oldScrollY: Int, scrollY: Int) {
         val behavior = bottomBarScrollBehavior ?: return
-        if (!pinToViewport) return
         val delta = scrollY - oldScrollY
         if (delta == 0) return
         behavior.nestedScrollConnection.onPostScroll(
@@ -395,40 +384,21 @@ class WordViewModel(
 
     fun loadWebView(word: Word) {
         val webView = this.webView ?: return
-        if (word.renderAsJson) {
-            pinToViewport = true
 
-            val gson = Gson()
-            val json = gson.toJson(word)
-            val template =
-                getApplication<android.app.Application>().assets.open("word_template.html")
-                    .bufferedReader().use { it.readText() }
-            val html = template.replace("</body>", """
-                <script>
-                    loadWord($json);
-                </script>
-                </body>
-            """.trimIndent())
-
-            webView.loadDataWithBaseURL(
-                "file:///android_asset/", html,
-                "text/html", "UTF-8", null
-            )
-            return
-        }
-
-        pinToViewport = false
-
-        val text = word.getPage()
-        val footer = ("<script src='file:///android_asset/jquery.min.js'></script>"
-                + "<link rel='stylesheet' type='text/css' href='file:///android_asset/word.css'>"
-                + "<script src='file:///android_asset/word.js'></script>")
-
-        val builder = StringBuilder(text.replace("/speaker.png", "https://svenska.se/speaker.png"))
-        builder.append(footer)
+        val gson = Gson()
+        val json = gson.toJson(word)
+        val template =
+            getApplication<android.app.Application>().assets.open("word_template.html")
+                .bufferedReader().use { it.readText() }
+        val html = template.replace("</body>", """
+            <script>
+                loadWord($json);
+            </script>
+            </body>
+        """.trimIndent())
 
         webView.loadDataWithBaseURL(
-            word.baseUrl, builder.toString(),
+            "file:///android_asset/", html,
             "text/html", "UTF-8", null
         )
     }
@@ -642,18 +612,11 @@ fun WordScreen(
     // The docked word action bar uses the M3 exit-always scroll behavior: it
     // collapses when the word content is scrolled down and reappears on a
     // scroll back up. The connection lives on the screen's root (as the M3
-    // wiring does); the pinned JSON WebView feeds it through vm.webViewScrolled
+    // wiring does); the pinned WebView feeds it through vm.webViewScrolled
     // since its internal scroll is invisible to the Compose nested-scroll
-    // chain, while legacy words scroll the outer Compose column past it.
+    // chain.
     val bottomBarScrollBehavior = BottomAppBarDefaults.exitAlwaysScrollBehavior()
     vm.bottomBarScrollBehavior = bottomBarScrollBehavior
-
-    // The legacy words' outer scroll position; JSON words scroll inside the
-    // pinned WebView instead (the verticalScroll below is disabled for them).
-    // Hoisted out of the BoxWithConstraints so the lifecycle effect can capture
-    // the offset on pause/dispose and the restore effect can put it back after
-    // the page re-renders.
-    val scrollState = rememberScrollState()
 
     // Load the word page as soon as the fetch lands. The AndroidView factory
     // can run before the coroutine finishes, so a fast fetch (or a retry)
@@ -662,22 +625,11 @@ fun WordScreen(
     // pushed over by another word re-renders the already-fetched word.
     LaunchedEffect(word, vm.webView) { vm.maybeLoadWord() }
 
-    // A legacy word's page loads asynchronously into the WebView, so when this
+    // A word's page loads asynchronously into the WebView, so when this
     // destination is re-entered after being covered the scrollable's max extent
     // starts at 0 and clamps a restored offset to it. Once the page finishes and
-    // reports its laid-out height, put the column back where the user left it
-    // (JSON words are restored by the WebView itself in restoreWebViewScroll).
-    LaunchedEffect(vm.pageFinished, vm.pinToViewport) {
-        if (vm.pageFinished && !vm.pinToViewport && vm.savedScrollY > 0 &&
-            scrollState.value != vm.savedScrollY
-        ) {
-            repeat(50) {
-                scrollState.scrollTo(vm.savedScrollY)
-                if (scrollState.value == vm.savedScrollY) return@LaunchedEffect
-                delay(50)
-            }
-        }
-    }
+    // reports its laid-out height, put the WebView back where the user left it
+    // (restoreWebViewScroll re-applies the saved offset on the pinned page).
 
     // Restore Ordboken state + the cross-dictionary hook on resume, matching
     // the old WordActivity.onResume/onPause duties. The hook is installed at
@@ -705,7 +657,7 @@ fun WordScreen(
                     // dictionary tap during the transition to the next word
                     // destination must still reach this (or the next) view.
                     vm.onLeave()
-                    vm.captureScroll(scrollState.value)
+                    vm.captureScroll()
                 }
                 else -> Unit
             }
@@ -718,7 +670,7 @@ fun WordScreen(
             // is disposed right around the ON_PAUSE event, and the WebView (and
             // its scroll) survives untouched until the re-created one replaces
             // it, so the last offset is still readable here.
-            vm.captureScroll(scrollState.value)
+            vm.captureScroll()
         }
     }
 
@@ -730,35 +682,10 @@ fun WordScreen(
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val maxH = maxHeight
 
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState, enabled = !vm.pinToViewport)
-            ) {
-                // Legacy homograph strip (JSON dictionaries render their own).
-                if (word != null && !word.renderAsJson && word.mHomographs.isNotEmpty()) {
-                    Column {
-                        word.mHomographs.forEach { homograph ->
-                            val isCurrent = homograph.uri == word.uri
-                            Text(
-                                text = (if (isCurrent) "▶ " else "  ") + homograph.mSummary,
-                                fontSize = 15.sp,
-                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Normal,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        onOpenUri(homograph.uri.toAndroidUri(), homograph.mSummary)
-                                    }
-                                    .padding(start = 20.dp, top = 10.dp, end = 0.dp, bottom = 10.dp)
-                            )
-                        }
-                    }
-                }
-
-                AndroidView(
+            AndroidView(
                     factory = { ctx ->
                         val webView = vm.createWebView(ctx)
-                        // Bridge the pinned (JSON) WebView's internal
+                        // Bridge the pinned WebView's internal
                         // scroll into the word bar's exit-always scroll
                         // behavior: Compose nested scroll can't see a
                         // platform WebView, so the bar listens here.
@@ -771,15 +698,10 @@ fun WordScreen(
                         vm.maybeLoadWord()
                         webView
                     },
-                    modifier = if (vm.pinToViewport) {
-                        Modifier
-                            .fillMaxWidth()
-                            .height(maxH)
-                    } else {
-                        Modifier.fillMaxWidth()
-                    }
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(maxH)
                 )
-            }
 
             if (vm.uiStatus !is WordUiStatus.Hidden) {
                 Box(
@@ -814,10 +736,9 @@ fun WordScreen(
         // WebView, which runs behind it all the way to the screen bottom so
         // the bar can collapse away and reveal the page's last lines.
         // exitAlwaysScrollBehavior hides the bar when the content is scrolled
-        // down and brings it back on a scroll up; the pinned (JSON) WebView's
-        // scroll feeds it through vm.webViewScrolled, the legacy words through
-        // the outer Compose scroll. The Anki-card FAB is folded in as a
-        // regular action.
+        // down and brings it back on a scroll up; the pinned WebView's
+        // scroll feeds it through vm.webViewScrolled. The Anki-card FAB is
+        // folded in as a regular action.
         if (word != null) {
             BottomAppBar(
                 modifier = Modifier.align(Alignment.BottomCenter),

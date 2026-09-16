@@ -330,7 +330,6 @@ class EstParserTest {
 
         // Each entry snapshots the whole set, keyed by the same refs.
         for (word in words) {
-            assertThat(word.mHomographs).hasSize(2)
             assertThat(word.mHomonymEntries).hasSize(2)
             assertThat(word.mHomonymEntries.map { it.ref }).containsExactly("1", "2").inOrder()
             assertThat(word.mHomonymEntries.map { it.mTitle }).containsExactly("cura", "cura").inOrder()

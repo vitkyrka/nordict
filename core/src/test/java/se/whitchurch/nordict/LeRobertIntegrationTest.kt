@@ -81,7 +81,6 @@ class LeRobertIntegrationTest {
 
         assertThat(word2).isNotNull()
         assertThat(word2?.mTitle).isEqualTo("table")
-        assertThat(word2?.renderAsJson).isTrue()
     }
 
     @Test

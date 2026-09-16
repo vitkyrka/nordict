@@ -145,8 +145,7 @@ class DiccionariParser {
                 if (title.isEmpty()) return@forEachIndexed
 
                 val headword = Word(
-                    tag, title, title, title, page, wordUri,
-                    baseUrl, doc, "", article, renderAsJson = true
+                    tag, title, title, title, wordUri
                 )
                 headword.rawHeadword = title
                 headword.xrefs.add((words.size + 1).toString())
@@ -173,10 +172,8 @@ class DiccionariParser {
 
         private fun attachHomographs(words: List<Word>) {
             if (words.size < 2) return
-            val homographs = words.map { SearchResult(it.mTitle, it.summary, it.uri) }
             val entries = Word.homonymEntries(words)
             for (word in words) {
-                word.mHomographs.addAll(homographs)
                 word.mHomonymEntries.addAll(entries)
             }
         }

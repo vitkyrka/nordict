@@ -121,13 +121,8 @@ class CollinsParser {
                 else uri.newBuilder().addQueryParameter(REFPARAM, head.ref).build()
 
                 val headword = Word(
-                    tag, head.title, head.title, head.title, page, headUri,
-                    baseRoot + "/",
-                    doc,
-                    "",
-                    null,
-                    xrefs = arrayListOf(head.ref),
-                    renderAsJson = true
+                    tag, head.title, head.title, head.title, headUri,
+                    xrefs = arrayListOf(head.ref)
                 )
                 headword.rawHeadword = rawHeadword(head.title)
                 headword.dictionary = head.label
@@ -154,11 +149,9 @@ class CollinsParser {
             }
 
             if (words.size > 1) {
-                val homographs = words.map { SearchResult(it.mTitle, it.summary, it.uri) }
                 val entries = Word.homonymEntries(words)
 
                 for (word in words) {
-                    word.mHomographs.addAll(homographs)
                     word.mHomonymEntries.addAll(entries)
                 }
             }

@@ -10,8 +10,7 @@ import java.io.File
 
 /**
  * Pure-JVM tests for the card pipeline ([Cards]): card proposals, Back HTML
- * building (fragment mode for JSON dictionaries, page-skeleton mode for
- * legacy dictionaries, combining for multi-dictionary words) and the note
+ * building (fragment mode, combining for multi-dictionary words) and the note
  * fields. Parser fixtures are the same ones the parser golden tests use.
  */
 class CardsTest {
@@ -142,7 +141,8 @@ class CardsTest {
         assertThat(def.element.outerHtml()).contains("feminine noun")
 
         // The page-level chrome stays out of the card back.
-        assertThat(word.element.outerHtml()).contains("Log in here")
+        val page = File("../testdata/colspan/frente.html").readText()
+        assertThat(page).contains("Log in here")
         assertThat(back).doesNotContain("Log in here")
     }
 
@@ -165,8 +165,8 @@ class CardsTest {
         val entries = MultiDict.entriesFor("DLE", dle) + MultiDict.entriesFor("EST", est)
         val combined = Word.combined(dle, "combined", entries, "otro", null)
 
-        // The combined word has no page skeleton (empty element), so the old
-        // getPage injection produced an empty <body>. Fragment mode must not.
+        // The combined word has no page skeleton, so fragment mode must render
+        // the definitions' elements directly, never an empty body.
         val back = Cards.definitionBack(combined, combined.definitions, "css{}")
         assertThat(back).isEqualTo(
             "<style>css{}</style>" + combined.definitions.joinToString("") { it.element.outerHtml() }
@@ -185,46 +185,6 @@ class CardsTest {
         val mixed = Cards.definitionBack(combined, listOf(dle.definitions[0], est.definitions[0]), "css{}")
         assertThat(mixed).contains(dle.definitions[0].element.outerHtml())
         assertThat(mixed).contains(est.definitions[0].element.outerHtml())
-    }
-
-    @Test
-    fun definitionBack_legacyDictionary_keepsThePageSkeleton() {
-        val doc = Jsoup.parse(
-            "<div id='content'><div class='bojning'>fram -en</div>" +
-                "<div id='content-betydninger'></div></div>"
-        )
-        val defEl = Element("div").addClass("definitionIndent")
-        val box = defEl.appendElement("div").addClass("definitionBox")
-        box.text("a dog")
-        val def = Word.Definition("a dog", defEl)
-        def.examples.add("The dog barked.")
-
-        val word = Word(
-            "DDO", "hund", "hund", "hund", "", httpUrl("https://ordnet.dk/ddo/ordbog?entry_id=1"),
-            "https://ordnet.dk/ddo/", doc.selectFirst("#content"), "", null,
-            renderAsJson = false
-        )
-        word.definitions.add(def)
-
-        val back = Cards.definitionBack(word, listOf(def), "legacy{}")
-        assertThat(back).startsWith("<style>legacy{}</style>")
-        assertThat(back).contains("a dog")
-        assertThat(back).contains("fram -en")
-    }
-
-    @Test
-    fun definitionBack_legacyWithNullCss_keepsHeaderPrefix() {
-        val doc = Jsoup.parse("<div id='content'><div id='content-betydninger'></div></div>")
-        val defEl = Element("div").text("def")
-        val def = Word.Definition("def", defEl)
-        val word = Word(
-            "DDO", "hund", "hund", "hund", "", httpUrl("https://ordnet.dk/ddo/"),
-            "https://ordnet.dk/ddo/", doc.selectFirst("#content"), "<head></head><body>", null,
-            renderAsJson = false
-        )
-        word.definitions.add(def)
-
-        assertThat(Cards.definitionBack(word, listOf(def), null)).contains("def")
     }
 
     // ---- idiom Back / examples ----
@@ -246,15 +206,12 @@ class CardsTest {
     }
 
     @Test
-    fun examples_legacyUsesDefinitionExamples() {
+    fun examples_usesDefinitionExamplesWhenGlossesAreEmpty() {
         val defEl = Element("div").text("def")
         val def = Word.Definition("def", defEl)
         def.examples.add("example 1")
 
-        val word = Word(
-            "DDO", "hund", "hund", "hund", "", httpUrl("https://ordnet.dk/ddo/"),
-            "https://ordnet.dk/ddo/", Jsoup.parse("<div/>"), "", null, renderAsJson = false
-        )
+        val word = Word("DDO", "hund", "hund", "hund", httpUrl("https://ordnet.dk/ddo/"))
 
         assertThat(Cards.examples(word, listOf(def), emptyList())).containsExactly("example 1")
     }
@@ -277,10 +234,7 @@ class CardsTest {
         val defEl = Element("div").text("def")
         val def = Word.Definition("def", defEl)
         def.examples.add("example 1")
-        val word = Word(
-            "DDO", "hund", "hund", "hund", "", httpUrl("https://ordnet.dk/ddo/"),
-            "https://ordnet.dk/ddo/", Jsoup.parse("<div/>"), "", null, renderAsJson = false
-        )
+        val word = Word("DDO", "hund", "hund", "hund", httpUrl("https://ordnet.dk/ddo/"))
 
         assertThat(Cards.examples(word, listOf(def), listOf("extra"))).containsExactly("example 1", "extra")
 
@@ -292,10 +246,7 @@ class CardsTest {
     fun examples_fallbackPrefersDefinitionTitle() {
         val defEl = Element("div").text("def")
         val titled = Word.Definition("def", defEl, "the title")
-        val word = Word(
-            "DDO", "hund", "hund", "hund", "", httpUrl("https://ordnet.dk/ddo/"),
-            "https://ordnet.dk/ddo/", Jsoup.parse("<div/>"), "", null, renderAsJson = false
-        )
+        val word = Word("DDO", "hund", "hund", "hund", httpUrl("https://ordnet.dk/ddo/"))
         assertThat(Cards.examples(word, listOf(titled), emptyList())).containsExactly("the title")
     }
 

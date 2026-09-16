@@ -53,7 +53,6 @@ class WiktionaryIntegrationTest {
 
         assertThat(word).isNotNull()
         assertThat(word?.mTitle).isEqualTo("table")
-        assertThat(word?.renderAsJson).isTrue()
         assertThat(word?.definitions).isNotEmpty()
         assertThat(word?.definitions?.get(0)?.glosses?.get(0)?.definition)
             .contains("Surface plane de bois")
@@ -87,7 +86,6 @@ class WiktionaryIntegrationTest {
         assertThat(word2?.mTitle).isEqualTo("table")
         assertThat(word2?.definitions?.get(0)?.glosses?.get(0)?.gender)
             .isEqualTo(Genders.FEMININE)
-        assertThat(word2?.renderAsJson).isTrue()
     }
 
     @Test

@@ -1,7 +1,5 @@
-/* Styles for dictionaries rendered from JSON by renderer.js
- * (e.g. EST). The template (word_template.html) loads this stylesheet.
- * Legacy dictionaries that render original source HTML use word.css
- * instead; keep the two files independent. */
+/* Styles for the JSON-rendered word pages built by renderer.js. The
+ * template (word_template.html) loads this stylesheet. */
 
 :root {
     color-scheme: light dark;

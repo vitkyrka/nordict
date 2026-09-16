@@ -31,23 +31,7 @@ abstract class DslDictionary(
         }
 
         val id = matcher.group(1)
-        val word = getMainSiteWord(getEntryUri(id))
-            ?: return null
-
-        val doc = Jsoup.parse(page, "${apiBaseUrl}/${shortName}/")
-        val wordLinks = doc.select(".short-result ul li a")
-        for (wordLink in wordLinks) {
-            val href = wordLink.attr("href")
-
-            if (!href.startsWith("#")) {
-                continue
-            }
-
-            val otherId = href.substring(1)
-            word.addHomograph(SearchResult(wordLink.text(), getEntryUri(otherId)))
-        }
-
-        return word
+        return getMainSiteWord(getEntryUri(id))
     }
 
     override fun get(uri: HttpUrl): Word? {

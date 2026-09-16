@@ -64,7 +64,6 @@ class ColfrenIntegrationTest {
         assertThat(word).isNotNull()
         assertThat(word?.mTitle).isEqualTo("table")
         assertThat(word?.dictionary).isEqualTo("Collins French-English")
-        assertThat(word?.renderAsJson).isTrue()
         assertThat(word?.definitions).hasSize(1)
         assertThat(word?.definitions?.get(0)?.pos).isEqualTo("feminine noun")
         assertThat(word?.definitions?.get(0)?.glosses).hasSize(1)

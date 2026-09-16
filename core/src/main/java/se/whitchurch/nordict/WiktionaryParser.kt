@@ -148,12 +148,8 @@ class WiktionaryParser {
                 first = false
 
                 val headword = Word(
-                    tag, word, word, "$word $pos", page, newUri,
-                    finalBaseUrl,
-                    doc,
-                    doc.head().html() + "<body>",
-                    xrefs = arrayListOf(ref),
-                    renderAsJson = true
+                    tag, word, word, "$word $pos", newUri,
+                    xrefs = arrayListOf(ref)
                 )
 
                 headword.images.addAll(images)
@@ -185,12 +181,8 @@ class WiktionaryParser {
                 val ol = langSection.selectFirst("ol") ?: return words
                 val ref = "def"
                 val headword = Word(
-                    tag, word, word, word, page, uri,
-                    finalBaseUrl,
-                    doc,
-                    doc.head().html() + "<body>",
-                    xrefs = arrayListOf(ref),
-                    renderAsJson = true
+                    tag, word, word, word, uri,
+                    xrefs = arrayListOf(ref)
                 )
                 headword.images.addAll(images)
                 headword.pronunciation = pronunciationText
@@ -204,11 +196,9 @@ class WiktionaryParser {
             }
 
             if (words.size > 1) {
-                val homographs = words.map { SearchResult(it.mTitle, it.summary, it.uri) }
                 val entries = Word.homonymEntries(words)
 
                 for (w in words) {
-                    w.mHomographs.addAll(homographs)
                     w.mHomonymEntries.addAll(entries)
                 }
             }
@@ -267,13 +257,8 @@ class WiktionaryParser {
                 first = false
 
                 val headword = Word(
-                    tag, word, word, "$word $pos", cleanpage, newUri,
-                    baseUrl,
-                    element,
-                    doc.head().html() + "<body>",
-                    lemma,
-                    xrefs = arrayListOf(ref),
-                    renderAsJson = true
+                    tag, word, word, "$word $pos", newUri,
+                    xrefs = arrayListOf(ref)
                 )
                 headword.rawHeadword = word
 
@@ -293,10 +278,8 @@ class WiktionaryParser {
             }
 
             if (words.size > 1) {
-                val homographs = words.map { SearchResult(it.mTitle, it.summary, it.uri) }
                 val entries = Word.homonymEntries(words)
                 for (w in words) {
-                    w.mHomographs.addAll(homographs)
                     w.mHomonymEntries.addAll(entries)
                 }
             }

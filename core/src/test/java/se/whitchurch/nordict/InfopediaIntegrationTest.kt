@@ -57,7 +57,6 @@ class InfopediaIntegrationTest {
 
         assertThat(word).isNotNull()
         assertThat(word?.mTitle).isEqualTo("mesa")
-        assertThat(word?.renderAsJson).isTrue()
         assertThat(word?.definitions).hasSize(12)
         assertThat(word?.definitions?.get(0)?.glosses?.get(0)?.definition).contains("móvel")
         assertThat(word?.idioms).hasSize(8)

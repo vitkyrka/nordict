@@ -74,13 +74,8 @@ class InfopediaParser {
                 val word = lemma.selectFirst(".dolEntrinfoEntrada")?.text()?.trim() ?: return@forEach
 
                 val headword = Word(
-                    tag, word, word, word, page, newUri,
-                    finalBaseUrl,
-                    doc,
-                    "",
-                    lemma,
-                    xrefs = arrayListOf(ref.toString()),
-                    renderAsJson = true
+                    tag, word, word, word, newUri,
+                    xrefs = arrayListOf(ref.toString())
                 )
 
                 headword.pronunciation = pronunciationOf(lemma)
@@ -152,11 +147,9 @@ class InfopediaParser {
             }
 
             if (words.size > 1) {
-                val homographs = words.map { SearchResult(it.mTitle, it.summary, it.uri) }
                 val entries = Word.homonymEntries(words)
 
                 for (w in words) {
-                    w.mHomographs.addAll(homographs)
                     w.mHomonymEntries.addAll(entries)
                 }
             }

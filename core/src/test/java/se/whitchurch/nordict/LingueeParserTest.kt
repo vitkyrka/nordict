@@ -37,7 +37,6 @@ class LingueeParserTest {
 
         val mesa = words[0]
         assertThat(mesa.mTitle).isEqualTo("mesa")
-        assertThat(mesa.renderAsJson).isTrue()
         assertThat(mesa.audio).hasSize(1)
         assertThat(mesa.audio[0]).isEqualTo(
             "https://www.linguee.pt/mp3/PT_PT/85/85770ae9def3473f559e0dbe0609060a-107.mp3"

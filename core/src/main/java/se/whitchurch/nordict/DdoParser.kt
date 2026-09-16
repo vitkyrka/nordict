@@ -52,7 +52,6 @@ class DdoParser {
             val finalBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
             val doc = Jsoup.parse(page, finalBaseUrl)
             val words: ArrayList<Word> = ArrayList()
-            val header = doc.head().html() + "<body>"
 
             doc.select("div.artikel").forEachIndexed { index, artikel ->
                 val match = artikel.selectFirst(".definitionBoxTop .match")
@@ -64,10 +63,8 @@ class DdoParser {
                 val newUri = if (index == 0) uri else uri.withQueryParam("__ref", (index + 1).toString())
 
                 val headword = Word(
-                    tag, word, word, word, page, newUri, finalBaseUrl,
-                    artikel.clone(), header,
-                    xrefs = arrayListOf((index + 1).toString()),
-                    renderAsJson = true
+                    tag, word, word, word, newUri,
+                    xrefs = arrayListOf((index + 1).toString())
                 )
 
                 parseMeta(headword, artikel, word)

@@ -30,7 +30,6 @@ class DdoParserTest {
         val word = words[0]
 
         assertThat(word.mTitle).isEqualTo("arbejde")
-        assertThat(word.renderAsJson).isTrue()
         assertThat(word.pos).isEqualTo(Pos.NOUN)
 
         // Header meta: pronunciation, "bøjning" (hyphens stand for the

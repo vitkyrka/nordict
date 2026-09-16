@@ -50,12 +50,7 @@ class EstParser {
                 val summary = StringBuilder(word)
 
                 val headword = Word(
-                    tag, word, word, summary.toString(), page, newUri,
-                    finalBaseUrl,
-                    doc,
-                    "",
-                    lemma,
-                    renderAsJson = true
+                    tag, word, word, summary.toString(), newUri
                 )
                 headword.rawHeadword = Word.raeSearchKey(word)
 
@@ -112,8 +107,7 @@ class EstParser {
                     val subUri = uri.newBuilder()
                         .addQueryParameter("__ref", ref.toString()).build()
                     val sub = Word(
-                        tag, subTitle, subTitle, subTitle, page, subUri,
-                        finalBaseUrl, doc, "", null, renderAsJson = true
+                        tag, subTitle, subTitle, subTitle, subUri
                     )
                     sub.rawHeadword = subTitle
                     sub.xrefs.add(ref.toString())
@@ -131,11 +125,9 @@ class EstParser {
             }
 
             if (words.size > 1) {
-                val homographs = words.map { SearchResult(it.mTitle, it.summary, it.uri) }
                 val entries = Word.homonymEntries(words)
 
                 for (word in words) {
-                    word.mHomographs.addAll(homographs)
                     word.mHomonymEntries.addAll(entries)
                 }
             }

@@ -72,7 +72,6 @@ class SdoIntegrationTest {
         assertThat(word).isNotNull()
         assertThat(word?.mTitle).isEqualTo("hus")
         assertThat(word?.pos).isEqualTo(Pos.NOUN)
-        assertThat(word?.renderAsJson).isTrue()
         assertThat(word?.definitions).isNotEmpty()
         assertThat(word?.definitions?.get(0)?.glosses?.get(0)?.definition).isNotEmpty()
         assertThat(word?.idioms).isNotEmpty()
@@ -96,8 +95,6 @@ class SdoIntegrationTest {
 
         assertThat(word).isNotNull()
         assertThat(word?.mTitle).isEqualTo("skaffa")
-        // SDO api pages carry no .short-result homograph links, so none.
-        assertThat(word?.mHomographs).isEmpty()
 
         server.takeRequest()
         val entryRequest = server.takeRequest()

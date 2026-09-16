@@ -56,7 +56,6 @@ class DleIntegrationTest {
         assertThat(word).isNotNull()
         assertThat(word?.mTitle).isEqualTo("frente")
         assertThat(word?.definitions).isNotEmpty()
-        assertThat(word?.renderAsJson).isTrue()
         assertThat(word?.etymology).isNotEmpty()
     }
 

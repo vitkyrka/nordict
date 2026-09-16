@@ -25,9 +25,9 @@ const renderGlosses = (glosses) => (glosses || []).map(gloss => `
     </div>
 `).join('');
 
-// Structured synonyms carry the source's link target (`id`, a RAE DLE
-// data-id) and optionally a DLE `abbr.sin_alert` marker (`plev`, e.g.
-// "malsonante"). Legacy dictionaries still emit plain strings.
+// Structured synonyms carry the source's link target and optionally a DLE
+// `abbr.sin_alert` marker (`plev`, e.g. "malsonante"); a plain string renders
+// unlinked.
 const renderSynonym = (s) => typeof s === 'string'
     ? `<span class="synonym">${s}</span>`
     : `<a class="synonym" href="${s.href}">${s.text}</a>` +
@@ -126,8 +126,8 @@ const template = (word) => {
     // diccionari.cat and DIDAC keep locutions interleaved with the senses in
     // the source page (no separate "locuciones" section), so their idioms
     // carry a senseNumber. Render them inline in the single numbered list,
-    // sorted back into page order. Legacy dictionaries (DLE/EST) have
-    // unnumbered idioms and keep the separate locutions section below.
+    // sorted back into page order. DLE/EST idioms are unnumbered and keep
+    // the separate locutions section below.
     const numberedIdioms = idioms.some(i => i.senseNumber);
     const senses = numberedIdioms
         ? [...defs, ...idioms].sort(compareSenses)

@@ -106,7 +106,6 @@ class DiccionariParserTest {
         ).inOrder()
 
         assertThat(words[0].mHomonymEntries).hasSize(10)
-        assertThat(words[0].mHomographs).hasSize(10)
 
         // The "cap1" article in the search view matches the full-view parse.
         val cap1 = words[1]

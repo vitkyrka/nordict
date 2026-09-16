@@ -70,13 +70,8 @@ class LeRobertParser {
                 first = false
 
                 val headword = Word(
-                    tag, word, word, word, page, newUri,
-                    finalBaseUrl,
-                    doc,
-                    doc.head().html() + "<body>",
-                    lemma,
-                    xrefs = arrayListOf(ref.toString()),
-                    renderAsJson = true
+                    tag, word, word, word, newUri,
+                    xrefs = arrayListOf(ref.toString())
                 )
 
                 val cat = lemma.selectFirst("span.d_cat")?.text()?.trim() ?: ""
@@ -115,11 +110,9 @@ class LeRobertParser {
             }
 
             if (words.size > 1) {
-                val homographs = words.map { SearchResult(it.mTitle, it.summary, it.uri) }
                 val entries = Word.homonymEntries(words)
 
                 for (w in words) {
-                    w.mHomographs.addAll(homographs)
                     w.mHomonymEntries.addAll(entries)
                 }
             }

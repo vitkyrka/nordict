@@ -23,7 +23,6 @@ class SoParserTest {
 
         val word = words.single()
         assertThat(word.mTitle).isEqualTo("hus")
-        assertThat(word.renderAsJson).isTrue()
         assertThat(word.pos).isEqualTo(Pos.NOUN)
         assertThat(word.conjugation)
             .isEqualTo("huset, plural hus, bestämd form plural husen, åld. dativ huse")

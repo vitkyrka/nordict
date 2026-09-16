@@ -37,8 +37,7 @@ sealed interface CardProposal {
  * multi-dictionary words) get their Back rendered from the definition
  * fragments directly — there is no page skeleton to inject into (combined
  * words carry an empty `element`), and Collins' definitions are not reached
- * by any of [Word.getPage]'s container selectors. Legacy dictionaries with a
- * real page skeleton keep using [Word.getPage].
+ * by any skeleton selector.
  */
 object Cards {
     private val gson = Gson()
@@ -84,18 +83,12 @@ object Cards {
     }
 
     /**
-     * The Back field HTML for a definition card. For JSON-rendered words
-     * ([Word.renderAsJson], including combined multi-dictionary words) the
-     * chosen definitions' fragments are stacked directly, wrapped in the
-     * extracted page CSS; legacy words keep the page-skeleton injection in
-     * [Word.getPage] (headword header + pronunciation + definitions).
+     * The Back field HTML for a definition card: the chosen definitions'
+     * fragments stacked directly, wrapped in the extracted page CSS.
      */
     fun definitionBack(word: Word, defs: List<Word.Definition>, css: String?): String {
-        if (word.renderAsJson) {
-            val style = if (css.isNullOrBlank()) "" else "<style>$css</style>"
-            return style + defs.joinToString(separator = "") { it.element.outerHtml() }
-        }
-        return word.getPage(defs, css)
+        val style = if (css.isNullOrBlank()) "" else "<style>$css</style>"
+        return style + defs.joinToString(separator = "") { it.element.outerHtml() }
     }
 
     /** The Back field HTML for an idiom card. */
@@ -112,8 +105,8 @@ object Cards {
     /**
      * The example sentences shown on the card front: every chosen
      * definition's examples (from its glosses when it has them — Collins and
-     * the RAE dictionaries keep examples there — else the legacy
-     * definition-level list), plus any clipboard extras. Falls back to the
+     * the RAE dictionaries keep examples there — else the definition-level
+     * list), plus any clipboard extras. Falls back to the
      * word's title so the front is never empty.
      */
     fun examples(word: Word, defs: List<Word.Definition>, extras: List<String>): List<String> {

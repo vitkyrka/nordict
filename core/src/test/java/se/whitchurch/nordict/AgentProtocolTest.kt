@@ -23,12 +23,7 @@ class AgentProtocolTest {
             mTitle = title,
             mSlug = "frente",
             summary = "frente",
-            mText = "",
-            uri = httpUrl("https://dle.rae.es/frente"),
-            baseUrl = "https://dle.rae.es",
-            element = Element("div"),
-            header = "",
-            renderAsJson = true
+            uri = httpUrl("https://dle.rae.es/frente")
         )
         word.dictionary = "Diccionario de la lengua española"
         if (ref.isNotEmpty()) word.xrefs.add(ref)

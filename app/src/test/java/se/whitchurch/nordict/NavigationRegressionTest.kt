@@ -756,11 +756,11 @@ class NavigationRegressionTest {
         est.enqueue(MockResponse().setBody(estFrente()))
         openWord(est, "/frente")
         val vm = topWordViewModel()!!
-        awaitCondition(message = "JSON word pins and wires the bar behavior") {
-            vm.bottomBarScrollBehavior != null && vm.pinToViewport
+        awaitCondition(message = "word renders and wires the bar behavior") {
+            vm.bottomBarScrollBehavior != null
         }
 
-        // JSON words scroll inside the pinned WebView (invisible to Compose
+        // Words scroll inside the pinned WebView (invisible to Compose
         // nested scroll), so WordScreen bridges it to the bar behavior: a
         // downward WebView scroll must collapse the bar, an upward one restore
         // it (the size the platform scroll listener reports in real use).
@@ -819,9 +819,9 @@ class NavigationRegressionTest {
     }
 
     // ---------- Scroll-position persistence (a covered word destination is
-    // torn down and its WebView re-created, resetting both the pinned JSON
-    // WebView's internal scroll and the legacy outer Compose column; the
-    // ViewModel must remember the offset and restore it on the re-render) ----------
+    // torn down and its WebView re-created, resetting the pinned WebView's
+    // internal scroll; the ViewModel must remember the offset and restore it
+    // on the re-render) ----------
 
     /** A detached [WebView] pre-scrolled to [scrollY], standing in for a
      * user-scrolled page: Robolectric's `View.scrollTo` updates the real
@@ -871,24 +871,8 @@ class NavigationRegressionTest {
         est.enqueue(MockResponse().setBody(estFrente()))
         openWord(est, "/frente")
         val vm = topWordViewModel()!!
-        assertThat(vm.pinToViewport).isTrue()
         onMain { vm.webView = scrolledWebView(700) }
-        // The Compose column is disabled for a JSON word, so its (zero)
-        // position must not win over the WebView's real scroll.
-        onMain { vm.captureScroll(0) }
+        onMain { vm.captureScroll() }
         assertThat(vm.savedScrollY).isEqualTo(700)
-    }
-
-    @Test
-    fun legacyWordScrollCaptureReadsTheComposeColumn() {
-        awaitNav()
-        est.enqueue(MockResponse().setBody(estFrente()))
-        openWord(est, "/frente")
-        val vm = topWordViewModel()!!
-        // A legacy word scrolls the outer Compose column (not the WebView), so
-        // the capture must take the caller's column position over the WebView.
-        onMain { vm.pinToViewport = false }
-        onMain { vm.captureScroll(400) }
-        assertThat(vm.savedScrollY).isEqualTo(400)
     }
 }

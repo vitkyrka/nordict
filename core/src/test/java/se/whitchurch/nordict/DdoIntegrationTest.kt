@@ -73,7 +73,6 @@ class DdoIntegrationTest {
 
         assertThat(word).isNotNull()
         assertThat(word?.mTitle).isEqualTo("arbejde")
-        assertThat(word?.renderAsJson).isTrue()
         assertThat(word?.definitions).isNotEmpty()
         assertThat(word?.definitions?.get(0)?.glosses?.get(0)?.definition).isNotEmpty()
         assertThat(word?.idioms).isNotEmpty()
@@ -97,8 +96,6 @@ class DdoIntegrationTest {
 
         assertThat(word).isNotNull()
         assertThat(word?.mTitle).isEqualTo("arbejde")
-        // Homograph links from the api page's .short-result block.
-        assertThat(word?.mHomographs).hasSize(2)
 
         server.takeRequest()
         val entryRequest = server.takeRequest()

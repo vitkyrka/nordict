@@ -100,10 +100,8 @@ class SoParser {
             val ordklass = str(source, "ordklass") ?: ""
 
             val word = Word(
-                tag, headword, headword, headword, page, uri, baseUrl,
-                Jsoup.parseBodyFragment("").body(), "",
-                xrefs = arrayListOf(str(source, "l_nr") ?: ""),
-                renderAsJson = true
+                tag, headword, headword, headword, uri,
+                xrefs = arrayListOf(str(source, "l_nr") ?: "")
             )
             word.rawHeadword = headword
             word.pos = normalizePos(ordklass)

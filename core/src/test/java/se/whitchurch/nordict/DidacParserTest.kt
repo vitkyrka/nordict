@@ -103,7 +103,6 @@ class DidacParserTest {
 
         // Homograph navigation data is attached for multi-entry pages.
         assertThat(words[0].mHomonymEntries).hasSize(9)
-        assertThat(words[0].mHomographs).hasSize(9)
 
         // cap4's "locució que fa d'adverbi" (cap al tard) is an idiom. Its
         // bolded phrase opens the gloss, so it is dropped (it duplicates the

@@ -31,7 +31,6 @@ class InfopediaParserTest {
 
         val mesa = words[0]
         assertThat(mesa.mTitle).isEqualTo("mesa")
-        assertThat(mesa.renderAsJson).isTrue()
         assertThat(mesa.xrefs).containsExactly("1")
 
         // Orthoepy + syllabification + phonetic transcription make up the

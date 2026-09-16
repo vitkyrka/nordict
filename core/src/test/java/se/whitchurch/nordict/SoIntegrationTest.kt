@@ -59,7 +59,6 @@ class SoIntegrationTest {
         assertThat(word).isNotNull()
         assertThat(word?.mTitle).isEqualTo("hus")
         assertThat(word?.pos).isEqualTo(Pos.NOUN)
-        assertThat(word?.renderAsJson).isTrue()
         assertThat(word?.definitions).hasSize(3)
         assertThat(word?.idioms).hasSize(12)
         assertThat(word?.audio).containsExactly(

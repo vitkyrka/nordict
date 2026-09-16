@@ -58,7 +58,6 @@ class LingueeIntegrationTest {
 
         assertThat(word).isNotNull()
         assertThat(word?.mTitle).isEqualTo("mesa")
-        assertThat(word?.renderAsJson).isTrue()
         assertThat(word?.definitions).hasSize(2)
         assertThat(word?.definitions?.get(0)?.glosses?.get(0)?.definition).isEqualTo("table")
         assertThat(word?.definitions?.get(0)?.glosses?.get(0)?.examples).hasSize(2)

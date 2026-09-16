@@ -23,7 +23,6 @@ class SdoParserTest {
 
         val word = words.single()
         assertThat(word.mTitle).isEqualTo("skaffa")
-        assertThat(word.renderAsJson).isTrue()
         assertThat(word.pos).isEqualTo(Pos.VERB)
         // "-r, -de, -t" become conjugated with the stem filled in.
         assertThat(word.conjugation).isEqualTo("skaffar, skaffade, skaffat")

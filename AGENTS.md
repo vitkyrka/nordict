@@ -84,34 +84,32 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
 - **`WordScreen.kt`** — the word destination: `WordViewModel` (scoped to the
   word `NavBackStackEntry` via `viewModel(entry)`, so stacked word views keep
   independent state like the old activities). It fetches the word through
-  `Ordboken.getWord` and, when `word.renderAsJson` is true, serializes the
-  `Word` with Gson and injects it into `assets/word_template.html` via
-  `loadWord(...)`; otherwise it keeps the original HTML fragments (`getPage()`)
-  for non-JSON dictionaries. JSON words pin the WebView to the viewport
-  (internal scroll, reliable `#hom-N` anchors); legacy words let the outer
-  `verticalScroll` own the page. The docked word action bar is an M3
+  `Ordboken.getWord`, serializes the `Word` with Gson, and injects it into
+  `assets/word_template.html` via `loadWord(...)`. The WebView is pinned to
+  the viewport height and owns its own scroll (reliable `#hom-N` anchors).
+  The docked word action bar is an M3
   `BottomAppBar` (`BottomAppBarDefaults.exitAlwaysScrollBehavior`) overlaid on
   the WebView, which runs behind it to the screen bottom; the bar collapses on
-  a downward scroll and returns on an upward one — legacy words drive it
-  through the root `Box`'s `nestedScroll` modifier, JSON words through
+  a downward scroll and returns on an upward one — driven through
   `WordViewModel.webViewScrolled` (a `WebView.OnScrollChangeListener` bridge,
-  since the pinned WebView's internal scroll is invisible to Compose).
+  since the pinned WebView's internal scroll is invisible to Compose);
+  `WordViewModel.captureScroll`/`restoreWebViewScroll` snapshot the WebView's
+  scroll offset across configuration changes and the collapse state.
   Owns the WebView, an `ExoPlayer`, and the
   oracle history SQLite writes; navigation side effects flow out through
   `onOpenUri`/`onOpenExternal`/`onFillSearch` callbacks.
 - **`<Name>Parser.kt`** — companion-object parsers that take a raw HTML page,
-  `okhttp3.HttpUrl`, and dict `tag`, and return `List<Word>`. They use Jsoup and
-  clone the fragments they keep in `Word.element`. DLE, EST, and Collins all
-  live in `:core` with `HttpUrl`-typed uris (the remaining app-side parsers
-  still take `android.net.Uri`). Each also exposes a `parseSearch(body, uriOf)`
+  `okhttp3.HttpUrl`, and dict `tag`, and return `List<Word>`. They use Jsoup.
+  Every parser feeds the JSON rendering pipeline (`Word` -> `renderer.js`). Each
+  also exposes a `parseSearch(body, uriOf)`
   that decodes that dictionary's search-endpoint JSON into `List<SearchResult>`
   (the RAE pair share the `KeyItemSearchResults` `/srv/keys` decoder); the
   app-side `<Name>Dictionary.search()` and the CLI both call it so there is one
   shared mapping (the app only builds the endpoint URL and the result `uri`).
 - **`core/.../Word.kt`** — the model serialized to JSON. Lives in the shared
-  `:core` module; `uri`/`baseUrl` are `okhttp3.HttpUrl` / plain `String` so the
-  class runs on a desktop JVM. `Word.Definition` and
-  `Word.Idiom` are nested classes; `element`/`lemma` fields are `@Transient`
+  `:core` module; `uri` is an `okhttp3.HttpUrl` so the class runs on a desktop
+  JVM. `Word.Definition` and
+  `Word.Idiom` are nested classes; their `element`/`lemma` fields are `@Transient`
   (excluded from Gson output). `Word.Synonym` carries the display `text`, an
   `href` (the full source link target, e.g. a RAE DLE `?id=` deep-link), and a
   `plev` marker (the DLE `abbr.sin_alert` title, e.g. "malsonante").
@@ -124,13 +122,10 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
 - **`assets/renderer.css`** — styling for the JSON-rendered content
   (`span.grammar`/`domain`/`geo`, `ol.definitions`, `ul.idiom-list`, gender
   backgrounds, small-screen layout). Loaded by `word_template.html`.
-- **`assets/word.css`** — styling/overrides for legacy dictionaries that render
-  original HTML from their sources (loaded by `WordScreen`'s WebView on the
-  non-JSON path).
 
 ### The JSON rendering + testing pipeline (what most parser work touches)
 
-1. Parser (e.g. `EstParser.parse`) builds `Word`s with `renderAsJson = true`.
+1. Parser (e.g. `EstParser.parse`) builds `Word`s with the JSON schema.
 2. Golden test `EstParserTest` parses `testdata/est.html`, maps `Word`s onto
    plain `WordData`/`DefinitionData`/`IdiomData` data classes, **rewrites**
    `testdata/est.json`, then reads it back and asserts equality. So updating the
@@ -495,7 +490,7 @@ raw JSON URL `https://svenska.se/api/article/so/<l_nr>`; `get()` also accepts
 a main-site URL with `?activeTab=so&q=<word>&id=<l_nr>` (the `id` query param
 or a trailing `/api/article/so/<id>` path segment is used). Homographs are
 separate article docs, so each `get()` returns exactly one `Word` with no
-`mHomonymEntries`/`mHomographs`/`__ref`; `supportsCombining=false`
+`mHomonymEntries`/`__ref`; `supportsCombining=false`
 (`OrdbokenSelectionTest` asserts SO toggling is non-combining), and the CLI
 registers it as search-first (`wordUrl = null`). `SoDictionary` gates the
 request on the base host (a foreign host → `null`).
@@ -696,7 +691,7 @@ URL prefixes, `<base>`, and Insert scripts back to live-site form.
 
 `InfopediaParser.parse` isolates the single `.dolEntradaVverbete` article
 (the browsable `testdata/infopedia/mesa.html` fixture is `mesa` — 12 senses,
-8 locuções) and emits one `renderAsJson` `Word`:
+8 locuções) and emits one JSON-rendered `Word`:
 
 - **Header**: `h1.dolEntrinfoEntrada` headword; pronunciation is the
   `.dolSilab` syllabification (me.sa) + `.dolRegfonFonet` transcription (ˈmezɐ)
@@ -754,7 +749,7 @@ with a `#<shortName>` span) inside `.mw-parser-output`, strips other
 languages and the `Traductions` section, de-lazies images, and reads the
 pronunciation (`span.titrepron`), etymology (`span.titreetym`), and
 definition (`span.titredef`) sub-sections. Each `span.titredef` heading (one
-POS group, e.g. "Nom commun", "Forme de verbe") becomes one `renderAsJson`
+POS group, e.g. "Nom commun", "Forme de verbe") becomes one JSON-rendered
 `Word` whose `titredef` id is its `__ref` xref (e.g. `fr-nom-1`); gender comes
 from `span.ligne-de-forme` (`genderOf` maps "féminin"/"masculin" to
 `Genders`). Definitions/idioms parse each `<ol><li>`: `span.term`/`span.emploi`
@@ -769,48 +764,6 @@ Tests: `WiktionaryParserTest` + `WiktionaryIntegrationTest` (both `:core`,
 plain JUnit goldens + MockWebServer — search endpoint must NOT be the mobile
 host), fixtures `testdata/wfr/table.{html,json}` and `testdata/wfr-search.json`.
 CLI: `wfr table` / `wfr table --search` (or `--dict wfr --file …` offline).
-
-## Modernizing a legacy dictionary
-
-Legacy dictionaries (those with `renderAsJson = false`) keep original source
-HTML and don't feed the shared JSON rendering pipeline. To convert one to the
-modern schema (targets: `EstParser`, `CollinsParser`, `DleParser`,
-`LeRobertParser`, `LingueeParser`, `InfopediaParser`, `WiktionaryParser`,
-`SoParser`):
-
-1. **Rewrite the parser** to return `Word`s with `renderAsJson = true`:
-   - Build a companion `parseSearch(body, uriOf)` so search decoding is shared
-     with the CLI (match `EstParser.parseSearch` / `LeRobertParser.parseSearch`).
-   - Give `parse(page, uri, tag, baseUrl = "<default home>")` a configurable
-     base for tests — the page's relative hrefs resolve against it.
-   - Split senses into `Word.Definition` (with `glosses`, `domain`, `geo`,
-     `plev`, `register`, `synonyms`, `antonyms`) and expressions/idioms into
-     `Word.Idiom`; set each definition's `pos`/`grammar`/`gender` (map
-     language-specific gender words like "nom féminin"/"masculin" through a
-     `genderOf` helper to `Genders.FEMININE`/`MASCULINE`).
-   - Leave `Word.pos` alone — it's the `Pos` enum (ADJECTIVE/Noun/VERB/…), not
-     a display string; the label lives on `Word.Definition.pos`.
-   - Fill `audio` from the page's `<audio>/<source>` URLs (resolve relative
-     paths against `baseUrl`).
-   - For homographs/.sols-style multi-entry pages, set `xrefs` per word so
-     `get()` can resolve `__ref`.
-2. **Rewrite the dictionary** to take `client, baseUrl = "…"` and delegate
-   `search()` to `XxxParser.parseSearch` against the autocomplete endpoint
-   (keep `Ordboken.kt` calling the no-baseUrl constructor unchanged); dedupe
-   `__ref` via `uri.withoutRefParam()` before fetching.
-3. **Update the CLI** (`cli/.../Main.kt`) to call `XxxParser.parseSearch`
-   instead of an inline JSON decoder.
-4. **Add fixtures + tests**:
-   - `testdata/<tag>-search.json` from the live autocomplete response, and
-     `testdata/<tag>/<word>.html` from a real page.
-   - A plain-JUnit `XxxParserTest` (golden via `Goldens.assertGolden(..., 
-     Array<WordJson.WordData>::class.java)`) asserting title, definitions,
-     idioms, grammar/gender/domain/register, audio, and the search rewrite.
-   - A `XxxIntegrationTest` with MockWebServer: `testSearch` (fixture served,
-     assert request path `q=` + rewrite), `testGet` (word page served), and a
-     foreign-host rejection for URL-gated dictionaries.
-5. **Run `:core:test`**, regenerate goldens with `UPDATE_GOLDEN=1` when the
-   structure intentionally changes, then review the `git diff` on the JSON.
 
 ## Conventions / gotchas
 
@@ -834,12 +787,9 @@ modern schema (targets: `EstParser`, `CollinsParser`, `DleParser`,
   by `Word.homonymEntries(...)` in `EstParser`/`DleParser`/`CollinsParser`.
   `renderer.js` draws all entries stacked on one page, with a nav row above
   each heading (`#hom-N` anchors) listing every entry (duplicate titles get
-  RAE-style ordinals) and bolding the one that follows the row. Legacy
-  (non-JSON) dictionaries leave the list empty and keep the word screen's
-  homograph strip (skipped for `renderAsJson` words). In `WordScreen` the
-  WebView sits inside a `BoxWithConstraints` that pins it to the viewport for
-  `renderAsJson` words (internal WebView scroll, reliable `#hom-N` anchors)
-  or lets the outer `verticalScroll` own the page otherwise.
+  RAE-style ordinals) and bolding the one that follows the row. In
+  `WordScreen` the WebView sits inside a `BoxWithConstraints` that always pins
+  it to the viewport (internal WebView scroll, reliable `#hom-N` anchors).
 - The `definitions`/`idioms` lists in `Word` carry plain fields only; jsoup
   `Element`s are `@Transient` and never reach the renderer.
 - `renderer.js` accepts both plain strings and structured `{text, href, plev}`

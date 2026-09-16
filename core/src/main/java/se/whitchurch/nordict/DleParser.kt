@@ -53,12 +53,7 @@ class DleParser {
                 val summary = StringBuilder(word)
 
                 val headword = Word(
-                    tag, word, word, summary.toString(), page, newUri,
-                    finalBaseUrl,
-                    doc,
-                    "",
-                    lemma,
-                    renderAsJson = true
+                    tag, word, word, summary.toString(), newUri
                 )
                 headword.rawHeadword = Word.raeSearchKey(word)
 
@@ -113,11 +108,9 @@ class DleParser {
             }
 
             if (words.size > 1) {
-                val homographs = words.map { SearchResult(it.mTitle, it.summary, it.uri) }
                 val entries = Word.homonymEntries(words)
 
                 for (word in words) {
-                    word.mHomographs.addAll(homographs)
                     word.mHomonymEntries.addAll(entries)
                 }
             }

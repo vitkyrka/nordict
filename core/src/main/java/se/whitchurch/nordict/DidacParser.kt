@@ -88,9 +88,7 @@ class DidacParser {
                 if (title.isEmpty()) return@forEachIndexed
 
                 val headword = Word(
-                    tag, title, title, title, page, wordUri,
-                    baseUrl.takeIf { it.endsWith("/") } ?: "$baseUrl/",
-                    doc, "", article, renderAsJson = true
+                    tag, title, title, title, wordUri
                 )
                 headword.rawHeadword = title
                 headword.xrefs.add((index + 1).toString())
@@ -108,10 +106,8 @@ class DidacParser {
             }
 
             if (words.size > 1) {
-                val homographs = words.map { SearchResult(it.mTitle, it.summary, it.uri) }
                 val entries = Word.homonymEntries(words)
                 for (word in words) {
-                    word.mHomographs.addAll(homographs)
                     word.mHomonymEntries.addAll(entries)
                 }
             }

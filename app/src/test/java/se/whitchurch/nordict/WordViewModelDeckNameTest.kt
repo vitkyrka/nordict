@@ -48,8 +48,7 @@ class WordViewModelDeckNameTest {
         return WordViewModel(app, handle).also {
             it.mWord = Word(
                 dict = "DLE", mTitle = "frente", mSlug = "frente", summary = "",
-                mText = "", uri = uri, baseUrl = "https://dle.rae.es",
-                element = org.jsoup.Jsoup.parseBodyFragment("").body(), header = ""
+                uri = uri
             )
         }
     }
