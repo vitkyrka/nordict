@@ -169,9 +169,11 @@ fun NordictApp(
     }
 
     // Debounced autocomplete suggestions for the global search bar. Recomposes
-    // on the selection signature so a dictionary/combined-selection switch
-    // re-runs the prefetch under the new selection.
-    LaunchedEffect(searchQuery, ordboken.selectionSignature) {
+    // on the selection signature AND the current index so a dictionary or
+    // language switch re-runs the prefetch under the new selection — including
+    // a single-dict switch, where `activeDicts` (the only state
+    // `selectionSignature` reads) never changes.
+    LaunchedEffect(searchQuery, ordboken.currentIndex, ordboken.selectionSignature) {
         if (searchQuery.isBlank()) {
             suggestions = emptyList()
             return@LaunchedEffect

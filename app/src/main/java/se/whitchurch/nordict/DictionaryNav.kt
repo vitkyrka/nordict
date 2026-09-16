@@ -73,9 +73,17 @@ fun DictionaryNav(
     ) {
         LanguageTopBar(ordboken = ordboken)
         if (ordboken.hasCombiningForLang(currentLang)) {
-            CombiningDictRow(ordboken = ordboken, modifier = Modifier.weight(1f))
+            CombiningDictRow(
+                ordboken = ordboken,
+                lang = currentLang,
+                modifier = Modifier.weight(1f)
+            )
         } else {
-            SingleDictRow(ordboken = ordboken, modifier = Modifier.weight(1f))
+            SingleDictRow(
+                ordboken = ordboken,
+                lang = currentLang,
+                modifier = Modifier.weight(1f)
+            )
         }
     }
 }
@@ -261,9 +269,10 @@ private fun LanguageFlag(flagRes: Int) {
 @Composable
 private fun SingleDictRow(
     ordboken: Ordboken,
+    lang: String,
     modifier: Modifier = Modifier
 ) {
-    val dictIndices = ordboken.dictIndicesForLang(ordboken.currentLang)
+    val dictIndices = ordboken.dictIndicesForLang(lang)
     Row(
         modifier = modifier
             .horizontalScroll(rememberScrollState())
@@ -299,9 +308,14 @@ private fun SingleDictRow(
 @Composable
 private fun CombiningDictRow(
     ordboken: Ordboken,
+    lang: String,
     modifier: Modifier = Modifier
 ) {
-    val lang = ordboken.currentLang
+    // lang comes in as a parameter (not via ordboken.currentLang) so the row
+    // recomposes when the language changes even while the multi-selection
+    // stays collapsed: activeDicts stays empty on a single-dict switch, so
+    // that state alone never invalidates this row, and only a changed lang key
+    // forces the chips to rebuild for the new language.
     val candidates = ordboken.combiningDictsForLang(lang)
 
     // The enabled set: the active multi selection when combining, else the

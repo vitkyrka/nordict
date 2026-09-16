@@ -209,6 +209,43 @@ class DictionaryNavUiTest {
     }
 
     @Test
+    fun dictionaryChipsUpdateAfterLanguageSwap() {
+        setNav()
+
+        // Fresh: current language es renders DLE/EST.
+        composeRule.onNodeWithText("DLE").assertExists()
+        composeRule.onNodeWithText("EST").assertExists()
+
+        // Swap es -> ca (the seeded lastLang): the chips must switch to the
+        // Catalan set.
+        swapButton("ca").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("GDLC").assertExists()
+        composeRule.onNodeWithText("DLE").assertDoesNotExist()
+        composeRule.onNodeWithText("EST").assertDoesNotExist()
+
+        // Swap back ca -> es: the Spanish chips come back.
+        swapButton("es").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("DLE").assertExists()
+        composeRule.onNodeWithText("GDLC").assertDoesNotExist()
+    }
+
+    @Test
+    fun dictionaryChipsUpdateAfterLanguageMenuChange() {
+        setNav()
+
+        // Pick se from the language menu: chips must switch to SO.
+        composeRule.onNodeWithContentDescription("Byt språk").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("se").performClick()
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("SO").assertExists()
+        composeRule.onNodeWithText("DLE").assertDoesNotExist()
+        composeRule.onNodeWithText("GDLC").assertDoesNotExist()
+    }
+
+    @Test
     fun swapButtonHiddenWithoutASecondLanguage() {
         // The setUp seed persists "lastLang"=ca, so clear prefs before
         // reseeding a single-language Ordboken: it must have no swap target,
