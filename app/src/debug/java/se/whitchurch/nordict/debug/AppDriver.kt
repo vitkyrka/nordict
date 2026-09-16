@@ -16,6 +16,7 @@ import se.whitchurch.nordict.MainActivity
 import se.whitchurch.nordict.MultiDict
 import se.whitchurch.nordict.Ordboken
 import se.whitchurch.nordict.Word
+import se.whitchurch.nordict.WordViewModel
 import se.whitchurch.nordict.toSearchResultData
 import se.whitchurch.nordict.wordResultOf
 import java.util.concurrent.CountDownLatch
@@ -56,6 +57,7 @@ class AppDriver(private val app: android.app.Application) {
                 AgentOps.BACK -> opBack(command)
                 AgentOps.OPEN_CARDS -> opOpenCards(command)
                 AgentOps.CREATE_CARD -> opCreateCard(command)
+                AgentOps.AUDIO -> opAudio(command)
                 AgentOps.SET_DICT -> opSetDict(command)
                 AgentOps.SET_LANG -> opSetLang(command)
                 AgentOps.SWAP_LANG -> opSwapLang(command)
@@ -265,6 +267,55 @@ class AppDriver(private val app: android.app.Application) {
                 "card creation failed (no proposal, word not loaded yet, or AnkiDroid unreachable)"
             )
         }
+    }
+
+    /**
+     * Plays the current word's pronunciation through the word view's ExoPlayer,
+     * exactly like the docked play button, and reports how the playlist settled.
+     * Re-`audio` on the same word must reset the playlist — the "playback only
+     * works once" bug regressed this: every play stacked another copy of the
+     * media item while the player, parked at the already-ended item, never
+     * restarted it. A `url` argument plays that URL instead (handy for the
+     * search-first dictionaries, where the headword result page rather than
+     * the word itself carries the speaker links).
+     */
+    private fun opAudio(command: AgentCommand): AgentResult {
+        val word = ordboken().currentWord
+            ?: return AgentResult.error(AgentOps.AUDIO, "no word loaded — open a word first")
+        val urls = command.url?.let { java.util.ArrayList(listOf(it)) }
+            ?: java.util.ArrayList(word.audio)
+        if (urls.isEmpty()) {
+            return AgentResult.error(
+                AgentOps.AUDIO,
+                "loaded word has no audio URLs (${word.dictionary}) — pass a `url` to `audio`"
+            )
+        }
+        val count = onMain {
+            val vm = topWordViewModel() ?: return@onMain -1
+            vm.playAudio(urls)
+            vm.player.mediaItemCount
+        }
+        if (count < 0) {
+            return AgentResult.error(AgentOps.AUDIO, "no word destination up to play audio")
+        }
+        return AgentResult(
+            ok = true,
+            op = AgentOps.AUDIO,
+            message = "queued ${urls.size} audio URL(s); playlist has $count item(s)",
+            state = snapshot()
+        )
+    }
+
+    /** The [WordViewModel] of the current word destination, or null. */
+    private fun topWordViewModel(): WordViewModel? {
+        val activity = tracker.current as? MainActivity ?: return null
+        val nav = activity.navController ?: return null
+        val entry = nav.currentBackStackEntry ?: return null
+        if (entry.destination.route?.startsWith("word?") != true) return null
+        return entry.viewModelStore["se.whitchurch.nordict.WordViewModel"] as? WordViewModel
+            ?: entry.viewModelStore[
+        "androidx.lifecycle.ViewModelProvider.DefaultKey:se.whitchurch.nordict.WordViewModel"
+        ] as? WordViewModel
     }
 
     /** Closes the card screen if it's still up, so main-activity routes run. */

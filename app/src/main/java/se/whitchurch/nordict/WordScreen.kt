@@ -166,7 +166,8 @@ class WordViewModel(
     private var switchDictGeneration = 0
     private var switchDictJob: kotlinx.coroutines.Job? = null
 
-    private val player: ExoPlayer by lazy {
+    // internal so tests can observe the playlist (a re-play must reset it).
+    internal val player: ExoPlayer by lazy {
         ExoPlayer.Builder(getApplication()).build()
     }
 
@@ -570,6 +571,7 @@ class WordViewModel(
 
     fun playAudio(urls: java.util.ArrayList<String>) {
         if (urls.isEmpty()) return
+        player.clearMediaItems()
         urls.forEach { player.addMediaItem(MediaItem.fromUri(it)) }
         player.prepare()
         player.play()

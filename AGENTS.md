@@ -205,8 +205,8 @@ output to the JS renderer for a browser preview:
 The debug build ships a loopback agent server (`app/src/debug/.../AgentServer`,
 `AgentProtocol.PORT = 42837`) bound to `127.0.0.1` on the device; the CLI's
 `repl` subcommand drives it. Each input line is one JSON `AgentCommand`
-(`{"op": "search"|"open"|"openUri"|"nextPage"|"back"|"openCards"|"createCard"|"setDict"|"setLang"|"swapLang"|"state"|"quit",
-"query"?, "uri"?, "tag"?, "lang"?, "index"?}`); each produces exactly one JSON
+(`{"op": "search"|"open"|"openUri"|"nextPage"|"back"|"openCards"|"createCard"|"audio"|"setDict"|"setLang"|"swapLang"|"state"|"quit",
+"query"?, "uri"?, "url"?, "tag"?, "lang"?, "index"?}`); each produces exactly one JSON
 `AgentResult` (`ok`, `error`, optional `state`/`word`), in order, over a
 persistent session until EOF or `quit`. `"word"` carries the loaded word's
 `mTitle`, `uri`, `xrefs` and a per-entry `selected` index. Ops run against the
@@ -226,6 +226,15 @@ default the first definition) through the same `Cards.*` pipeline the Create
 button uses, reporting the new Anki note id. `debugAnkiApi`
 (`CardActivity` companion) lets tests/CLI inject a fake `AnkiApi` instead of
 touching a real AnkiDroid.
+
+`audio` replays the current word's pronunciation through the word view's
+ExoPlayer (the same path as the docked play button) and reports the resulting
+playlist size; a `url` argument plays that URL instead of the word's own
+`audio` list (for the search-first dictionaries, whose headword page rather
+than the word itself carries the speaker links). Every play must start a
+fresh single-item playlist — the regression that left playback working only
+once (the player parked on the ended item while each tap stacked another
+copy of the media item).
 
 ```sh
 ./gradlew :app:assembleDebug

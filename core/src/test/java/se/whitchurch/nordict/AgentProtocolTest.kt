@@ -85,6 +85,18 @@ class AgentProtocolTest {
     }
 
     @Test
+    fun audioCommandRoundTripsUrl() {
+        val cmd = AgentCommand(op = AgentOps.AUDIO, url = "https://example.com/a.mp3")
+        assertThat(gson.toJson(cmd)).isEqualTo("{\"op\":\"audio\",\"url\":\"https://example.com/a.mp3\"}")
+        assertThat(gson.fromJson(gson.toJson(cmd), AgentCommand::class.java)).isEqualTo(cmd)
+
+        // Without a url the loaded word's own audio list is used.
+        val noUrl = gson.fromJson("""{"op":"audio"}""", AgentCommand::class.java)
+        assertThat(noUrl.url).isNull()
+        assertThat(noUrl).isEqualTo(AgentCommand(op = AgentOps.AUDIO))
+    }
+
+    @Test
     fun selectionTagsPreferTagsOverCommaTag() {
         val cmd = AgentCommand(op = AgentOps.SET_DICT, tag = "DLE,SO", tags = listOf("DLE", "EST"))
         assertThat(cmd.selectionTags()).containsExactly("DLE", "EST").inOrder()

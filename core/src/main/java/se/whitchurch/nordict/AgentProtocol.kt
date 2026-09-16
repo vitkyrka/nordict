@@ -32,6 +32,7 @@ object AgentOps {
     const val BACK = "back"
     const val OPEN_CARDS = "openCards"
     const val CREATE_CARD = "createCard"
+    const val AUDIO = "audio"
     const val SET_DICT = "setDict"
     const val SET_LANG = "setLang"
     const val SWAP_LANG = "swapLang"
@@ -48,6 +49,10 @@ data class AgentCommand(
     val query: String? = null,
     val uri: String? = null,
     val title: String? = null,
+    // A pronunciation URL to play with `audio` (overrides the loaded word's
+    // own audio list, e.g. for the search-first dictionaries whose headword
+    // page — not the word — carries the speaker links).
+    val url: String? = null,
     val tag: String? = null,
     val lang: String? = null,
     // A multi-dictionary selection for `setDict` (ordered). When present it

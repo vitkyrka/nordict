@@ -562,6 +562,43 @@ class AppDriverTest {
         assertThat(back.state?.activity).isEqualTo("CardActivity")
     }
 
+    @Test
+    fun audioWithoutAWordErrors() {
+        launchMain()
+        val result = drive(AgentCommand(op = AgentOps.AUDIO))
+        assertThat(result.ok).isFalse()
+        assertThat(result.error).contains("no word loaded")
+    }
+
+    @Test
+    fun audioReplayResetsThePlaylistNotStacksIt() {
+        seedAndOpenWord()
+        val first = server.url("/sounds/a.mp3").toString()
+        val second = server.url("/sounds/b.mp3").toString()
+
+        // First tap plays the pronunciation…
+        val one = drive(AgentCommand(op = AgentOps.AUDIO, url = first))
+        assertThat(one.ok).isTrue()
+        assertThat(one.message).contains("playlist has 1 item(s)")
+
+        // …the second tap must start a fresh single-item playlist, not stack a
+        // second copy (the regression: the waiting player stayed parked on the
+        // already-ended item and never restarted).
+        val two = drive(AgentCommand(op = AgentOps.AUDIO, url = second))
+        assertThat(two.ok).isTrue()
+        assertThat(two.message).contains("playlist has 1 item(s)")
+    }
+
+    @Test
+    fun audioForAWordWithoutAudioErrors() {
+        // DLE's /frente fixture carries no audio; the op must say so clearly
+        // instead of silently playing nothing.
+        seedAndOpenWord()
+        val result = drive(AgentCommand(op = AgentOps.AUDIO))
+        assertThat(result.ok).isFalse()
+        assertThat(result.error).contains("has no audio URLs")
+    }
+
     private fun trackedActivity(): android.app.Activity? =
         (ApplicationProvider.getApplicationContext<android.app.Application>() as DebugApp).activityTracker.current
 }
