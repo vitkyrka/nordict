@@ -152,27 +152,6 @@ class Main {
             emptyList()
         }
 
-    private fun lerobertSearchResults(body: String): List<SearchResult> {
-        val results = ArrayList<SearchResult>()
-        val items = try {
-            JsonParser.parseString(body).asJsonArray
-        } catch (e: Exception) {
-            return results
-        }
-        for (el in items) {
-            if (!el.isJsonObject) continue
-            val item = el.asJsonObject
-            val display = item.get("display")?.takeIf { it.isJsonPrimitive }?.asString ?: continue
-            val page = item.get("page")?.takeIf { it.isJsonPrimitive }?.asString ?: continue
-            val title = Jsoup.parse(display).text()
-            val url = ("https://dictionnaire.lerobert.com" + page)
-                .replace("/conjugaison/", "/definition/")
-                .toHttpUrlOrNull() ?: continue
-            results.add(SearchResult(title, url))
-        }
-        return results
-    }
-
     private fun wiktionarySearchResults(body: String, short: String): List<SearchResult> {
         val results = ArrayList<SearchResult>()
         val pages = try {
@@ -347,7 +326,11 @@ class Main {
             wordUrl = { word -> lerobertUrl(word) },
             searchUrl = { query -> lerobertAutocomplete(query) },
             parse = { page, uri -> LeRobertParser.parse(page, uri, "ROB") },
-            searchResults = { body -> lerobertSearchResults(body) }
+            searchResults = { body ->
+                LeRobertParser.parseSearch(body) { page ->
+                    ("https://dictionnaire.lerobert.com" + page).toHttpUrlOrNull()!!
+                }
+            }
         ),
         Dict(
             aliases = listOf("wfr"),

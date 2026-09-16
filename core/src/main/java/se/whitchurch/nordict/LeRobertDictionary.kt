@@ -1,27 +1,28 @@
 package se.whitchurch.nordict
 
-import com.google.gson.JsonParser
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.jsoup.Jsoup
 
-class LeRobertDictionary(client: OkHttpClient) : Dictionary(client) {
+class LeRobertDictionary(
+    client: OkHttpClient,
+    private val baseUrl: String = "https://dictionnaire.lerobert.com"
+) : Dictionary(client) {
     override val tag: String = "ROB"
     override val flagCode: String = "fr"
     override val lang: String = "fr"
 
     override fun get(uri: HttpUrl): Word? {
-        if (uri.host != "dictionnaire.lerobert.com") {
-            return null;
+        if (uri.host != baseUrl.toHttpUrlOrNull()!!.host) {
+            return null
         }
 
         val newUri = uri.withoutRefParam()
-
         val page = fetch(newUri.toString())
+        val finalBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
 
-        val words = LeRobertParser.parse(page, newUri, tag)
+        val words = LeRobertParser.parse(page, newUri, tag, finalBaseUrl)
         if (words.isEmpty()) return null
 
         val ref = uri.queryParameter(REFPARAM) ?: return words[0]
@@ -34,7 +35,7 @@ class LeRobertDictionary(client: OkHttpClient) : Dictionary(client) {
         return candidates[0]
     }
 
-    private fun publicApiRequest(requestUrl: String): String {
+    private fun fetchBody(requestUrl: String): String {
         val request = Request.Builder().url(requestUrl)
             .addHeader("Accept", "application/json")
             .build()
@@ -49,37 +50,19 @@ class LeRobertDictionary(client: OkHttpClient) : Dictionary(client) {
     }
 
     override fun search(query: String): List<SearchResult> {
-        val results = ArrayList<SearchResult>()
-        val uri = HttpUrl.Builder()
-            .scheme("https")
-            .host("dictionnaire.lerobert.com")
+        val base = baseUrl.toHttpUrlOrNull()!!
+        val url = base.newBuilder()!!
             .addPathSegment("autocomplete.json")
             .addQueryParameter("q", query)
             .addQueryParameter("t", "def")
             .build()
 
-        val items = try {
-            JsonParser.parseString(publicApiRequest(uri.toString())).asJsonArray
-        } catch (e: Exception) {
-            return results
+        val body = fetchBody(url.toString())
+        if (body.isEmpty()) return emptyList()
+
+        return LeRobertParser.parseSearch(body) { page ->
+            base.resolve(page)!!
         }
-
-        for (el in items) {
-            if (!el.isJsonObject) continue
-            val item = el.asJsonObject
-            val display = item.get("display")?.takeIf { it.isJsonPrimitive }?.asString ?: continue
-            var page = item.get("page")?.takeIf { it.isJsonPrimitive }?.asString ?: continue
-            val title = Jsoup.parse(display).text()
-
-            if (page.startsWith("/conjugaison/")) {
-                page = page.replace("/conjugaison/", "/definition/")
-            }
-
-            val url = "https://dictionnaire.lerobert.com$page".toHttpUrlOrNull() ?: continue
-            results.add(SearchResult(title, url))
-        }
-
-        return results
     }
 
     override fun fullSearch(query: String): List<SearchResult> = search(query)

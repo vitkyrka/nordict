@@ -28,9 +28,10 @@ core/src/                               Shared PURE-JVM parser core (no Android)
   main/java/...            Word, SearchResult, Dictionary (abstract), all
                            <Name>Dictionary.kt, <Name>Parser.kt, HttpUrlExt
                            (URL helpers), Goldens, WordJson, Genders, Pos
-  test/java/...            DleParserTest, EstParserTest, CollinsParserTest, the
-                           moved *IntegrationTest suite (plain JUnit, no
-                           Robolectric), Goldens
+test/java/...            DleParserTest, EstParserTest, CollinsParserTest,
+                            DiccionariParserTest, LeRobertParserTest, the moved
+                            *IntegrationTest suite (plain JUnit, no
+                            Robolectric), Goldens
 cli/src/main/...                        Desktop CLI (application) using :core
 app/src/main/java/...      Android-only Kotlin (Ordboken registry, activities,
                            UI, Flags.kt — the flagCode → R.drawable mapping)
@@ -143,7 +144,7 @@ The DLE, EST, and Collins parsers and the golden JSON mapping live in `:core`
 (pure JVM — no Android, no Robolectric):
 
 ```sh
-./gradlew :core:test                          # DleParserTest/EstParserTest/CollinsParserTest
+./gradlew :core:test                          # DleParserTest/EstParserTest/CollinsParserTest/LeRobertParserTest/…
 ./gradlew :core:test --tests se.whitchurch.nordict.EstParserTest
 ```
 
@@ -279,10 +280,11 @@ JUnit against a MockWebServer (no Robolectric, no Android):
 ./gradlew testDebugUnitTest --tests 'se.whitchurch.nordict.AppDriverTest'   # app-side Robolectric tests
 ```
 
-The parser tests (`DleParserTest`, `EstParserTest`, `CollinsParserTest`) all
-run in `:core` as plain JUnit and read fixtures relatively as
-`../testdata/...` (working dir `core/`). App-side integration tests spin up a
-MockWebServer serving `testdata/<tag>-search.json` / `testdata/<tag>.html`.
+The parser tests (`DleParserTest`, `EstParserTest`, `CollinsParserTest`,
+`LeRobertParserTest`) all run in `:core` as plain JUnit and read fixtures
+relatively as `../testdata/...` (working dir `core/`). App-side integration
+tests spin up a MockWebServer serving `testdata/<tag>-search.json` /
+`testdata/<tag>.html`.
 
 The parser tests use a true golden pattern via the shared
 `Goldens.assertGolden(...)` helper (`core/.../Goldens.kt`): the parsed output
@@ -294,6 +296,7 @@ When parser behavior changes intentionally, regenerate the fixtures with
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.DleParserTest'
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.EstParserTest'
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.CollinsParserTest'
+UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.LeRobertParserTest'
 ```
 
 (or any parser test class), then review the git diff; keep the test's semantic
@@ -445,6 +448,80 @@ Fixtures: `testdata/{gdlc,ca-es,ca-en}/*.{html,json}` (word pages + goldens) and
 `{gdlc,ca-es,ca-en}-search.json`. Tests: `DiccionariParserTest` (`:core`, plain
 JUnit), `DiccionariIntegrationTest` (`app`, Robolectric + MockWebServer).
 
+## Le Robert (ROB, French)
+
+`LeRobertDictionary` (`:core`) is baseUrl-parameterized (default
+`https://dictionnaire.lerobert.com`, tests use a MockWebServer). `search()`
+hits `/autocomplete.json?q=<query>&t=def` with a JSON `Accept` header and
+delegates decoding to `LeRobertParser.parseSearch` (the shared RAE-style
+mapping the CLI uses too); a `/conjugaison/` page is rewritten to
+`/definition/`.
+
+`LeRobertParser.parse` isolates `div.ws-c`, and each POS group in
+`section.def > div.b` becomes one `Word` (`span.d_cat` is the POS label, e.g.
+`nom féminin`). Audio URLs come from `audio source[src]` relative paths.
+Definitions/idioms live in the `div.d_ptma` tree:
+
+- `div.d_dvr` = a sense group (optional `span.d_dtr` "(topic)" is its `domain`),
+  `div.d_dvn`/`div.d_dvl` = nested containers. The parser **recurses** through
+  all three and flattens every `span.d_dfn` it finds into a
+  `Word.Definition`. `span.d_mta` markers (e.g. `spécialement`,
+  `(dans quelques emplois)`) that *precede* a `d_dfn` become its `register`;
+  `span.d_xpl` siblings become examples.
+- `div.d_dvt` blocks whose `span.d_mtb` contains "locution" become
+  `Word.Idiom`s (headword `span.d_lca`, gloss `span.d_gls`); other `d_dvt`s
+  with a `d_dfn` are treated as definitions and their examples attach to the
+  current one.
+- `section.syn > div.b``s `span.s_cat` (lowercased) maps to synonym lists from
+  `span.s_syni a`/`span.s_syn a`; the matching `s_cat` list attaches to the
+  first definition of the same POS group.
+
+`genderOf` maps `féminin`/`feminin` → `Genders.FEMININE`, `masculin` →
+`Genders.MASCULINE`. Tests: `LeRobertParserTest` + `LeRobertIntegrationTest`
+(both `:core`, plain JUnit), fixtures `testdata/rob/table.{html,json}` and
+`testdata/rob-search.json`.
+
+## Modernizing a legacy dictionary
+
+Legacy dictionaries (those with `renderAsJson = false`) keep original source
+HTML and don't feed the shared JSON rendering pipeline. To convert one to the
+modern schema (targets: `EstParser`, `CollinsParser`, `DleParser`,
+`LeRobertParser`):
+
+1. **Rewrite the parser** to return `Word`s with `renderAsJson = true`:
+   - Build a companion `parseSearch(body, uriOf)` so search decoding is shared
+     with the CLI (match `EstParser.parseSearch` / `LeRobertParser.parseSearch`).
+   - Give `parse(page, uri, tag, baseUrl = "<default home>")` a configurable
+     base for tests — the page's relative hrefs resolve against it.
+   - Split senses into `Word.Definition` (with `glosses`, `domain`, `geo`,
+     `plev`, `register`, `synonyms`, `antonyms`) and expressions/idioms into
+     `Word.Idiom`; set each definition's `pos`/`grammar`/`gender` (map
+     language-specific gender words like "nom féminin"/"masculin" through a
+     `genderOf` helper to `Genders.FEMININE`/`MASCULINE`).
+   - Leave `Word.pos` alone — it's the `Pos` enum (ADJECTIVE/Noun/VERB/…), not
+     a display string; the label lives on `Word.Definition.pos`.
+   - Fill `audio` from the page's `<audio>/<source>` URLs (resolve relative
+     paths against `baseUrl`).
+   - For homographs/.sols-style multi-entry pages, set `xrefs` per word so
+     `get()` can resolve `__ref`.
+2. **Rewrite the dictionary** to take `client, baseUrl = "…"` and delegate
+   `search()` to `XxxParser.parseSearch` against the autocomplete endpoint
+   (keep `Ordboken.kt` calling the no-baseUrl constructor unchanged); dedupe
+   `__ref` via `uri.withoutRefParam()` before fetching.
+3. **Update the CLI** (`cli/.../Main.kt`) to call `XxxParser.parseSearch`
+   instead of an inline JSON decoder.
+4. **Add fixtures + tests**:
+   - `testdata/<tag>-search.json` from the live autocomplete response, and
+     `testdata/<tag>/<word>.html` from a real page.
+   - A plain-JUnit `XxxParserTest` (golden via `Goldens.assertGolden(..., 
+     Array<WordJson.WordData>::class.java)`) asserting title, definitions,
+     idioms, grammar/gender/domain/register, audio, and the search rewrite.
+   - A `XxxIntegrationTest` with MockWebServer: `testSearch` (fixture served,
+     assert request path `q=` + rewrite), `testGet` (word page served), and a
+     foreign-host rejection for URL-gated dictionaries.
+5. **Run `:core:test`**, regenerate goldens with `UPDATE_GOLDEN=1` when the
+   structure intentionally changes, then review the `git diff` on the JSON.
+
 ## Conventions / gotchas
 
 - All Kotlin source is in one package, `se.whitchurch.nordict`, in both
@@ -452,9 +529,9 @@ JUnit), `DiccionariIntegrationTest` (`app`, Robolectric + MockWebServer).
 - Unit tests use Robolectric (`@RunWith(RobolectricTestRunner::class)`,
   `@Config(sdk = [28])`) when Android classes (e.g. `Uri`) are involved.
   The shared `:core` tests — `DleParserTest`, `EstParserTest`,
-  `CollinsParserTest`, `DiccionariParserTest`, and the moved
-  `{Est,Dle,Collins,Didac,Diccionari}IntegrationTest` suites (MockWebServer) —
-  are plain JUnit and run on a desktop JVM.
+  `CollinsParserTest`, `DiccionariParserTest`, `LeRobertParserTest`, and the
+  moved `{Est,Dle,Collins,Didac,Diccionari,LeRobert}IntegrationTest` suites
+  (MockWebServer) — are plain JUnit and run on a desktop JVM.
 - `Word` fields are read by `renderer.js` by exact JSON name; renaming fields
   in `Word.kt` requires updating the golden-schema data classes in
   `core/.../WordJson.kt`, the `testdata/{dle,est,colspan}/` fixtures, and
