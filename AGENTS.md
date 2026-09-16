@@ -29,8 +29,9 @@ core/src/                               Shared PURE-JVM parser core (no Android)
                            <Name>Dictionary.kt, <Name>Parser.kt, HttpUrlExt
                            (URL helpers), Goldens, WordJson, Genders, Pos
 test/java/...            DleParserTest, EstParserTest, CollinsParserTest,
-                            DiccionariParserTest, LeRobertParserTest, the moved
-                            *IntegrationTest suite (plain JUnit, no
+                            ColfrenParserTest, DiccionariParserTest,
+                            LeRobertParserTest, the moved *IntegrationTest
+                            suite (plain JUnit, no
                             Robolectric), Goldens
 cli/src/main/...                        Desktop CLI (application) using :core
 app/src/main/java/...      Android-only Kotlin (Ordboken registry, activities,
@@ -146,10 +147,11 @@ The DLE, EST, and Collins parsers and the golden JSON mapping live in `:core`
 ```sh
 ./gradlew :core:test                          # DleParserTest/EstParserTest/CollinsParserTest/LeRobertParserTest/…
 ./gradlew :core:test --tests se.whitchurch.nordict.EstParserTest
+./gradlew :core:test --tests se.whitchurch.nordict.ColfrenParserTest   # Collins French-English
 ```
 
 The `:cli` module runs the *same* parsers against arbitrary dictionary pages and
-dumps the shared JSON schema (identical to `testdata/{dle,est,colspan}/*.json`):
+dumps the shared JSON schema (identical to `testdata/{dle,est,colspan,colfren}/*.json`):
 
 ```sh
 ./gradlew :cli:run --args="frente"                                  # default dict DLE: dle.rae.es/frente
@@ -170,6 +172,8 @@ dumps the shared JSON schema (identical to `testdata/{dle,est,colspan}/*.json`):
 ./gradlew :cli:run --args="frente --search"                         # search results (default DLE)
 ./gradlew :cli:run --args="est frente --search"                     # search via a dictionary
 ./gradlew :cli:run --args="--dict colspan --search --file ../testdata/colspan-search.json"  # offline search
+./gradlew :cli:run --args="--dict colfren --file ../testdata/colfren/table.html"  # offline parse
+./gradlew :cli:run --args="--dict colfren --search --file ../testdata/colfren-search.json"  # offline search
 ./gradlew :cli:run --args="--dict est --file ../testdata/est/morir.html"   # offline, no network
 ./gradlew :cli:run --args="--url https://dle.rae.es/cagar"
 ./gradlew :cli:run --args="frente -o /tmp/frente.json"              # write to file
@@ -192,10 +196,10 @@ per-dictionary parsers the app uses — `DleParser.parseSearch`/`EstParser.parse
 `CollinsParser.parseSearch` (the `/autocomplete/` `{"title"}` shape), and
 `DiccionariParser.parseSearch` (the diccionari.cat `{value,url,label}` shape) —
 so the app, the CLI, and the `*ParserTest.kt` suites lock one mapping against
-`testdata/{dle,est,colspan,gdlc,ca-es,ca-en}-search.json`. Note:
+`testdata/{dle,est,colspan,colfren,gdlc,ca-es,ca-en}-search.json`. Note:
 collinsdictionary.com serves a Cloudflare JS challenge to datacenter IPs, so
-live `colspan` fetches can 403 from this machine — use `--file` against the
-fixtures instead (the parser itself is fully covered by tests).
+live `colspan`/`colfren` fetches can 403 from this machine — use `--file`
+against the fixtures instead (the parser itself is fully covered by tests).
 
 JSON goes to stdout (summary on stderr; nonzero exit on failure). Pipe the
 output to the JS renderer for a browser preview:
@@ -281,10 +285,10 @@ JUnit against a MockWebServer (no Robolectric, no Android):
 ```
 
 The parser tests (`DleParserTest`, `EstParserTest`, `CollinsParserTest`,
-`LeRobertParserTest`) all run in `:core` as plain JUnit and read fixtures
-relatively as `../testdata/...` (working dir `core/`). App-side integration
-tests spin up a MockWebServer serving `testdata/<tag>-search.json` /
-`testdata/<tag>.html`.
+`ColfrenParserTest`, `LeRobertParserTest`) all run in `:core` as plain JUnit
+and read fixtures relatively as `../testdata/...` (working dir `core/`).
+App-side integration tests spin up a MockWebServer serving
+`testdata/<tag>-search.json` / `testdata/<tag>.html`.
 
 The parser tests use a true golden pattern via the shared
 `Goldens.assertGolden(...)` helper (`core/.../Goldens.kt`): the parsed output
@@ -296,6 +300,7 @@ When parser behavior changes intentionally, regenerate the fixtures with
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.DleParserTest'
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.EstParserTest'
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.CollinsParserTest'
+UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.ColfrenParserTest'
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.LeRobertParserTest'
 ```
 
@@ -406,6 +411,27 @@ full deep-link back to the RAE article (from the `data-id` attribute,
 `https://dle.rae.es/?id=<id>`), and `plev` is populated from
 `abbr.sin_alert` (NOT the parent `<span title="...">`), so only "malsonante"
 markers appear — "uso coloquial" / "usado en América" are dropped.
+
+## Collins bilingual (COLSPAN, COLFREN)
+
+`CollinsSpanishEnglishDictionary` (COLSPAN, `spanish-english`) and
+`CollinsFrenchEnglishDictionary` (COLFREN, `french-english`) share one parser,
+`CollinsParser` (`:core`), parameterized by `dictCode`. Each POS-group hom
+(`div.hom`) in the `benedict` main dictionary is its own renderable `Word`;
+`div.hom` cross-reference stubs collapse through `data-xrentry`/`hom sense`;
+Easy Learning entries (`easy`) become separate `Word`s with the leading article
+stripped into `rawHeadword` ("la table" -> "table"). Multi-word search slugs are
+lower-cased with spaces as hyphens (`table basse` -> `table-basse`).
+
+Pronunciation audio is read from each block's `div.mini_h2` strip and filtered
+by the source language: COLSPAN keeps only the Spain clip (`ES-ES`, dropping
+the `ES-419` Latin American one), COLFREN keeps the single French clip
+(`FR-…` in the main dictionary, `fr_<word>.mp3` in Easy Learning).
+
+Tests: `CollinsParserTest`/`CollfrenParserTest` (both `:core`, plain JUnit
+goldens), `CollinsIntegrationTest`/`ColfrenIntegrationTest` (MockWebServer).
+Fixtures: `testdata/{colspan,colfren}/<word>.{html,json}` and
+`{colspan,colfren}-search.json`.
 
 ## diccionari.cat family (DIDAC, GDLC, CA-ES, CA-EN)
 

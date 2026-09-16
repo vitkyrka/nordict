@@ -132,9 +132,15 @@ class CollinsParser {
                 headword.rawHeadword = rawHeadword(head.title)
                 headword.dictionary = head.label
 
+                // The headword pronunciation lives in the mini_h2 strip.
+                // Spanish pages carry both a Spain (ES-ES) and a Latin American
+                // (ES-419) clip — keep only the Spain one. French pages carry a
+                // single French clip (FR-… in the main dictionary, fr_<word>.mp3
+                // in Easy Learning).
+                val audioLocales = if (dictCode == "french-english") listOf("FR-", "/fr_") else listOf("ES-ES")
                 head.block.select("div.mini_h2 a.hwd_sound[data-src-mp3]").forEach { audio ->
                     val url = audio.attr("data-src-mp3")
-                    if (url.contains("ES-ES")) {
+                    if (audioLocales.any { url.contains(it) }) {
                         headword.audio.add(url)
                     }
                 }

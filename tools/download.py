@@ -44,6 +44,7 @@ DICTIONARIES = {
     "EST": "https://www.rae.es/diccionario-estudiante",
     "DLE": "https://dle.rae.es",
     "COLSPAN": "https://www.collinsdictionary.com/dictionary/spanish-english",
+    "COLFREN": "https://www.collinsdictionary.com/dictionary/french-english",
     "DIDAC": "https://www.diccionari.cat/cerca/didac",
 }
 
