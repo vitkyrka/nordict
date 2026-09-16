@@ -294,6 +294,8 @@ class WordViewModel(
 
         val webView = WebView(context)
         this.webView = webView
+        webView.clipToOutline = true
+        webView.visibility = View.INVISIBLE
         webView.webChromeClient = WebChromeClient()
         val settings = webView.settings.apply {
             builtInZoomControls = true
