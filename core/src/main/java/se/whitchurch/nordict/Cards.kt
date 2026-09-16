@@ -1,6 +1,7 @@
 package se.whitchurch.nordict
 
 import com.google.gson.Gson
+import org.jsoup.Jsoup
 
 /**
  * One card the user can create for a [Word]: a definition (which may be
@@ -143,5 +144,23 @@ object Cards {
             audio,
             "<div style=\"text-align: left\">$back</div>"
         )
+    }
+
+    /**
+     * Plain text for the card preview: strips HTML (Collins gloss definitions
+     * and examples are rich HTML) while leaving plain text untouched.
+     */
+    fun plainText(html: String): String = Jsoup.parseBodyFragment(html).text()
+
+    /**
+     * The definition line for the card preview. Most definitions carry their
+     * text directly; Collins definitions carry none and keep the content in
+     * their first gloss, so fall back to it.
+     */
+    fun definitionText(definition: Word.Definition): String {
+        val raw = definition.definition.ifEmpty {
+            definition.glosses.firstOrNull()?.definition.orEmpty()
+        }
+        return plainText(raw)
     }
 }

@@ -299,6 +299,41 @@ class CardsTest {
         assertThat(Cards.examples(word, listOf(titled), emptyList())).containsExactly("the title")
     }
 
+    // ---- card preview text ----
+
+    @Test
+    fun plainText_stripsHtmlFromCollinsExamples() {
+        val html = "<span class=\"quote\">ha muerto de repente</span> " +
+            "<span class=\"quote\">she died suddenly</span>"
+        assertThat(Cards.plainText(html)).isEqualTo("ha muerto de repente she died suddenly")
+    }
+
+    @Test
+    fun plainText_leavesPlainTextUntouched() {
+        assertThat(Cards.plainText("Dicho de una persona")).isEqualTo("Dicho de una persona")
+    }
+
+    @Test
+    fun definitionText_collinsFallsBackToGloss() {
+        val word = parseCollinsFrente()
+        val def = word.definitions[0]
+        // Collins definitions carry no top-level text; the first gloss's rich
+        // HTML becomes the preview line, stripped of markup.
+        assertThat(def.definition).isEmpty()
+        val text = Cards.definitionText(def)
+        assertThat(text).doesNotContain("<")
+        assertThat(text).contains("Anatomy")
+        assertThat(text).contains("forehead")
+    }
+
+    @Test
+    fun definitionText_usesTopLevelWhenPresent() {
+        val word = parseDleOtro()
+        val text = Cards.definitionText(word.definitions[0])
+        assertThat(text).isNotEmpty()
+        assertThat(text).doesNotContain("<")
+    }
+
     // ---- fields ----
 
     @Test

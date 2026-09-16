@@ -206,7 +206,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         ) {
             Column(modifier = Modifier.padding(10.dp)) {
                 Text(
-                    text = "$title: ${definition.definition}",
+                    text = "$title: ${Cards.definitionText(definition)}",
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -214,7 +214,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                     .ifEmpty { definition.examples } + extraExamples
                 if (examplesText.isNotEmpty()) {
                     Text(
-                        text = "• " + examplesText.joinToString(separator = "\n• "),
+                        text = "• " + examplesText.joinToString(separator = "\n• ") { Cards.plainText(it) },
                         fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                         modifier = Modifier.padding(top = 4.dp)
                     )
@@ -384,13 +384,13 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         ) {
             Column(modifier = Modifier.padding(10.dp)) {
                 Text(
-                    text = "${idiom.idiom}: ${idiom.definition}",
+                    text = "${idiom.idiom}: ${Cards.plainText(idiom.definition)}",
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 if (idiom.examples.isNotEmpty()) {
                     Text(
-                        text = "• " + idiom.examples.joinToString(separator = "\n• "),
+                        text = "• " + idiom.examples.joinToString(separator = "\n• ") { Cards.plainText(it) },
                         fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                         modifier = Modifier.padding(top = 4.dp)
                     )
