@@ -35,6 +35,7 @@
     font-size: 1em;
     color: var(--text-color);
     background-color: var(--bg-color);
+    padding-bottom: 96px;
 }
 
 a.normalx {
