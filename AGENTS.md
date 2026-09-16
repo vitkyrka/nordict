@@ -285,7 +285,8 @@ JUnit against a MockWebServer (no Robolectric, no Android):
 ```
 
 The parser tests (`DleParserTest`, `EstParserTest`, `CollinsParserTest`,
-`ColfrenParserTest`, `LeRobertParserTest`) all run in `:core` as plain JUnit
+`ColfrenParserTest`, `LeRobertParserTest`, `LingueeParserTest`) all run in
+`:core` as plain JUnit
 and read fixtures relatively as `../testdata/...` (working dir `core/`).
 App-side integration tests spin up a MockWebServer serving
 `testdata/<tag>-search.json` / `testdata/<tag>.html`.
@@ -302,6 +303,7 @@ UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.EstParserTes
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.CollinsParserTest'
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.ColfrenParserTest'
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.LeRobertParserTest'
+UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.LingueeParserTest'
 ```
 
 (or any parser test class), then review the git diff; keep the test's semantic
@@ -507,12 +509,44 @@ Definitions/idioms live in the `div.d_ptma` tree:
 (both `:core`, plain JUnit), fixtures `testdata/rob/table.{html,json}` and
 `testdata/rob-search.json`.
 
+## Linguee (LINGPT, Portuguese-English)
+
+`LingueeDictionary` (`:core`) is baseUrl-parameterized (default
+`https://www.linguee.pt`, tests use a MockWebServer). `search()` hits the
+`/portugues-ingles/search?qe=<query>` endpoint — which returns an HTML
+fragment of `.main_item` suggested matches, **not** JSON — and delegates
+decoding to `LingueeParser.parseSearch(body) { uriOf }`; each `.main_item`'s
+relative `/portugues-ingles/traducao/<word>.html` href becomes the result's
+word-page URL. `get(uri)` fetches that traducao page and resolves the `__ref`
+homographs like the other JSON dictionaries. Linguee serves pages latin-1
+(ISO-8859-15) with CRLF line endings, so the test fixtures are read with
+`readText(Charsets.ISO_8859_1)` (a UTF-8 read would replace the accented
+bytes with U+FFFD).
+
+`LingueeParser.parse` iterates `div.exact div.lemma` and emits one `Word` per
+exact match (a headword page usually carries two — "mesa" plus the
+spelling-variant "mês" on the `mesa.html` page). Grammar/gender come from
+`span.tag_wordtype` ("substantivo, feminino" → `Genders.FEMININE`,
+"substantivo, masculino" → `Genders.MASCULINE`). Each featured translation
+(`div.translation.sortablemg.featured`) becomes one `Word.Definition`; the
+English headword is its gloss, the Portuguese POS label its `pos`/`grammar`,
+and the translation's `.example` lines become bilingual examples
+("Portuguese sentence — English sentence"). Pronunciation keeps only the
+European-Portuguese clip (`a.audio` ids starting `PT_PT`, resolved to
+`<baseUrl>mp3/<id>.mp3`; the `PT_BR` Brazilian clip is dropped).
+
+Tests: `LingueeParserTest` + `LingueeIntegrationTest` (both `:core`, plain
+JUnit goldens + MockWebServer), fixtures `testdata/lingpt/mesa.{html,json}`
+and `testdata/lingpt-search.json` (latin-1). `tools/download.py` supports
+`LINGPT` (`https://www.linguee.pt/portugues-ingles/traducao/<word>`) and
+writes the fixture back in latin-1.
+
 ## Modernizing a legacy dictionary
 
 Legacy dictionaries (those with `renderAsJson = false`) keep original source
 HTML and don't feed the shared JSON rendering pipeline. To convert one to the
 modern schema (targets: `EstParser`, `CollinsParser`, `DleParser`,
-`LeRobertParser`):
+`LeRobertParser`, `LingueeParser`):
 
 1. **Rewrite the parser** to return `Word`s with `renderAsJson = true`:
    - Build a companion `parseSearch(body, uriOf)` so search decoding is shared
@@ -555,8 +589,9 @@ modern schema (targets: `EstParser`, `CollinsParser`, `DleParser`,
 - Unit tests use Robolectric (`@RunWith(RobolectricTestRunner::class)`,
   `@Config(sdk = [28])`) when Android classes (e.g. `Uri`) are involved.
   The shared `:core` tests — `DleParserTest`, `EstParserTest`,
-  `CollinsParserTest`, `DiccionariParserTest`, `LeRobertParserTest`, and the
-  moved `{Est,Dle,Collins,Didac,Diccionari,LeRobert}IntegrationTest` suites
+  `CollinsParserTest`, `DiccionariParserTest`, `LeRobertParserTest`,
+  `LingueeParserTest`, and the moved
+  `{Est,Dle,Collins,Didac,Diccionari,LeRobert,Linguee}IntegrationTest` suites
   (MockWebServer) — are plain JUnit and run on a desktop JVM.
 - `Word` fields are read by `renderer.js` by exact JSON name; renaming fields
   in `Word.kt` requires updating the golden-schema data classes in

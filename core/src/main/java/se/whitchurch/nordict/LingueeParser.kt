@@ -1,14 +1,40 @@
 package se.whitchurch.nordict
 
 import okhttp3.HttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.jsoup.Jsoup
+import org.jsoup.nodes.Element
 
 class LingueeParser {
     companion object {
-        fun parse(page: String, uri: HttpUrl, tag: String): List<Word> {
+
+        /**
+         * Linguee's `/portugues-ingles/search` response is an HTML fragment of
+         * `.main_item` suggested matches, not JSON. Each item carries a relative
+         * `/portugues-ingles/traducao/<word>.html` href that becomes the result's
+         * word-page URL.
+         */
+        fun parseSearch(body: String, uriOf: (page: String) -> HttpUrl): List<SearchResult> {
+            val results = ArrayList<SearchResult>()
+            val doc = Jsoup.parse(body)
+            doc.select(".main_item").forEach {
+                val href = it.attr("href")
+                if (href.isEmpty()) return@forEach
+                val title = it.text()
+                if (title.isEmpty()) return@forEach
+                results.add(SearchResult(title, uriOf(href)))
+            }
+            return results
+        }
+
+        fun parse(
+            page: String,
+            uri: HttpUrl,
+            tag: String,
+            baseUrl: String = "https://www.linguee.pt/"
+        ): List<Word> {
             val words: ArrayList<Word> = ArrayList()
-            val doc = Jsoup.parse(page)
+            val finalBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
+            val doc = Jsoup.parse(page, finalBaseUrl)
 
             doc.selectFirst(".l_header")?.remove()
             doc.selectFirst(".footer")?.remove()
@@ -29,49 +55,32 @@ class LingueeParser {
 
                 first = false
 
-                val taglemma = lemma.selectFirst("span.tag_lemma") ?: return@forEach;
+                val taglemma = lemma.selectFirst("span.tag_lemma") ?: return@forEach
                 val word = taglemma.select("a.dictLink").map { it.text() }.joinToString(" ")
-                val summary = StringBuilder(word)
 
-                val type = lemma.selectFirst(".tag_wordtype")?.text() ?: ""
-                if (type.isNotEmpty()) {
-                    summary.append(" ($type)")
-
-                    if (type.contains("subst")) {
-                        if (type.contains("plural")) {
-                            lemma.addClass("plural")
-                        } else {
-                            lemma.addClass("singular")
-                        }
-                        if (type.contains("masculino")) {
-                            lemma.addClass("masculine")
-                        } else if (type.contains("feminino")) {
-                            lemma.addClass("feminine")
-                        }
-                    }
-                }
-
+                val grammar = lemma.selectFirst(".tag_wordtype")?.text()?.trim() ?: ""
                 val meanings =
                     lemma.select("div.translation.featured span.tag_trans a.dictLink")
-                        .joinToString("; ") { it.text() }
+                        .map { it.text() }.joinToString("; ")
 
-                summary.append(" $meanings")
+                val summary = StringBuilder(word)
+                if (grammar.isNotEmpty()) {
+                    summary.append(" ($grammar)")
+                }
+                if (meanings.isNotEmpty()) {
+                    summary.append(" $meanings")
+                }
 
                 val headword = Word(
                     tag, word, word, summary.toString(), page, newUri,
-                    "https://www.linguee.pt/",
+                    finalBaseUrl,
                     doc,
                     "",
+                    xrefs = arrayListOf(ref.toString()),
+                    renderAsJson = true
                 )
 
-                headword.xrefs.add(ref.toString())
-
-                val definition = Word.Definition(meanings, lemma)
-                headword.definitions.add(definition)
-
-                lemma.select(".example .tag_s").forEach {
-                    definition.examples.add(it.text())
-                }
+                val gender = genderOf(grammar)
 
                 lemma.select("a.audio").forEach {
                     val id = it.attr("id")
@@ -80,7 +89,40 @@ class LingueeParser {
                         return@forEach
                     }
 
-                    headword.audio.add("https://www.linguee.pt/mp3/$id.mp3")
+                    headword.audio.add("${finalBaseUrl}mp3/$id.mp3")
+                }
+
+                // Each featured translation is its own definition sense: the
+                // English headword is the gloss, joined with the entry's
+                // Portuguese grammar/gender label.
+                lemma.select("div.translation.sortablemg.featured").forEach { translation ->
+                    val transText = translation.selectFirst("span.tag_trans a.dictLink")
+                        ?.text()?.trim() ?: return@forEach
+                    if (transText.isEmpty()) return@forEach
+
+                    val definition = Word.Definition(transText, translation.clone())
+                    definition.pos = grammar
+                    definition.grammar = grammar
+                    definition.gender = gender
+
+                    val gloss = Word.Gloss()
+                    gloss.definition = transText
+                    gloss.grammar = grammar
+                    gloss.gender = gender
+
+                    // Bilingual examples: "Portuguese sentence — English sentence".
+                    translation.select("div.example").forEach { ex ->
+                        val pt = ex.selectFirst(".tag_s")?.text() ?: ""
+                        val en = ex.selectFirst(".tag_t")?.text() ?: ""
+                        val example = if (en.isEmpty()) pt else "$pt — $en"
+                        if (example.isNotBlank()) {
+                            gloss.examples.add(example)
+                        }
+                    }
+
+                    definition.glosses.add(gloss)
+                    definition.examples.addAll(gloss.examples)
+                    headword.definitions.add(definition)
                 }
 
                 lemma.remove()
@@ -89,26 +131,24 @@ class LingueeParser {
 
             if (words.size > 1) {
                 val homographs = words.map { SearchResult(it.mTitle, it.summary, it.uri) }
+                val entries = Word.homonymEntries(words)
 
                 for (word in words) {
                     word.mHomographs.addAll(homographs)
+                    word.mHomonymEntries.addAll(entries)
                 }
             }
 
             return words
         }
 
-        fun parseSearch(page: String, uri: HttpUrl): List<SearchResult> {
-            val results = ArrayList<SearchResult>()
-            val doc = Jsoup.parse(page, uri.toString())
-
-            doc.select(".main_item").forEach {
-                ("https://www.linguee.pt" + it.attr("href")).toHttpUrlOrNull()?.let { url ->
-                    results.add(SearchResult(it.text(), url))
-                }
+        private fun genderOf(grammar: String): String {
+            val lower = grammar.lowercase()
+            return when {
+                lower.contains("feminino") -> Genders.FEMININE
+                lower.contains("masculino") -> Genders.MASCULINE
+                else -> ""
             }
-
-            return results;
         }
     }
 }

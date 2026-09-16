@@ -308,7 +308,7 @@ class Main {
             wordUrl = { word -> lingueeUrl(word) },
             searchUrl = { query -> lingueeUrl(query) },
             parse = { page, uri -> LingueeParser.parse(page, uri, "LINGPT") },
-            searchResults = { body -> LingueeParser.parseSearch(body, lingueeBase) }
+            searchResults = { body -> LingueeParser.parseSearch(body) { page -> lingueeBase.resolve(page)!! } }
         ),
         Dict(
             aliases = listOf("infopedia"),
