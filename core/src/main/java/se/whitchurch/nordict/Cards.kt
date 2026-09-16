@@ -37,7 +37,7 @@ sealed interface CardProposal {
  * definition fragments directly — there is no page skeleton to inject into
  * (combined words carry an empty `element`), and Collins' definitions are not
  * reached by any of [Word.getPage]'s container selectors. Legacy dictionaries
- * with a real page skeleton (DDO, SO) keep using [Word.getPage].
+ * with a real page skeleton (SO) keep using [Word.getPage].
  */
 object Cards {
     private val gson = Gson()

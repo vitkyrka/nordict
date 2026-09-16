@@ -30,7 +30,9 @@ core/src/                               Shared PURE-JVM parser core (no Android)
                            (URL helpers), Goldens, WordJson, Genders, Pos
 test/java/...            DleParserTest, EstParserTest, CollinsParserTest,
                             ColfrenParserTest, DiccionariParserTest,
-                            LeRobertParserTest, the moved *IntegrationTest
+                            LeRobertParserTest, LingueeParserTest,
+                            InfopediaParserTest, WiktionaryParserTest,
+                            DdoParserTest, the moved *IntegrationTest
                             suite (plain JUnit, no
                             Robolectric), Goldens
 cli/src/main/...                        Desktop CLI (application) using :core
@@ -58,8 +60,11 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
   boundary (see `HttpUrlBridge`) and maps `flagCode` → drawable via
   `Flags.kt`/`Ordboken.get`. The DLE, EST, Collins (sp/en + fr/en),
   diccionari.cat family, Linguee, Infopedia, Le Robert, and Wiktionary
-  dictionaries take an optional `baseUrl`; SO/DDO/SDO use the client and hard-
-  coded hosts. The word cache in `Ordboken` is keyed on `HttpUrl`.
+  dictionaries take an optional `baseUrl`; SO uses the client and hard-coded
+  hosts; DDO/SDO share `DslDictionary`, parameterized with default
+  `apiBaseUrl`/`siteBaseUrl` (the `ws.dsl.dk`/`ordnet.dk` hosts) so a single
+  MockWebServer can stand in for both in tests. The word cache in `Ordboken`
+  is keyed on `HttpUrl`.
 - **`Ordboken.kt`** — dictionary registry (`dictMap` keyed by `tag`), the app
   entry point for lookups (`getWord(uri)`, cached, probes every dictionary; and
   `search(query, count)`, cached per `currentIndex`), and the persisted
@@ -478,6 +483,52 @@ nodeClass, bilingual)`.
 Fixtures: `testdata/{gdlc,ca-es,ca-en}/*.{html,json}` (word pages + goldens) and
 `{gdlc,ca-es,ca-en}-search.json`. Tests: `DiccionariParserTest` (`:core`, plain
 JUnit), `DiccionariIntegrationTest` (`app`, Robolectric + MockWebServer).
+
+## DDO / SDO (Den Danske Ordbog / Svensk ordbok)
+
+`DdoDictionary` (DDO, `dk`) and `SdoDictionary` (SDO, `se`/`sedk`) share
+`DslDictionary` (`:core`), parameterized with `apiBaseUrl` (default
+`https://ws.dsl.dk`) and `siteBaseUrl` (default `https://ordnet.dk`), so one
+MockWebServer can serve both hosts in tests (`DdoIntegrationTest`).
+`search()` hits the API's `getInflectedResults` (`/<short>/query`) plus the
+`/<short>/livesearch` autocomplete JSON (a plain array of headword strings,
+decoded by `DdoParser.parseSearch` — shared with the CLI); `get()` routes on
+host *and* last path segment (`ordbog` → main-site article, `query` → API
+page) and resolves homographs from the API page's `.short-result ul li a`.
+
+`DdoParser.parse` reads one `div.artikel` per page and returns JSON-rendered
+`Word`s:
+
+- **Header**: `div.definitionBoxTop`'s `span.match` (ownText, so the `.super`
+  homograph number is dropped) is the headword; `span.tekstmedium` is the POS
+  label (e.g. "substantiv, intetkøn") mapped by `normalizePos` to `Pos`
+  (`substantiv`→NOUN, `verbum`→VERB, ...). `#id-udt span.lydskrift` is the
+  `pronunciation`, `#id-boj .allow-glossing` the `conjugation` (each "-" is
+  the headword stem), `#id-ety .allow-glossing` the `etymology`. Audio comes
+  from the speaker.gif `onclick="playSound('<id>')"` → `static.ordnet.dk/mp3/`.
+- **Definitions**: `#content-betydninger`'s `div.definitionNumber` +
+  `div.definitionIndent` pairs. A `definitionIndent` wrapping a nested
+  `definitionNumber` + `definitionIndent` is a sub-sense shell ("1.a", "2.a")
+  — the inner indent holds the body. Each sense: `senseNumber` from the
+  number, `.stempelNoBorder` (e.g. "FYSIK") → `domain`, `span.definition`
+  → gloss, "Eksempler" `.details .inlineList` text nodes + `.citat` quotes →
+  examples.
+- **Idioms**: `#content-faste-udtryk`, each headed by a `div.definitionBox`
+  with a `span.match` title; sub-sense shells become extra idiom entries.
+  Idioms carry no senseNumber, so the renderer keeps the separate locutions
+  section below the senses.
+- **Synonyms**: `div.definitionBox.onym` `.inlineList a` links attach to the
+  definition; relative `?entry_id=...` hrefs resolve against the page uri
+  (`ordbog?entry_id=...&query=...`).
+- Stand-alone idiom pages (e.g. "klappe hesten") with no numbered-sense
+  containers fall back to parsing the `artikel` itself.
+
+Tests: `DdoParserTest` (golden via `Goldens.assertGolden`) +
+`DdoIntegrationTest` (MockWebServer, plain JUnit), fixtures
+`testdata/ddo/arbejde.{html,json}` (a real archived ordnet.dk page) and
+`testdata/ddo-search.json` / `testdata/ddo-query.html` (the API's livesearch
+JSON and the `/<short>/query` page). CLI: `ddo arbejde --search` / offline
+`--dict ddo --file ../testdata/ddo/arbejde.html --url <entry uri>`.
 
 ## Le Robert (ROB, French)
 

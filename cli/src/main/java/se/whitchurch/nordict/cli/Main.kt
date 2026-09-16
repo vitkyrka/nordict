@@ -144,14 +144,7 @@ class Main {
     }
 
     private fun dslSearchResults(body: String, short: String): List<SearchResult> =
-        try {
-            JsonParser.parseString(body).asJsonArray.mapNotNull { el ->
-                if (!el.isJsonPrimitive) null
-                else SearchResult(el.asString, dslEntryUri(short, el.asString))
-            }
-        } catch (e: Exception) {
-            emptyList()
-        }
+        DdoParser.parseSearch(body) { word -> dslEntryUri(short, word) }
 
     private fun wiktionarySearchResults(body: String, short: String): List<SearchResult> =
         WiktionaryParser.parseSearch(body, short) { id, _ ->
@@ -277,7 +270,7 @@ class Main {
             lang = "se",
             wordUrl = null,
             searchUrl = { query -> dslLiveSearch("sdo", query) },
-            parse = { page, uri -> listOfNotNull(DdoParser.parse(page, uri, "SDO")) },
+            parse = { page, uri -> DdoParser.parse(page, uri, "SDO", "https://ordnet.dk/sdo/") },
             searchResults = { body -> dslSearchResults(body, "sdo") }
         ),
         Dict(
@@ -286,7 +279,7 @@ class Main {
             lang = "dk",
             wordUrl = null,
             searchUrl = { query -> dslLiveSearch("ddo", query) },
-            parse = { page, uri -> listOfNotNull(DdoParser.parse(page, uri, "DDO")) },
+            parse = { page, uri -> DdoParser.parse(page, uri, "DDO", "https://ordnet.dk/ddo/") },
             searchResults = { body -> dslSearchResults(body, "ddo") }
         ),
         Dict(
