@@ -14,6 +14,7 @@ import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasSetTextAction
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -679,26 +680,32 @@ class NavigationRegressionTest {
         // (+8.dp), stealing 16.dp more vertical space from the dictionary row
         // and content below. Robolectric's font metrics make the field taller
         // than the spec 56dp here, so we assert layout geometry (the field
-        // fills the pill, the bar adds exactly its own 8dp), not absolute dp.
+        // fills the pill, the pill has no padded rim), not absolute dp.
         val field = composeRule.onAllNodes(hasSetTextAction())[0].fetchSemanticsNode()
         val rootWidth = composeRule.onRoot().fetchSemanticsNode().size.width
         val tolerancePx = with(composeRule.density) { 2.dp.roundToPx() }
-        val verticalPaddingPx = with(composeRule.density) { 8.dp.roundToPx() }
 
         // The field spans the whole bar, so its content isn't pushed in from
         // the edges (a re-added side padding shrinks it below the screen).
         assertThat(field.size.width).isAtLeast(rootWidth - tolerancePx)
 
-        // The dictionary nav row below the bar starts exactly one M3 vertical
-        // padding (8.dp) below the field's bottom — i.e. the pill holds only
-        // the field with no extra internal vertical padding.
-        val navTop = composeRule
-            .onNodeWithContentDescription(ordboken().currentLang)
-            .fetchSemanticsNode()
+        // That the field's content spans the whole bar means no side padding
+        // was re-added on the InputField. The nav row's first control is the
+        // language split button's menu segment, whose top is not a stable
+        // anchor here: the old single current-language button was shorter than the row and sat below its top by the row-centering
+        // slack, while the merged split button is the row's tallest element and
+        // sits flush. So assert the bar's own geometry instead — the pill
+        // (the full-width clickable search bar) is exactly the field's bounds
+        // with no padded rim, which is what a re-added InputField modifier
+        // padding would inflate.
+        val bar = composeRule
+            .onAllNodes(hasClickAction())
+            .fetchSemanticsNodes()
+            .first { it.boundsInRoot.width >= rootWidth - tolerancePx }
             .boundsInRoot
-            .top
-        val gapToNav = navTop - (field.boundsInRoot.top + field.size.height)
-        assertThat(Math.abs(gapToNav - verticalPaddingPx).toDouble())
+        assertThat(Math.abs(bar.top - field.boundsInRoot.top).toDouble())
+            .isAtMost(tolerancePx.toDouble())
+        assertThat(Math.abs(bar.bottom - (field.boundsInRoot.top + field.size.height)).toDouble())
             .isAtMost(tolerancePx.toDouble())
     }
 

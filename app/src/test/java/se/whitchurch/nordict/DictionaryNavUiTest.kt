@@ -177,7 +177,7 @@ class DictionaryNavUiTest {
     @Test
     fun swapButtonShowsLastLangAndSwapsBackAndForth() {
         // Seeded with [es, ca, se]: fresh current language is es, so lastLang
-        // is ca and the swap button reads "Byt till ca".
+        // is ca and the split button's swap segment reads "Byt till ca".
         setTopBar()
         swapButton("ca").assertExists().performClick()
         composeRule.waitForIdle()
@@ -193,9 +193,26 @@ class DictionaryNavUiTest {
     }
 
     @Test
+    fun splitButtonDropdownOpensTheLanguageMenu() {
+        setTopBar()
+
+        // The trailing segment of the split button opens the language menu;
+        // picking a language goes through Ordboken.setLanguage.
+        composeRule.onNodeWithContentDescription("Byt språk").assertExists().performClick()
+        composeRule.waitForIdle()
+
+        composeRule.onNodeWithText("se").performClick()
+        composeRule.waitForIdle()
+
+        assertThat(ordboken.currentDictionary.lang).isEqualTo("se")
+        assertThat(ordboken.lastLang).isEqualTo("es")
+    }
+
+    @Test
     fun swapButtonHiddenWithoutASecondLanguage() {
         // The setUp seed persists "lastLang"=ca, so clear prefs before
-        // reseeding a single-language Ordboken: it must have no swap target.
+        // reseeding a single-language Ordboken: it must have no swap target,
+        // leaving just the language-menu button.
         Ordboken.reset()
         app.getSharedPreferences("ordboken", android.content.Context.MODE_PRIVATE)
             .edit().clear().commit()
@@ -203,5 +220,6 @@ class DictionaryNavUiTest {
         setTopBar()
         composeRule.onNodeWithContentDescription("Byt till ca").assertDoesNotExist()
         composeRule.onNodeWithContentDescription("Byt till es").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Byt språk").assertExists()
     }
 }

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -13,16 +14,17 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.NorthWest
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -188,9 +190,17 @@ fun NordictApp(
             modifier = Modifier.fillMaxWidth(),
             placeholder = { Text(context.getString(R.string.search_hint)) },
             leadingIcon = {
-                Icon(
-                    Icons.Filled.Search,
-                    contentDescription = context.getString(R.string.menu_search)
+                // The current language's flag takes over the role of the
+                // magnifying glass. currentIndex is the snapshot state every
+                // dictionary/language switch writes, so reading it here
+                // recomposes the flag after a switch.
+                val currentIndex = ordboken.currentIndex
+                val currentLang = ordboken.currentLang
+                Image(
+                    painter = painterResource(ordboken.langFlag(currentLang)),
+                    contentDescription = context.getString(R.string.menu_search),
+                    modifier = Modifier.size(24.dp),
+                    contentScale = ContentScale.Fit
                 )
             },
             trailingIcon = {
