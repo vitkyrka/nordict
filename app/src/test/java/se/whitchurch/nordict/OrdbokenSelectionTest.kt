@@ -14,10 +14,11 @@ import org.robolectric.annotation.Config
  * State/persistence tests for the multi-dictionary selection on top of
  * [Ordboken]: the per-language enabled+ordered list survives across
  * re-instantiation, `setLanguage` restores each language's own selection, and
- * invalid / non-combining stored tags fall back to single-dict mode.
+ * invalid / foreign-language stored tags fall back to single-dict mode.
  *
- * Seeded with DLE/EST (es), DIDAC/GDLC (ca) — all combining — and SO (se), a
- * legacy single-dict language. No MockWebServer needed: selection state never
+ * Seeded with DLE/EST (es), DIDAC/GDLC (ca), and SO/SDO (se) — every
+ * dictionary combines with its language's siblings, including the formerly
+ * single-dict Swedish pair. No MockWebServer needed: selection state never
  * touches the network.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -32,7 +33,8 @@ class OrdbokenSelectionTest {
         EstDictionary(client),
         DidacDictionary(client),
         GdlcDictionary(client),
-        SoDictionary(client)
+        SoDictionary(client),
+        SdoDictionary(client)
     )
 
     private fun ordboken(tags: Array<se.whitchurch.nordict.Dictionary> = dicts()): Ordboken =
@@ -138,15 +140,24 @@ class OrdbokenSelectionTest {
         assertThat(ord.activeDicts.map { it.tag }).containsExactly("DIDAC", "GDLC").inOrder()
         assertThat(ord.selectionSignature).isEqualTo("DIDAC,GDLC")
 
-        // A language with only a legacy dict stays single-dict.
+        // Swedish: SO + SDO combine too — every same-language dictionary does.
         ord.setLanguage("se")
-        assertThat(ord.activeDicts).isEmpty()
         assertThat(ord.currentDictionary.tag).isEqualTo("SO")
+        ord.setCurrentDictionaries(listOf("SO", "SDO"))
+        assertThat(ord.activeDicts.map { it.tag }).containsExactly("SO", "SDO").inOrder()
+
+        // Each language's own combination is remembered and restored.
+        ord.setLanguage("es")
+        assertThat(ord.activeDicts.map { it.tag }).containsExactly("DLE", "EST").inOrder()
+        ord.setLanguage("se")
+        assertThat(ord.activeDicts.map { it.tag }).containsExactly("SO", "SDO").inOrder()
+        assertThat(ord.selectionSignature).isEqualTo("SO,SDO")
     }
 
     @Test
-    fun restoreDropsInvalidOrNonCombineableTags() {
-        // Seeded prefs with a non-combining tag in the multi selection.
+    fun restoreDropsInvalidOrForeignTags() {
+        // Seeded prefs with a foreign-language tag in the es selection: SO is
+        // Swedish, so the pair cannot combine and falls back to single-dict.
         app.getSharedPreferences("ordboken", Context.MODE_PRIVATE)
             .edit().putString("dicts_es", "DLE,SO").commit()
         val invalid = ordboken()
@@ -171,10 +182,10 @@ class OrdbokenSelectionTest {
     }
 
     @Test
-    fun toggleOffTheLastDictStaysOnTheFirstCombiningDict() {
+    fun toggleOffTheLastDictStaysOnTheFirstDict() {
         val ord = ordboken()
         // The only enabled dict cannot be turned off: the selection falls back
-        // to the language's first combining dictionary.
+        // to the language's first dictionary.
         assertThat(ord.toggleDictionary("DLE")).isTrue()
         assertThat(ord.activeDicts).isEmpty()
         assertThat(ord.currentDictionary.tag).isEqualTo("DLE")
@@ -182,12 +193,30 @@ class OrdbokenSelectionTest {
     }
 
     @Test
-    fun toggleDictionaryRejectsNonCombiningAndUnknownTags() {
+    fun toggleDictionaryRejectsCrossLanguageAndUnknownTags() {
         val ord = ordboken()
-        assertThat(ord.toggleDictionary("SO")).isFalse() // legacy, non-combining
+        // SO is combining-capable but Swedish: mixing it into the Spanish
+        // selection spans two languages, so the toggle is rejected.
+        assertThat(ord.toggleDictionary("SO")).isFalse()
         assertThat(ord.toggleDictionary("NOPE")).isFalse()
         assertThat(ord.activeDicts).isEmpty()
         assertThat(ord.currentDictionary.tag).isEqualTo("DLE")
+    }
+
+    @Test
+    fun seCombinationTogglesSoAndSdoTogether() {
+        val ord = ordboken()
+        ord.setLanguage("se")
+        assertThat(ord.toggleDictionary("SDO")).isTrue()
+        assertThat(ord.activeDicts.map { it.tag }).containsExactly("SO", "SDO").inOrder()
+        assertThat(prefsKey("se")).isEqualTo("SO,SDO")
+        ord.prefsEditor.commit() // the real app persists the state on pause
+
+        // Restarts restore the Swedish combination.
+        val restored = restart()
+        assertThat(restored.currentDictionary.lang).isEqualTo("se")
+        assertThat(restored.activeDicts.map { it.tag }).containsExactly("SO", "SDO").inOrder()
+        assertThat(restored.selectionSignature).isEqualTo("SO,SDO")
     }
 
     @Test
@@ -197,10 +226,12 @@ class OrdbokenSelectionTest {
             .containsExactly("DLE", "EST").inOrder()
         assertThat(ord.combiningDictsForLang("ca").map { it.tag })
             .containsExactly("DIDAC", "GDLC").inOrder()
-        assertThat(ord.combiningDictsForLang("se")).isEmpty()
+        // Swedish combines too now: SO + SDO.
+        assertThat(ord.combiningDictsForLang("se").map { it.tag })
+            .containsExactly("SO", "SDO").inOrder()
         assertThat(ord.hasCombiningForLang("es")).isTrue()
         assertThat(ord.hasCombiningForLang("ca")).isTrue()
-        assertThat(ord.hasCombiningForLang("se")).isFalse()
+        assertThat(ord.hasCombiningForLang("se")).isTrue()
     }
 
     @Test

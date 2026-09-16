@@ -22,7 +22,7 @@ class DictSelectionTest {
     @Test
     fun toggleOffTheLastDictRestoresTheFirstCandidate() {
         // The selection never becomes empty: toggling off the last enabled
-        // dict falls back to the first combining dict of the language.
+        // dict falls back to the first dictionary of the language.
         assertThat(DictSelection.toggle(es, listOf("DLE"), "DLE"))
             .containsExactly("DLE")
         assertThat(DictSelection.toggle(es, listOf("EST"), "EST"))
@@ -31,7 +31,8 @@ class DictSelectionTest {
 
     @Test
     fun toggleUnknownTagIsNoop() {
-        // A non-combining, foreign-language, or typo'd tag is ignored.
+        // A foreign-language or typo'd tag (not a candidate of this language)
+        // is ignored.
         val current = listOf("DLE", "COLSPAN")
         assertThat(DictSelection.toggle(es, current, "WFR")).isEqualTo(current)
         assertThat(DictSelection.toggle(es, current, "SO")).isEqualTo(current)

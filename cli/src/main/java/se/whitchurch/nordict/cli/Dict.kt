@@ -15,10 +15,6 @@ data class Dict(
     val aliases: List<String>,
     val tag: String,
     val lang: String,
-    // True when this dictionary takes part in multi-dictionary combining:
-    // JSON-rendered pages and a same-language combining selection (DLE, EST,
-    // COLSPAN, DIDAC, GDLC, CA-ES, CA-EN).
-    val supportsCombining: Boolean = false,
     val wordUrl: ((String) -> HttpUrl)?,
     val searchUrl: (String) -> HttpUrl,
     val parse: (page: String, uri: HttpUrl) -> List<Word>,

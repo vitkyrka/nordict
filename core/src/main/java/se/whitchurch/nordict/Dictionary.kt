@@ -16,15 +16,6 @@ abstract class Dictionary(val client: OkHttpClient) : WordLookup {
     abstract val flagCode: String
     abstract val lang: String
 
-    /**
-     * True when this dictionary can take part in a combined multi-dictionary
-     * lookup: its parsed words are JSON-rendered, carry the `mHomonymEntries`
-     * page snapshot, and share one search-page shape with the other
-     * dictionaries of its language. Only a same-language, all-combining
-     * selection combines; everything else keeps single-dictionary behavior.
-     */
-    open val supportsCombining: Boolean = false
-
     override abstract fun search(query: String): List<SearchResult>
     abstract fun fullSearch(query: String): List<SearchResult>
     override abstract fun get(uri: HttpUrl): Word?

@@ -244,10 +244,6 @@ class HeadlessAgentDriver(
                 )
         }
         if (picks.size > 1) {
-            val unsupported = picks.filterNot { it.supportsCombining }
-            if (unsupported.isNotEmpty()) {
-                return AgentResult.error(AgentOps.SET_DICT, "dictionary ${unsupported.first().tag} does not support combining")
-            }
             if (picks.map { it.lang }.distinct().size != 1) {
                 return AgentResult.error(
                     AgentOps.SET_DICT,

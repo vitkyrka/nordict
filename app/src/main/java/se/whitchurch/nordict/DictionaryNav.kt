@@ -6,7 +6,6 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,7 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -31,14 +29,10 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 
 /**
@@ -50,10 +44,10 @@ import androidx.compose.ui.zIndex
  * button [LanguageTopBar]) pinned left, followed by the
  * horizontally scrolling dictionary chips of the selected language.
  *
- * Languages whose dictionaries can combine ([Dictionary.supportsCombining])
- * render multi-select [FilterChip] toggles: tapping toggles a dictionary
- * in/out of the selection, and long-pressing + dragging a chip reorders the
- * selection. All other languages keep the single-select chips.
+ * Every language renders multi-select [FilterChip] toggles (every dictionary
+ * combines with its language's siblings): tapping toggles a dictionary in/out
+ * of the selection, and long-pressing + dragging a chip reorders the
+ * selection.
  */
 @Composable
 fun DictionaryNav(
@@ -72,19 +66,11 @@ fun DictionaryNav(
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         LanguageTopBar(ordboken = ordboken)
-        if (ordboken.hasCombiningForLang(currentLang)) {
-            CombiningDictRow(
-                ordboken = ordboken,
-                lang = currentLang,
-                modifier = Modifier.weight(1f)
-            )
-        } else {
-            SingleDictRow(
-                ordboken = ordboken,
-                lang = currentLang,
-                modifier = Modifier.weight(1f)
-            )
-        }
+        CombiningDictRow(
+            ordboken = ordboken,
+            lang = currentLang,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
@@ -265,44 +251,10 @@ private fun LanguageFlag(flagRes: Int) {
     )
 }
 
-/** The single-select dictionary row: one radio-style chip per dictionary. */
-@Composable
-private fun SingleDictRow(
-    ordboken: Ordboken,
-    lang: String,
-    modifier: Modifier = Modifier
-) {
-    val dictIndices = ordboken.dictIndicesForLang(lang)
-    Row(
-        modifier = modifier
-            .horizontalScroll(rememberScrollState())
-            .selectableGroup(),
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        for (index in dictIndices) {
-            val tag = ordboken.dictTag(index)
-            val selected = index == ordboken.currentIndex
-            NavChoice(
-                selected = selected,
-                onClick = { ordboken.setCurrentDictionary(index) },
-                modifier = Modifier.padding(vertical = 2.dp)
-            ) {
-                Text(
-                    text = tag,
-                    fontSize = 14.sp,
-                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
-                )
-            }
-        }
-    }
-}
-
-/**
- * The multi-select dictionary row for a language whose dictionaries can
- * combine: one [FilterChip] per combining dictionary, toggled in/out of the
- * active selection, and reorderable by long-pressing a chip and dragging it
- * horizontally (committed once on drop through
- * [Ordboken.setDictionaryOrder]).
+/** The multi-select dictionary row: one [FilterChip] per dictionary of the
+ * language, toggled in/out of the active selection, and reorderable by
+ * long-pressing a chip and dragging it horizontally (committed once on drop
+ * through [Ordboken.setDictionaryOrder]).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -409,44 +361,6 @@ private fun CombiningDictRow(
                         )
                     }
             )
-        }
-    }
-}
-
-@Composable
-private fun NavChoice(
-    selected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-    contentDescription: String? = null,
-    content: @Composable () -> Unit
-) {
-    val bg = if (selected) MaterialTheme.colorScheme.primary else Color.Transparent
-    val fg = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant
-
-    Surface(
-        shape = RoundedCornerShape(6.dp),
-        color = bg,
-        contentColor = fg,
-        modifier = modifier
-            .semantics(mergeDescendants = true) {
-                role = Role.RadioButton
-                this.selected = selected
-                if (contentDescription != null) this.contentDescription = contentDescription
-            }
-            .selectable(
-                selected = selected,
-                role = Role.RadioButton,
-                onClick = onClick
-            )
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
-        ) {
-            content()
         }
     }
 }

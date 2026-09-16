@@ -207,7 +207,6 @@ class Main {
             aliases = listOf("dle"),
             tag = "DLE",
             lang = "es",
-            supportsCombining = true,
             wordUrl = { word -> dleUrl(word) },
             searchUrl = { query -> "https://dle.rae.es/srv/keys?q=$query".toHttpUrlOrNull()!! },
             parse = { page, uri -> DleParser.parse(page, uri, "DLE") },
@@ -217,7 +216,6 @@ class Main {
             aliases = listOf("est"),
             tag = "EST",
             lang = "es",
-            supportsCombining = true,
             wordUrl = { word -> estUrl(word) },
             searchUrl = { query -> "https://www.rae.es/diccionario-estudiante/srv/keys?q=$query".toHttpUrlOrNull()!! },
             parse = { page, uri -> EstParser.parse(page, uri, "EST") },
@@ -227,7 +225,6 @@ class Main {
             aliases = listOf("colspan", "col"),
             tag = "COLSPAN",
             lang = "es",
-            supportsCombining = true,
             wordUrl = { word -> collinsUrl("spanish-english", word) },
             searchUrl = { query -> collinsAutocomplete("spanish-english", query) },
             parse = { page, uri -> CollinsParser.parse(page, uri, "COLSPAN", "spanish-english") },
@@ -313,7 +310,6 @@ class Main {
             aliases = listOf("didac"),
             tag = "DIDAC",
             lang = "ca",
-            supportsCombining = true,
             wordUrl = { word -> didacUrl(word) },
             searchUrl = { query -> didacAutocomplete(query) },
             parse = { page, uri -> DidacParser.parse(page, uri, "DIDAC") },
@@ -321,9 +317,9 @@ class Main {
                 DidacParser.parseSearch(body) { path -> "https://www.diccionari.cat$path".toHttpUrlOrNull()!! }
             }
         ),
-        diccionariDict("gdlc", "GDLC", "gran-diccionari-de-la-llengua-catalana", "diccionari_gdlc", "diccionari-gdlc", "GDLC", false).withCombining(),
-        diccionariDict("ca-es", "CA-ES", "diccionari-catala-castella", "diccionari_ca_es_", "diccionari-ca-es", "catala-castella", true).withCombining(),
-        diccionariDict("ca-en", "CA-EN", "diccionari-catala-angles", "diccionari_ca_en", "diccionari-ca-en", "catala-angles", true).withCombining()
+        diccionariDict("gdlc", "GDLC", "gran-diccionari-de-la-llengua-catalana", "diccionari_gdlc", "diccionari-gdlc", "GDLC", false),
+        diccionariDict("ca-es", "CA-ES", "diccionari-catala-castella", "diccionari_ca_es_", "diccionari-ca-es", "catala-castella", true),
+        diccionariDict("ca-en", "CA-EN", "diccionari-catala-angles", "diccionari_ca_en", "diccionari-ca-en", "catala-angles", true)
     )
 
     fun run(args: Array<String>): Int {
@@ -405,16 +401,10 @@ class Main {
         }
 
         val selection: List<Dict> = selectedDicts.ifEmpty { listOf(dictionaries.first()) }
-        if (selection.size > 1) {
-            val unsupported = selection.filterNot { it.supportsCombining }
-            if (unsupported.isNotEmpty()) {
-                return error("dictionary ${unsupported.first().tag} does not support combining with other dictionaries")
-            }
-            if (selection.map { it.lang }.distinct().size != 1) {
-                return error(
-                    "combined lookup requires one language (got ${selection.map { it.lang }.distinct().joinToString(",")})"
-                )
-            }
+        if (selection.size > 1 && selection.map { it.lang }.distinct().size != 1) {
+            return error(
+                "combined lookup requires one language (got ${selection.map { it.lang }.distinct().joinToString(",")})"
+            )
         }
 
         try {
@@ -444,6 +434,13 @@ class Main {
             // dump the entries as the flat per-entry JSON array the renderer
             // draws as a combined homonym page (each entry labeled with its
             // dictionary, xrefs namespaced "DICT::id").
+            val missingUrl = selection.firstOrNull { it.wordUrl == null }
+            if (missingUrl != null) {
+                return error(
+                    "dictionary ${missingUrl.tag} has no word URL from a headword on the CLI — " +
+                        "run '${missingUrl.aliases.first()} $w --search' to list entries, then --url <result> to parse a page"
+                )
+            }
             val lookups = selection.map { it.asLookup(::fetch) }
             val sources = selection.map { d -> CombSource(d.tag, d.wordUrl!!.invoke(w)) }
             val combined = MultiDict.fetch(lookups, sources, headword = w)
@@ -631,9 +628,6 @@ class Main {
             """.trimIndent()
         )
     }
-
-    /** Marks a registered dictionary as combining-capable (keepers of the 7). */
-    private fun Dict.withCombining(): Dict = copy(supportsCombining = true)
 
     private fun aliasesString(): String = dictionaries.joinToString(", ") { it.aliases.joinToString("/") + " (" + it.tag + ")" }
 

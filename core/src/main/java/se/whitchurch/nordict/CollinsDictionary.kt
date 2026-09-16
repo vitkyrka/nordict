@@ -11,8 +11,6 @@ abstract class CollinsDictionary(
 ) : Dictionary(client) {
     abstract val dictCode: String
 
-    override val supportsCombining: Boolean = true
-
     override fun get(uri: HttpUrl): Word? {
         if (uri.host != baseUrl.toHttpUrlOrNull()!!.host) {
             return null;

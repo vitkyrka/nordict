@@ -322,7 +322,7 @@ class ReplSessionTest {
     }
 
     @Test
-    fun combinedSelectionRejectsMixedSupportsAndLanguages() {
+    fun combinedSelectionRejectsMixedLanguages() {
         val r = runScript(
             driver(),
             """{"op":"setDict","tags":["DLE","LINGPT"]}""",
@@ -332,20 +332,42 @@ class ReplSessionTest {
             """{"op":"state"}"""
         )
 
-        // LINGPT/COLFREN are not combining-capable; SO is the same-language but
-        // legacy. Every mixed selection is rejected with a clear message.
+        // Every dictionary combines, but a selection must stay within one
+        // language: es+pt, es+sv, es+fr are all rejected with a clear message.
         assertThat(r[0].ok).isFalse()
-        assertThat(r[0].error).contains("does not support combining")
+        assertThat(r[0].error).contains("one language")
         assertThat(r[1].ok).isFalse()
-        assertThat(r[1].error).contains("does not support combining")
+        assertThat(r[1].error).contains("one language")
         assertThat(r[2].ok).isFalse()
-        assertThat(r[2].error).contains("does not support combining")
+        assertThat(r[2].error).contains("one language")
 
         // A failed selection leaves the previous selection intact.
         ok(r[3])
         assertThat(r[3].state?.dict).isEqualTo("DLE")
         ok(r[4])
         assertThat(r[4].state?.dict).isEqualTo("DLE")
+    }
+
+    @Test
+    fun combinedSelectionAcceptsFormerlyNonCombiningSameLanguageDicts() {
+        val r = runScript(
+            driver(),
+            """{"op":"setDict","tags":["ROB","WFR"]}""",
+            """{"op":"state"}""",
+            """{"op":"setDict","tags":["DIDAC","CA-ES"]}""",
+            """{"op":"state"}"""
+        )
+
+        // French ROB+WFR (both previously single-dict-only) and Catalan
+        // DIDAC+CA-ES combine at the selection layer.
+        assertThat(r[0].ok).isTrue()
+        assertThat(r[0].state?.dict).isEqualTo("ROB,WFR")
+        ok(r[1])
+        assertThat(r[1].state?.dict).isEqualTo("ROB,WFR")
+        assertThat(r[2].ok).isTrue()
+        assertThat(r[2].state?.dict).isEqualTo("DIDAC,CA-ES")
+        ok(r[3])
+        assertThat(r[3].state?.dict).isEqualTo("DIDAC,CA-ES")
     }
 
     @Test

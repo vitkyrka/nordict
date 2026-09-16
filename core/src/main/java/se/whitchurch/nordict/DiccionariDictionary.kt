@@ -26,7 +26,6 @@ abstract class DiccionariDictionary(
 ) : Dictionary(client) {
     override val flagCode: String = "ca"
     override val lang: String = "ca"
-    override val supportsCombining: Boolean = true
 
     private fun fetchJson(requestUrl: String): String {
         val request = Request.Builder().url(requestUrl)

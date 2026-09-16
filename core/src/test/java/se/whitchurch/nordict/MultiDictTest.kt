@@ -65,8 +65,9 @@ class MultiDictTest {
 
     private fun lookups() = listOf(dle, est)
 
-    /** A legacy (non-combining) dictionary with a different language. */
-    private class FakeLegacy(client: OkHttpClient) : Dictionary(client) {
+    /** A same-tag, different-language dictionary (a cross-language pair cannot
+     * combine). */
+    private class FakeForeign(client: OkHttpClient) : Dictionary(client) {
         override val tag = "SO"
         override val flagCode = "sedk"
         override val lang = "sv"
@@ -76,11 +77,12 @@ class MultiDictTest {
     }
 
     @Test
-    fun canCombineAcceptsSameLanguageCombiningSelection() {
+    fun canCombineAcceptsOnlySameLanguageMultiDictionarySelections() {
         assertThat(MultiDict.canCombine(lookups())).isTrue()
 
-        val legacy = FakeLegacy(okhttp3.OkHttpClient())
-        assertThat(MultiDict.canCombine(listOf(dle, legacy))).isFalse() // mixed support
+        val foreign = FakeForeign(okhttp3.OkHttpClient())
+        assertThat(MultiDict.canCombine(listOf(dle, foreign))).isFalse() // mixed languages
+        assertThat(MultiDict.canCombine(listOf(dle))).isFalse() // needs two dictionaries
         assertThat(MultiDict.canCombine(emptyList())).isFalse()
     }
 

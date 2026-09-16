@@ -490,8 +490,8 @@ raw JSON URL `https://svenska.se/api/article/so/<l_nr>`; `get()` also accepts
 a main-site URL with `?activeTab=so&q=<word>&id=<l_nr>` (the `id` query param
 or a trailing `/api/article/so/<id>` path segment is used). Homographs are
 separate article docs, so each `get()` returns exactly one `Word` with no
-`mHomonymEntries`/`__ref`; `supportsCombining=false`
-(`OrdbokenSelectionTest` asserts SO toggling is non-combining), and the CLI
+`mHomonymEntries`/`__ref` (the `MultiDict.entriesFor` fallback to
+`Word.homonymEntries(listOf(word))` covers this in combining), and the CLI
 registers it as search-first (`wordUrl = null`). `SoDictionary` gates the
 request on the base host (a foreign host → `null`).
 

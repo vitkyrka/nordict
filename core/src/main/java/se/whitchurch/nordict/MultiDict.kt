@@ -63,11 +63,13 @@ object MultiDict {
      */
     fun labelFor(dictionary: String, tag: String): String = dictionary.ifEmpty { tag }
 
-    /** True when [dicts] can combine: nonempty, every member combining-capable,
-     * one language. */
+    /**
+     * True when [dicts] can combine: at least two same-language dictionaries
+     * (every JSON-rendered dictionary of the app combines with its language's
+     * siblings). Everything else keeps single-dictionary behavior.
+     */
     fun canCombine(dicts: List<Dictionary>): Boolean =
-        dicts.isNotEmpty() && dicts.all { it.supportsCombining } &&
-            dicts.map { it.lang }.distinct().size == 1
+        dicts.size > 1 && dicts.map { it.lang }.distinct().size == 1
 
     private class MutableReadySearch(
         val title: String,

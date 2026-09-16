@@ -80,20 +80,17 @@ class Ordboken private constructor(
 
     fun langFlag(lang: String): Int = languageFlags[lang] ?: R.drawable.flag_se
 
-    fun dictTag(index: Int): String = dictionaries[index].tag
-
-    fun dictIndicesForLang(lang: String): List<Int> =
-        dictionaries.indices.filter { dictionaries[it].lang == lang }
-
     fun dictFlag(index: Int): Int = flags[index]
 
-    /** True when [lang] has at least one combining-capable dictionary. */
+    /** True when [lang] has at least one dictionary (so its chips combine). */
     fun hasCombiningForLang(lang: String): Boolean =
         combiningDictsForLang(lang).isNotEmpty()
 
-    /** [lang]'s combining-capable dictionaries, in registration order. */
+    /** The dictionaries that combine for [lang]: its whole set, in
+     * registration order (every dictionary combines with its language's
+     * siblings). */
     fun combiningDictsForLang(lang: String): List<Dictionary> =
-        dictionaries.filter { it.lang == lang && it.supportsCombining }
+        dictionaries.filter { it.lang == lang }
 
     // Caller does the commit
     val prefsEditor: SharedPreferences.Editor
@@ -302,8 +299,8 @@ class Ordboken private constructor(
 
     /**
      * Selects a multi-dictionary combination by tag. A single tag collapses
-     * to the normal single-dictionary state; several tags must all support
-     * combining and share one language ([MultiDict.canCombine]).
+     * to the normal single-dictionary state; several tags must share one
+     * language ([MultiDict.canCombine]).
      */
     fun setCurrentDictionaries(tags: List<String>): Boolean {
         if (tags.isEmpty()) return false
@@ -325,7 +322,7 @@ class Ordboken private constructor(
      * Toggles [tag] in/out of the active selection (the UI chip handler).
      * Toggling on appends (keeps the current order); toggling off removes.
      * The selection never becomes empty ([DictSelection.toggle] restores
-     * the language's first combining dict). Persists and notifies.
+     * the language's first dictionary). Persists and notifies.
      */
     fun toggleDictionary(tag: String): Boolean {
         val dict = dictByTag(tag) ?: return false
@@ -405,7 +402,7 @@ class Ordboken private constructor(
         if (raw.isBlank()) return emptyList()
         return raw.split(",").map { it.trim() }.filter { tag ->
             val dict = dictByTag(tag)
-            dict != null && dict.lang == lang && dict.supportsCombining
+            dict != null && dict.lang == lang
         }
     }
 
