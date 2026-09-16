@@ -57,8 +57,18 @@ abstract class DslDictionary(
             uri.host == siteBaseUrl.host && uri.pathSegments.lastOrNull() == "ordbog" ->
                 getMainSiteWord(uri)
 
-            uri.host == apiBaseUrl.host && uri.pathSegments.lastOrNull() == "query" ->
-                getApiWord(uri)
+            uri.pathSegments.lastOrNull() == "query" &&
+                (uri.host == apiBaseUrl.host || uri.host == siteBaseUrl.host) -> {
+                // SDO synonym hrefs resolve `query?q=...` against the word's
+                // page uri, which may be the main site; re-host onto the API
+                // base (idempotent when `uri` already is one).
+                val apiUri = if (uri.host == siteBaseUrl.host) {
+                    uri.newBuilder()?.host(apiBaseUrl.host)?.build() ?: uri
+                } else {
+                    uri
+                }
+                getApiWord(apiUri)
+            }
 
             else -> null
         }
@@ -78,8 +88,15 @@ abstract class DslDictionary(
 
         val page = fetch(newUri.toString())
 
-        return DdoParser.parse(page, newUri, tag, "${siteBaseUrl}/${shortName}/").firstOrNull()
+        return parsePage(page, newUri, "${siteBaseUrl}/${shortName}/").firstOrNull()
     }
+
+    /**
+     * Turns the raw fetched page into renderable `Word`s. The DDO and SDO
+     * layouts differ (div- vs span-based), so the subclasses pick their parser.
+     */
+    protected open fun parsePage(page: String, uri: HttpUrl, baseUrl: String): List<Word> =
+        DdoParser.parse(page, uri, tag, baseUrl)
 
     private fun getInflectedResults(query: String): List<SearchResult> {
         val results = ArrayList<SearchResult>()

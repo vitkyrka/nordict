@@ -489,12 +489,16 @@ JUnit), `DiccionariIntegrationTest` (`app`, Robolectric + MockWebServer).
 `DdoDictionary` (DDO, `dk`) and `SdoDictionary` (SDO, `se`/`sedk`) share
 `DslDictionary` (`:core`), parameterized with `apiBaseUrl` (default
 `https://ws.dsl.dk`) and `siteBaseUrl` (default `https://ordnet.dk`), so one
-MockWebServer can serve both hosts in tests (`DdoIntegrationTest`).
-`search()` hits the API's `getInflectedResults` (`/<short>/query`) plus the
+MockWebServer can serve both hosts in tests (`DdoIntegrationTest`,
+`SdoIntegrationTest`). `DslDictionary.get()` routes on host *and* last path
+segment (`ordbog` → main-site article, `query` → API page) and re-hosts a
+site-hosted `query` URL onto the `apiBaseUrl` (SDO synonym hrefs resolve
+`query?q=...` against the word's page uri, which may be the main site); a
+`parsePage` hook lets each subclass pick its parser. `search()` hits the API's
+`getInflectedResults` (`/<short>/query`) plus the
 `/<short>/livesearch` autocomplete JSON (a plain array of headword strings,
-decoded by `DdoParser.parseSearch` — shared with the CLI); `get()` routes on
-host *and* last path segment (`ordbog` → main-site article, `query` → API
-page) and resolves homographs from the API page's `.short-result ul li a`.
+decoded by `DdoParser.parseSearch` — shared with the CLI) and resolves
+homographs from the API page's `.short-result ul li a`.
 
 `DdoParser.parse` reads one `div.artikel` per page and returns JSON-rendered
 `Word`s:
@@ -523,12 +527,41 @@ page) and resolves homographs from the API page's `.short-result ul li a`.
 - Stand-alone idiom pages (e.g. "klappe hesten") with no numbered-sense
   containers fall back to parsing the `artikel` itself.
 
-Tests: `DdoParserTest` (golden via `Goldens.assertGolden`) +
-`DdoIntegrationTest` (MockWebServer, plain JUnit), fixtures
-`testdata/ddo/arbejde.{html,json}` (a real archived ordnet.dk page) and
-`testdata/ddo-search.json` / `testdata/ddo-query.html` (the API's livesearch
-JSON and the `/<short>/query` page). CLI: `ddo arbejde --search` / offline
-`--dict ddo --file ../testdata/ddo/arbejde.html --url <entry uri>`.
+The SDO layout is **span-based**, not div-based, so SDO got its own parser;
+`SdoDictionary.parsePage` delegates to `SdoParser.parse`. It reads one
+`span.artikel` per homograph (checked for `.iddel .match` headwords, several
+articles become `mHomonymEntry`-linked words):
+
+- **Header**: `span.match` ownText (drops the `.homnr` homograph number) is
+  the headword; `span.lemklas` is the POS label ("sb.", "vb.", "adj.",
+  "adv.", "konj.", "pron.", "præp.") mapped to `Pos`; `span.bøjdel
+  .bøjning .txt` → `conjugation` ("-" and "=" are the headword stem,
+  "-r, -de, -t" → "skaffar, skaffade, skaffat"); `span.fondel .fon`
+  variants → `pronunciation` (joined with " / "). No audio markup in SDO.
+- **Definitions**: each `span.semdel` container's `.semem` numbered senses
+  (`.betnr`) plus their `.subsem` sub-senses (`.subbetnr`, usually flat
+  siblings or nested in the parent), numbered "<parent>.<letter>". The gloss
+  is the `.denbet` text with the `.spec` marker strip and `.tryk` stress mark
+  dropped. A `.spec` block maps `.fag` → `domain`, `.valør`/`.kron`/
+  `.semspec` → `register`, `.geo` → `geo`. Each sense's direct `.rel`
+  children become examples: the Swedish `.txt1` plus the Danish `.txt`
+  rendition joined with " — ".
+- **Idioms**: each `span.sulesem` (`span.txt2` phrase, `.tryk` dropped) whose
+  `.sulesemdel` senses become one `Word.Idiom` per `.semem`/`.subsem` — the
+  same fixed expression repeating with `a`/`b` sense numbers, mirroring DDO's
+  sub-sense-idiom behavior. Registers (e.g. "dagl.", "bibelsk") attach here.
+- **Synonyms**: `span.onym` `.syn`/`.ordfelt .txt1` links attach to the
+  nearest preceding definition (`.onym` inside an idiom body is dropped);
+  relative `query?q=...`/`?entry_id=...` hrefs resolve against the page uri.
+
+Tests: `DdoParserTest`/`SdoParserTest` (golden via `Goldens.assertGolden`) +
+`DdoIntegrationTest`/`SdoIntegrationTest` (MockWebServer, plain JUnit),
+fixtures `testdata/ddo/arbejde.{html,json}` (a real archived ordnet.dk page)
+and `testdata/sdo/skaffa.{html,json}`/`testdata/sdo/hus.{html,json}` (the
+ws.dsl.dk `<span class="artikel">` API layout) plus `testdata/ddo-search.json`/
+`testdata/ddo-query.html`/`testdata/sdo-search.json`. CLI: `ddo arbejde
+--search` / `sdo hus --search`; offline `--dict ddo|sdo --file
+../testdata/<dict>/<word>.html --url <entry uri>`.
 
 ## Le Robert (ROB, French)
 

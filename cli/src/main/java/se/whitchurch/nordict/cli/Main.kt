@@ -16,6 +16,7 @@ import se.whitchurch.nordict.InfopediaParser
 import se.whitchurch.nordict.LeRobertParser
 import se.whitchurch.nordict.LingueeParser
 import se.whitchurch.nordict.SearchResult
+import se.whitchurch.nordict.SdoParser
 import se.whitchurch.nordict.SoParser
 import se.whitchurch.nordict.Wiktionary
 import se.whitchurch.nordict.WiktionaryParser
@@ -270,7 +271,7 @@ class Main {
             lang = "se",
             wordUrl = null,
             searchUrl = { query -> dslLiveSearch("sdo", query) },
-            parse = { page, uri -> DdoParser.parse(page, uri, "SDO", "https://ordnet.dk/sdo/") },
+            parse = { page, uri -> SdoParser.parse(page, uri, "SDO", "https://ordnet.dk/sdo/") },
             searchResults = { body -> dslSearchResults(body, "sdo") }
         ),
         Dict(
