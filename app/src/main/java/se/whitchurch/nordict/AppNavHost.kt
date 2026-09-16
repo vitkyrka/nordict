@@ -185,9 +185,7 @@ fun NordictApp(
             textFieldState = textFieldState,
             searchBarState = searchBarState,
             onSearch = { runSearch(it) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth(),
             placeholder = { Text(context.getString(R.string.search_hint)) },
             leadingIcon = {
                 Icon(

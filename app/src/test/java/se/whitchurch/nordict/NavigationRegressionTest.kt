@@ -18,12 +18,14 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
@@ -663,6 +665,41 @@ class NavigationRegressionTest {
                 AnnotatedString("")
             )
         )
+    }
+
+    @Test
+    fun collapsedSearchBarMatchesTheMaterial3Geometry() {
+        awaitNav()
+
+        // The collapsed global bar is the full-width M3 search bar: the field
+        // spans the bar edge to edge, and the bar's own 8dp vertical breathing
+        // room is the only space above the next row. The pre-1.4 `SearchBar`
+        // modifier padding that used to be reapplied onto the InputField broke
+        // both: it shrank the field (12.dp each side) and inflated the pill
+        // (+8.dp), stealing 16.dp more vertical space from the dictionary row
+        // and content below. Robolectric's font metrics make the field taller
+        // than the spec 56dp here, so we assert layout geometry (the field
+        // fills the pill, the bar adds exactly its own 8dp), not absolute dp.
+        val field = composeRule.onAllNodes(hasSetTextAction())[0].fetchSemanticsNode()
+        val rootWidth = composeRule.onRoot().fetchSemanticsNode().size.width
+        val tolerancePx = with(composeRule.density) { 2.dp.roundToPx() }
+        val verticalPaddingPx = with(composeRule.density) { 8.dp.roundToPx() }
+
+        // The field spans the whole bar, so its content isn't pushed in from
+        // the edges (a re-added side padding shrinks it below the screen).
+        assertThat(field.size.width).isAtLeast(rootWidth - tolerancePx)
+
+        // The dictionary nav row below the bar starts exactly one M3 vertical
+        // padding (8.dp) below the field's bottom — i.e. the pill holds only
+        // the field with no extra internal vertical padding.
+        val navTop = composeRule
+            .onNodeWithContentDescription(ordboken().currentLang)
+            .fetchSemanticsNode()
+            .boundsInRoot
+            .top
+        val gapToNav = navTop - (field.boundsInRoot.top + field.size.height)
+        assertThat(Math.abs(gapToNav - verticalPaddingPx).toDouble())
+            .isAtMost(tolerancePx.toDouble())
     }
 
     // ---------- Zoom persistence (regression: the Compose conversion moved the
