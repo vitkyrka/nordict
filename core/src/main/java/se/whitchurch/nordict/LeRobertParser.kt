@@ -10,9 +10,14 @@ class LeRobertParser {
 
         /**
          * LeRobert `/autocomplete.json` search responses: a JSON array of
-         * `{display, page}` objects where `display` carries HTML markup and
-         * `page` is a relative path like `/definition/table`. The conjugation
-         * view (`/conjugaison/...`) is rewritten to the definition view.
+         * `{display, page, type}` objects where `display` carries HTML markup,
+         * `page` is a relative path like `/definition/table`, and `type` marks
+         * the view (`def`, `conj`, `syn`). Only `def` entries are kept as
+         * search results: the conjugation (`/conjugaison/...`) and synonyms
+         * (`/synonymes/...`) views can't be rendered by `get()` and the
+         * synonyms view repeats the same `display` as its matching definition,
+         * so keeping them would make the headword ambiguous for an exact match
+         * (two "table" results: one `/definition/table`, one `/synonymes/table`).
          */
         fun parseSearch(body: String, uriOf: (page: String) -> HttpUrl): List<SearchResult> {
             val results = ArrayList<SearchResult>()
@@ -22,14 +27,15 @@ class LeRobertParser {
                 array.asJsonArray.forEach { element ->
                     if (!element.isJsonObject) return@forEach
                     val item = element.asJsonObject
+                    val type = item["type"]?.takeIf { it.isJsonPrimitive }?.asString
+                    if (type != "def") return@forEach
                     val display = item["display"]?.takeIf { it.isJsonPrimitive }?.asString
                         ?: return@forEach
                     val page = item["page"]?.takeIf { it.isJsonPrimitive }?.asString
                         ?: return@forEach
                     val title = Jsoup.parse(display).text()
                     if (title.isEmpty()) return@forEach
-                    val rewritten = page.replace("/conjugaison/", "/definition/")
-                    results.add(SearchResult(title, uriOf(rewritten)))
+                    results.add(SearchResult(title, uriOf(page)))
                 }
             } catch (_: Exception) {
             }

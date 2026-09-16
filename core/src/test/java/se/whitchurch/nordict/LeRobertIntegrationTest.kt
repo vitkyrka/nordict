@@ -34,12 +34,18 @@ class LeRobertIntegrationTest {
 
         val results = dictionary.search("table")
 
-        assertThat(results).hasSize(5)
+        // Only definition entries are returned: the conjugation and synonyms
+        // views are dropped, so the headword resolves to a unique exact match.
+        assertThat(results).hasSize(4)
         assertThat(results[0].mTitle).isEqualTo("table")
         // Search results stay on the same host (the MockWebServer).
         assertThat(results[0].uri.toString()).contains("/definition/table")
-        // Conjugaison results are rewritten to the definition view.
-        assertThat(results[1].uri.toString()).contains("/definition/tabler")
+        assertThat(results.any { it.uri.toString().contains("/synonymes/") }).isFalse()
+        assertThat(results.any { it.uri.toString().contains("/conjugaison/") }).isFalse()
+
+        val exact = ExactMatch.resolve("table", results)
+        assertThat(exact).isNotNull()
+        assertThat(exact!!.uri.toString()).contains("/definition/table")
 
         val request = server.takeRequest()
         assertThat(request.path).contains("/autocomplete.json?q=table")

@@ -60,14 +60,22 @@ class LeRobertParserTest {
             httpUrl("https://dictionnaire.lerobert.com$page")
         }
 
-        assertThat(results).hasSize(5)
+        // Only "def" entries survive; the conjugation and (duplicate) synonyms
+        // views are dropped.
+        assertThat(results).hasSize(4)
         assertThat(results[0].mTitle).isEqualTo("table")
         assertThat(results[0].uri.toString())
             .isEqualTo("https://dictionnaire.lerobert.com/definition/table")
-        // conjugaison/tabler is rewritten to definition/tabler
-        assertThat(results[1].uri.toString())
-            .isEqualTo("https://dictionnaire.lerobert.com/definition/tabler")
-        assertThat(results[2].mTitle).isEqualTo("tableau")
+        assertThat(results[1].mTitle).isEqualTo("tableau")
+        assertThat(results.any { it.uri.toString().contains("/synonymes/") }).isFalse()
+        assertThat(results.any { it.uri.toString().contains("/conjugaison/") }).isFalse()
+
+        // The synonyms view repeated the "table" display, which made the exact
+        // match ambiguous; only the definition entry remains.
+        val exact = ExactMatch.resolve("table", results)
+        assertThat(exact).isNotNull()
+        assertThat(exact!!.uri.toString())
+            .isEqualTo("https://dictionnaire.lerobert.com/definition/table")
     }
 
     @Test
