@@ -55,6 +55,7 @@ import com.google.android.exoplayer2.ExoPlayer
 import com.google.android.exoplayer2.MediaItem
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
@@ -121,6 +122,17 @@ class WordViewModel(
     // listens to; the pinned (JSON) WebView feeds it through webViewScrolled,
     // while legacy words scroll the outer Compose column past it directly.
     var bottomBarScrollBehavior: BottomAppBarScrollBehavior? = null
+
+    /**
+     * The scroll offset a user left this word at, kept across a covered
+     * destination so popping back can restore it. JSON words scroll inside the
+     * pinned WebView ([captureScroll] reads `WebView.getScrollY`), legacy words
+     * in the outer Compose column (the caller hands its [ScrollState] value).
+     * Captured when the destination pauses and when its composition is torn
+     * down (both fire when another word is pushed over it), re-applied once the
+     * page is rendered again.
+     */
+    var savedScrollY: Int = 0
 
     /** True once [mWord] has been rendered into the current WebView (used by
      * tests to observe that a re-created WebView reloaded its page). */
@@ -223,6 +235,25 @@ class WordViewModel(
         ed.commit()
     }
 
+    /** Records the word's current scroll offset so a back-navigation can put
+     * the page back where the user left it. A covered destination is torn down
+     * (and its WebView re-created fresh), so without this the scroll silently
+     * resets to the top when the word is re-entered. */
+    fun captureScroll(composeScrollY: Int) {
+        savedScrollY = if (pinToViewport) webView?.scrollY ?: 0 else composeScrollY
+    }
+
+    /** Re-applies [savedScrollY] to a freshly loaded pinned WebView (JSON words
+     * scroll inside the viewport WebView, so the Compose column cannot do it).
+     * Called from `onPageFinished`, once the rendered content actually has a
+     * scrollable extent. */
+    fun restoreWebViewScroll() {
+        if (pinToViewport && savedScrollY > 0) {
+            val view = webView ?: return
+            view.post { view.scrollTo(0, savedScrollY) }
+        }
+    }
+
     /**
      * Renders [mWord] into the current WebView unless it is already showing it.
      * Called whenever the word or the WebView instance changes: a freshly
@@ -320,6 +351,7 @@ class WordViewModel(
                 }
 
                 pageFinished = true
+                restoreWebViewScroll()
             }
         }
 
@@ -602,12 +634,36 @@ fun WordScreen(
     val bottomBarScrollBehavior = BottomAppBarDefaults.exitAlwaysScrollBehavior()
     vm.bottomBarScrollBehavior = bottomBarScrollBehavior
 
+    // The legacy words' outer scroll position; JSON words scroll inside the
+    // pinned WebView instead (the verticalScroll below is disabled for them).
+    // Hoisted out of the BoxWithConstraints so the lifecycle effect can capture
+    // the offset on pause/dispose and the restore effect can put it back after
+    // the page re-renders.
+    val scrollState = rememberScrollState()
+
     // Load the word page as soon as the fetch lands. The AndroidView factory
     // can run before the coroutine finishes, so a fast fetch (or a retry)
     // re-triggers this load after the WebView exists. Also keyed on the
     // WebView instance so a fresh WebView created after the destination was
     // pushed over by another word re-renders the already-fetched word.
     LaunchedEffect(word, vm.webView) { vm.maybeLoadWord() }
+
+    // A legacy word's page loads asynchronously into the WebView, so when this
+    // destination is re-entered after being covered the scrollable's max extent
+    // starts at 0 and clamps a restored offset to it. Once the page finishes and
+    // reports its laid-out height, put the column back where the user left it
+    // (JSON words are restored by the WebView itself in restoreWebViewScroll).
+    LaunchedEffect(vm.pageFinished, vm.pinToViewport) {
+        if (vm.pageFinished && !vm.pinToViewport && vm.savedScrollY > 0 &&
+            scrollState.value != vm.savedScrollY
+        ) {
+            repeat(50) {
+                scrollState.scrollTo(vm.savedScrollY)
+                if (scrollState.value == vm.savedScrollY) return@LaunchedEffect
+                delay(50)
+            }
+        }
+    }
 
     // Restore Ordboken state + the cross-dictionary hook on resume, matching
     // the old WordActivity.onResume/onPause duties. The hook is installed at
@@ -635,6 +691,7 @@ fun WordScreen(
                     // dictionary tap during the transition to the next word
                     // destination must still reach this (or the next) view.
                     vm.onLeave()
+                    vm.captureScroll(scrollState.value)
                 }
                 else -> Unit
             }
@@ -643,6 +700,11 @@ fun WordScreen(
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
             if (ordboken.onDictChanged === myHook) ordboken.onDictChanged = null
+            // Defensive complement to the pause capture: a covered destination
+            // is disposed right around the ON_PAUSE event, and the WebView (and
+            // its scroll) survives untouched until the re-created one replaces
+            // it, so the last offset is still readable here.
+            vm.captureScroll(scrollState.value)
         }
     }
 
@@ -653,7 +715,6 @@ fun WordScreen(
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val maxH = maxHeight
-            val scrollState = rememberScrollState()
 
             Column(
                 modifier = Modifier

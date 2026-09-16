@@ -810,4 +810,78 @@ class NavigationRegressionTest {
         composeRule.activityRule.scenario.moveToState(Lifecycle.State.DESTROYED)
         assertThat(ordboken().mPrefs.getInt("scale", -1)).isEqualTo(0)
     }
+
+    // ---------- Scroll-position persistence (a covered word destination is
+    // torn down and its WebView re-created, resetting both the pinned JSON
+    // WebView's internal scroll and the legacy outer Compose column; the
+    // ViewModel must remember the offset and restore it on the re-render) ----------
+
+    /** A detached [WebView] pre-scrolled to [scrollY], standing in for a
+     * user-scrolled page: Robolectric's `View.scrollTo` updates the real
+     * `mScrollY`, so `getScrollY()` reports what it was told. */
+    private fun scrolledWebView(scrollY: Int): WebView =
+        WebView(composeRule.activity).also { it.scrollTo(0, scrollY) }
+
+    @Test
+    fun jsonWordScrollPositionSurvivesAnotherWordCoveringItAndBack() {
+        awaitNav()
+
+        // Word A scrolls inside its pinned WebView (JSON words). Push word B
+        // over it — the bug's "navigate to a different word" — then pop B: the
+        // re-created WebView must come back at A's saved offset, not the top.
+        est.enqueue(MockResponse().setBody(estFrente()))
+        openWord(est, "/frente")
+        val a = topWordViewModel()!!
+        onMain { a.webView = scrolledWebView(800) }
+        val frente = est.url("/frente").toString()
+
+        est.enqueue(MockResponse().setBody(estMuerte()))
+        openWord(est, "/muerte")
+
+        // Word A must have recorded its scroll offset as B covered it (the
+        // destination's ON_PAUSE or its disposal, whichever runs first).
+        awaitCondition(message = "word A remembers its scroll while covered") {
+            a.savedScrollY == 800
+        }
+
+        // Back to A: the same restoreWebViewScroll the page-finish listener
+        // runs must scroll the freshly re-created WebView back down.
+        onMain { composeRule.activity.navController?.popBackStack() }
+        awaitCondition(message = "back restores word A's display") {
+            val vm = topWordViewModel()
+            vm != null && vm.webView != null &&
+                ordboken().currentWord?.uri?.toString() == frente
+        }
+        onMain { topWordViewModel()?.restoreWebViewScroll() }
+        awaitCondition(message = "the re-created WebView is scrolled back down") {
+            topWordViewModel()?.webView?.scrollY == 800
+        }
+    }
+
+    @Test
+    fun jsonWordScrollCaptureReadsThePinnedWebView() {
+        awaitNav()
+        est.enqueue(MockResponse().setBody(estFrente()))
+        openWord(est, "/frente")
+        val vm = topWordViewModel()!!
+        assertThat(vm.pinToViewport).isTrue()
+        onMain { vm.webView = scrolledWebView(700) }
+        // The Compose column is disabled for a JSON word, so its (zero)
+        // position must not win over the WebView's real scroll.
+        onMain { vm.captureScroll(0) }
+        assertThat(vm.savedScrollY).isEqualTo(700)
+    }
+
+    @Test
+    fun legacyWordScrollCaptureReadsTheComposeColumn() {
+        awaitNav()
+        est.enqueue(MockResponse().setBody(estFrente()))
+        openWord(est, "/frente")
+        val vm = topWordViewModel()!!
+        // A legacy word scrolls the outer Compose column (not the WebView), so
+        // the capture must take the caller's column position over the WebView.
+        onMain { vm.pinToViewport = false }
+        onMain { vm.captureScroll(400) }
+        assertThat(vm.savedScrollY).isEqualTo(400)
+    }
 }
