@@ -10,6 +10,7 @@ Usage:
     uv run tools/download.py COLSPAN otro
     uv run tools/download.py didac cap
     uv run tools/download.py didac cap1 --url   # single entry page
+    uv run tools/download.py infopedia mesa
 
 Downloads https://www.rae.es/diccionario-estudiante/otro (EST),
 https://dle.rae.es/otro (DLE),
@@ -19,6 +20,8 @@ the search view embeds every matching entry inline) and writes the raw page
 (the same HTML the app fetches via OkHttp) to testdata/<tag>/<word>.html.
 LINGPT word pages are
 https://www.linguee.pt/portugues-ingles/traducao/<word> (served latin-1).
+INFOPEDIA word pages are
+https://www.infopedia.pt/dicionarios/lingua-portuguesa/<word>.
 
 DIDAC has no "<base>/<word>" entry URL — headwords are served from the search
 view, and homographs get numbered entry URLs like /didac/cap1. Pass `--url`
@@ -49,6 +52,7 @@ DICTIONARIES = {
     "COLFREN": "https://www.collinsdictionary.com/dictionary/french-english",
     "DIDAC": "https://www.diccionari.cat/cerca/didac",
     "LINGPT": "https://www.linguee.pt/portugues-ingles/traducao",
+    "INFOPEDIA": "https://www.infopedia.pt/dicionarios/lingua-portuguesa",
 }
 
 # Dictionaries that still serve latin-1 (ISO-8859-15) pages; the captured

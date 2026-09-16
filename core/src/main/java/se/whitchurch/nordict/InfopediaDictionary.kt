@@ -5,22 +5,24 @@ import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 
-class InfopediaDictionary(client: OkHttpClient) : Dictionary(client) {
+class InfopediaDictionary(
+    client: OkHttpClient,
+    private val baseUrl: String = "https://www.infopedia.pt"
+) : Dictionary(client) {
     override val tag: String = "INFOPEDIA"
     override val flagCode: String = "pt"
     override val lang: String = "pt"
 
     override fun search(query: String): List<SearchResult> {
-        val uri = HttpUrl.Builder()
-            .scheme("https")
-            .host("www.infopedia.pt")
+        val base = baseUrl.toHttpUrlOrNull()!!
+        val uri = base.newBuilder()!!
             .addPathSegments("dicionarios/lingua-portuguesa/sugestao-pesquisa")
             .addPathSegment(query)
             .build()
 
         val page = fetch(uri.toString())
         if (page.isEmpty()) {
-            return ArrayList();
+            return ArrayList()
         }
 
         val html = try {
@@ -29,20 +31,26 @@ class InfopediaDictionary(client: OkHttpClient) : Dictionary(client) {
             null
         } ?: return ArrayList()
 
-        return InfopediaParser.parseSearch(html)
+        return InfopediaParser.parseSearch(html) { title ->
+            base.newBuilder()!!
+                .addPathSegments("dicionarios/lingua-portuguesa")
+                .addPathSegment(title)
+                .build()
+        }
     }
 
     override fun fullSearch(query: String): List<SearchResult> = search(query)
 
     override fun get(uri: HttpUrl): Word? {
-        if (uri.host != "www.infopedia.pt") {
+        if (uri.host != baseUrl.toHttpUrlOrNull()!!.host) {
             return null
         }
 
         val newUri = uri.withoutRefParam()
         val page = fetch(newUri.toString())
+        val finalBaseUrl = if (baseUrl.endsWith("/")) baseUrl else "$baseUrl/"
 
-        val words = InfopediaParser.parse(page, newUri, tag)
+        val words = InfopediaParser.parse(page, newUri, tag, finalBaseUrl)
         if (words.isEmpty()) return null
 
         val ref = uri.queryParameter(REFPARAM) ?: return words[0]

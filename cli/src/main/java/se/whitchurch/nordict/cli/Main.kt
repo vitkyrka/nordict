@@ -164,7 +164,7 @@ class Main {
         } catch (e: Exception) {
             null
         } ?: return emptyList()
-        return InfopediaParser.parseSearch(html)
+        return InfopediaParser.parseSearch(html) { title -> infopediaUrl(title) }
     }
 
     private val lingueeBase = "https://www.linguee.pt/".toHttpUrlOrNull()!!

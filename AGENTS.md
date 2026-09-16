@@ -286,7 +286,7 @@ JUnit against a MockWebServer (no Robolectric, no Android):
 
 The parser tests (`DleParserTest`, `EstParserTest`, `CollinsParserTest`,
 `ColfrenParserTest`, `LeRobertParserTest`, `LingueeParserTest`,
-`WiktionaryParserTest`) all run in
+`InfopediaParserTest`, `WiktionaryParserTest`) all run in
 `:core` as plain JUnit
 and read fixtures relatively as `../testdata/...` (working dir `core/`).
 App-side integration tests spin up a MockWebServer serving
@@ -305,6 +305,7 @@ UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.CollinsParse
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.ColfrenParserTest'
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.LeRobertParserTest'
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.LingueeParserTest'
+UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.InfopediaParserTest'
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.WiktionaryParserTest'
 ```
 
@@ -543,6 +544,58 @@ and `testdata/lingpt-search.json` (latin-1). `tools/download.py` supports
 `LINGPT` (`https://www.linguee.pt/portugues-ingles/traducao/<word>`) and
 writes the fixture back in latin-1.
 
+## Infopédia (INFOPEDIA, Portuguese)
+
+`InfopediaDictionary` (`:core`) is baseUrl-parameterized (default
+`https://www.infopedia.pt`, tests use a MockWebServer). `search()` hits the
+`sugestao-pesquisa/<query>` autocomplete endpoint — which returns JSON
+`{"html": "<li title=\"…\">…"}` — unwraps the `html` field and delegates to
+`InfopediaParser.parseSearch(body) { title -> … }`, where each `<li title>`
+is the headword that becomes the result's word-page URL
+(`/dicionarios/lingua-portuguesa/<title>`). `get(uri)` fetches that page and
+resolves the `__ref` homographs like the other JSON dictionaries. The live
+site serves a Cloudflare JS challenge to datacenter IPs, so capture fixtures
+from the `.pt` web archive (arquivo.pt) and strip the `/wayback/<ts><flag>_/`
+URL prefixes, `<base>`, and Insert scripts back to live-site form.
+
+`InfopediaParser.parse` isolates the single `.dolEntradaVverbete` article
+(the browsable `testdata/infopedia/mesa.html` fixture is `mesa` — 12 senses,
+8 locuções) and emits one `renderAsJson` `Word`:
+
+- **Header**: `h1.dolEntrinfoEntrada` headword; pronunciation is the
+  `.dolSilab` syllabification (me.sa) + `.dolRegfonFonet` transcription (ˈmezɐ)
+  + the `.dolEntrinfoOrtoep` orthoepy note (/ê/), space-joined. Audio comes from
+  `audio.audio-player-word-tts` (the word's TTS clip, e.g.
+  `/dicionarios/lingua-portuguesa/tts/word/mesa?homografia=0`).
+- **Etymology**: `.dolVverbeteEtim` text after the `.dolVverbeteEtim-corpo`
+  descendant with the leading "Etimologia:" label stripped (mesa: "Do latim
+  mensa-, «idem»"). This section and the `.dolRelacoes` boxes sit *after* the
+  article, so they're read at the document level.
+- **Definitions**: each `.dolDivisaoCatgram` POS group (`.dolCatgramTbcat`
+  label, e.g. "nome feminino") whose `.dolAcepsRow` senses become
+  `Word.Definition`s: `senseNumber` from `.dolAcepsNum`, `domain`/`register`/
+  `geo` from the `.dolSubacepTbdom`/`.dolSubacepTbreg`/`.dolSubacepTbvar`
+  markers, and the gloss from the joined `.dolSubacepTraduz .dolTraduzTrad`
+  translations (alternative translations of one sense become a comma-joined
+  gloss, e.g. "alimentação, comida, passadio"), with `.dolAcepsExplica` /
+  `.dolSubacepContex` notes folded in front. `genderOf` maps "…feminino"/
+  "…masculino" → `Genders.FEMININE`/`MASCULINE`.
+- **Locuções**: inside `.dolVverbeteLexeger`, each `.dolLexegerExeger` heads
+  one `Word.Idiom` (`.dolExegerLexpress` headword, `.dolExegerTbdom`/
+  `.dolExegerTbreg` markers) whose senses are the rows of the *sibling*
+  `.dolTable` — the two element types strictly alternate (E-T-E-T-…).
+- **Synonyms/antonyms**: the page's `.dolRelacoes` boxes labelled *sinónimos*
+  / *antónimos* (current pages mark the former with
+  `#relacoesSinonimosContainer`; older pages use a `.title` heading like
+  "SINÓNIMOS") attach to the first definition — synonyms as linked
+  `Word.Synonym`s (hrefs resolved to absolute `/dicionarios/lingua-portuguesa/`
+  URLs), antonyms as plain strings. Ellipsis "see-more" anchors are skipped.
+
+Tests: `InfopediaParserTest` + `InfopediaIntegrationTest` (both `:core`, plain
+JUnit goldens + MockWebServer), fixtures `testdata/infopedia/mesa.{html,json}`
+and `testdata/infopedia-search.json`. `tools/download.py` supports `INFOPEDIA`
+(`https://www.infopedia.pt/dicionarios/lingua-portuguesa/<word>`).
+
 ## Wiktionary (WFR, French)
 
 `Wiktionary` (`:core`) is the abstract base class for Wiktionary language
@@ -586,7 +639,7 @@ CLI: `wfr table` / `wfr table --search` (or `--dict wfr --file …` offline).
 Legacy dictionaries (those with `renderAsJson = false`) keep original source
 HTML and don't feed the shared JSON rendering pipeline. To convert one to the
 modern schema (targets: `EstParser`, `CollinsParser`, `DleParser`,
-`LeRobertParser`, `LingueeParser`, `WiktionaryParser`):
+`LeRobertParser`, `LingueeParser`, `InfopediaParser`, `WiktionaryParser`):
 
 1. **Rewrite the parser** to return `Word`s with `renderAsJson = true`:
    - Build a companion `parseSearch(body, uriOf)` so search decoding is shared
@@ -631,7 +684,7 @@ modern schema (targets: `EstParser`, `CollinsParser`, `DleParser`,
   The shared `:core` tests — `DleParserTest`, `EstParserTest`,
   `CollinsParserTest`, `DiccionariParserTest`, `LeRobertParserTest`,
   `LingueeParserTest`, `WiktionaryParserTest`, and the moved
-  `{Est,Dle,Collins,Didac,Diccionari,LeRobert,Linguee,Wiktionary}IntegrationTest` suites
+  `{Est,Dle,Collins,Didac,Diccionari,LeRobert,Linguee,Infopedia,Wiktionary}IntegrationTest` suites
   (MockWebServer) — are plain JUnit and run on a desktop JVM.
 - `Word` fields are read by `renderer.js` by exact JSON name; renaming fields
   in `Word.kt` requires updating the golden-schema data classes in
