@@ -101,12 +101,15 @@ class Main {
         "https://$short.m.wiktionary.org/wiki/$word".toHttpUrlOrNull()!!
 
     private fun soAutocomplete(query: String): HttpUrl =
-        "https://svenska.se/wp-admin/admin-ajax.php"
+        "https://svenska.se/api/autocomplete"
             .toHttpUrlOrNull()!!
             .newBuilder()
-            .addQueryParameter("action", "tri_autocomplete")
-            .addQueryParameter("term", query)
+            .addQueryParameter("q", query)
+            .addQueryParameter("size", "10")
             .build()
+
+    private fun soArticleUrl(id: String): HttpUrl =
+        "https://svenska.se/api/article/so/$id".toHttpUrlOrNull()!!
 
     private fun dslLiveSearch(short: String, query: String): HttpUrl =
         "https://ws.dsl.dk/$short/livesearch"
@@ -126,23 +129,6 @@ class Main {
             .build()
 
     // ---- search-response decoders (mirror each Dictionary.search) ----
-
-    private fun soSearchResults(body: String): List<SearchResult> {
-        val results = ArrayList<SearchResult>()
-        val words = try {
-            JsonParser.parseString(body).asJsonArray
-        } catch (e: Exception) {
-            return results
-        }
-        for (el in words) {
-            if (!el.isJsonObject) continue
-            val obj = el.asJsonObject
-            val label = obj.get("label")?.takeIf { it.isJsonPrimitive }?.asString ?: continue
-            val link = obj.get("link")?.takeIf { it.isJsonPrimitive }?.asString ?: continue
-            ("https://svenska.se/$link").toHttpUrlOrNull()?.let { results.add(SearchResult(label, it)) }
-        }
-        return results
-    }
 
     private fun dslSearchResults(body: String, short: String): List<SearchResult> =
         DdoParser.parseSearch(body) { word -> dslEntryUri(short, word) }
@@ -262,8 +248,8 @@ class Main {
             lang = "se",
             wordUrl = null,
             searchUrl = { query -> soAutocomplete(query) },
-            parse = { page, _ -> SoParser.parse(page, "SO") },
-            searchResults = { body -> soSearchResults(body) }
+            parse = { page, uri -> SoParser.parse(page, uri, "SO", "https://svenska.se") },
+            searchResults = { body -> SoParser.parseSearch(body) { id -> soArticleUrl(id) } }
         ),
         Dict(
             aliases = listOf("sdo"),
@@ -432,7 +418,11 @@ class Main {
         }
 
         try {
-            val w = word ?: fallbackWord(filePath!!)
+            val w = word ?: when {
+                filePath != null -> fallbackWord(filePath)
+                url != null -> url.pathSegments.lastOrNull() ?: ""
+                else -> ""
+            }
             if (url != null || filePath != null) {
                 if (selection.size > 1) {
                     return error("--url/--file parse one dictionary page; combine directly with a word: '${selection.joinToString(",") { it.aliases.first() }} $w'")

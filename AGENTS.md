@@ -59,12 +59,11 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
   run on a desktop JVM. The Android app keeps `android.net.Uri` at the UI
   boundary (see `HttpUrlBridge`) and maps `flagCode` → drawable via
   `Flags.kt`/`Ordboken.get`. The DLE, EST, Collins (sp/en + fr/en),
-  diccionari.cat family, Linguee, Infopedia, Le Robert, and Wiktionary
-  dictionaries take an optional `baseUrl`; SO uses the client and hard-coded
-  hosts; DDO/SDO share `DslDictionary`, parameterized with default
-  `apiBaseUrl`/`siteBaseUrl` (the `ws.dsl.dk`/`ordnet.dk` hosts) so a single
-  MockWebServer can stand in for both in tests. The word cache in `Ordboken`
-  is keyed on `HttpUrl`.
+  diccionari.cat family, Linguee, Infopedia, Le Robert, Wiktionary, and SO
+  dictionaries take an optional `baseUrl`; DDO/SDO share `DslDictionary`,
+  parameterized with default `apiBaseUrl`/`siteBaseUrl` (the
+  `ws.dsl.dk`/`ordnet.dk` hosts) so a single MockWebServer can stand in for
+  both in tests. The word cache in `Ordboken` is keyed on `HttpUrl`.
 - **`Ordboken.kt`** — dictionary registry (`dictMap` keyed by `tag`), the app
   entry point for lookups (`getWord(uri)`, cached, probes every dictionary; and
   `search(query, count)`, cached per `currentIndex`), and the persisted
@@ -484,6 +483,59 @@ Fixtures: `testdata/{gdlc,ca-es,ca-en}/*.{html,json}` (word pages + goldens) and
 `{gdlc,ca-es,ca-en}-search.json`. Tests: `DiccionariParserTest` (`:core`, plain
 JUnit), `DiccionariIntegrationTest` (`app`, Robolectric + MockWebServer).
 
+## SO (Svensk ordbok, published by Svenska Akademien)
+
+`SoDictionary` (`:core`) is baseUrl-parameterized (default
+`https://svenska.se`, tests use a MockWebServer) against the site's Nuxt /
+FastAPI JSON API — there is no HTML word page anymore. `search()` hits
+`/api/autocomplete?q=<query>&size=10` (returns `{saol,so,saob}`; only the
+`so` array is decoded) and `get(uri)` fetches `/api/article/so/<l_nr>`.
+`fullSearch` aliases `search`. The canonical word/search-result URI is the
+raw JSON URL `https://svenska.se/api/article/so/<l_nr>`; `get()` also accepts
+a main-site URL with `?activeTab=so&q=<word>&id=<l_nr>` (the `id` query param
+or a trailing `/api/article/so/<id>` path segment is used). Homographs are
+separate article docs, so each `get()` returns exactly one `Word` with no
+`mHomonymEntries`/`mHomographs`/`__ref`; `supportsCombining=false`
+(`OrdbokenSelectionTest` asserts SO toggling is non-combining), and the CLI
+registers it as search-first (`wordUrl = null`). `SoDictionary` gates the
+request on the base host (a foreign host → `null`).
+
+`SoParser.parse` unwraps the document's `_source` object (or treats a bare
+root as the source) and builds one JSON-rendered `Word` per article:
+
+- **Header**: `ortografi` is `mTitle`/`mSlug`/`summary`/`rawHeadword`;
+  `ordklass` maps through `normalizePos` (including `preposition`) to `Pos`
+  and becomes each definition's `pos`/`grammar`; `böjning` (HTML) is jsoup-
+  texted into `conjugation`; `uttal[].lemmaMedTryckangivelse` (non-null
+  entries) join with " / " into `pronunciation`. Audio comes from
+  `filnamnInlästUttal` (e.g. `"185690_1.mp3"`, `.m4a`→`.mp3`) →
+  `https://isolve-so-service.appspot.com/pronounce?id=<filename>` (the
+  filename already carries its `.mp3`, so no suffix is appended).
+- **Definitions**: one per `huvudbetydelse`. The gloss is
+  `definition_full` (if present) else `definition`, plus a
+  `" (formkommentar.text)"` suffix when a `formkommentar` exists — this is
+  the *unstyled* SO text (grammar-marked words are not case-folded like the
+  site's `stam`-based styling). `register` = `bruklighetskommentar`,
+  examples = `syntex`. `underbetydelser` become extra glosses (definition =
+  `typ` + formkommentar suffix, examples from their `syntex`).
+- **Idioms**: each `idiom[]` with a non-empty `idiombetydelser` (pure
+  `hänvisning` crossref ghosts are dropped) is one `Word.Idiom`; its gloss is
+  `listOfNotNull(definitionsinledare, definition, definitionstillägg)`
+  space-joined, examples from `exempel`, `register` from
+  `bruklighetskommentar`.
+- Entry pages synthesize a per-definition jsoup `element`
+  (`div.gloss > span.definition` + `div.example` rows) so `Cards.kt` Anki
+  card backs aren't empty.
+
+Tests: `SoParserTest` + `SoIntegrationTest` (both `:core`, plain JUnit
+goldens + MockWebServer), fixtures `testdata/so/hus.article.json` / `testdata/so/kutter.article.json`
+(raw `/api/article/so/<l_nr>` responses), `testdata/so-search.json`
+(`/api/autocomplete?q=kutter&size=10`), goldens `testdata/so/hus.json` /
+`testdata/so/kutter.json`. CLI: `so hus --search` (lists entries) then `so
+--url https://svenska.se/api/article/so/<l_nr>`; offline `--dict so --file
+../testdata/so/hus.article.json --url <entry uri>` / `--search --file
+../testdata/so-search.json`.
+
 ## DDO / SDO (Den Danske Ordbog / Svensk ordbok)
 
 `DdoDictionary` (DDO, `dk`) and `SdoDictionary` (SDO, `se`/`sedk`) share
@@ -723,7 +775,8 @@ CLI: `wfr table` / `wfr table --search` (or `--dict wfr --file …` offline).
 Legacy dictionaries (those with `renderAsJson = false`) keep original source
 HTML and don't feed the shared JSON rendering pipeline. To convert one to the
 modern schema (targets: `EstParser`, `CollinsParser`, `DleParser`,
-`LeRobertParser`, `LingueeParser`, `InfopediaParser`, `WiktionaryParser`):
+`LeRobertParser`, `LingueeParser`, `InfopediaParser`, `WiktionaryParser`,
+`SoParser`):
 
 1. **Rewrite the parser** to return `Word`s with `renderAsJson = true`:
    - Build a companion `parseSearch(body, uriOf)` so search decoding is shared

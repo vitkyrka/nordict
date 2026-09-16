@@ -1,282 +1,218 @@
 package se.whitchurch.nordict
 
+import com.google.gson.JsonElement
+import com.google.gson.JsonObject
+import com.google.gson.JsonParser
 import okhttp3.HttpUrl
-import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import org.jsoup.Jsoup
 import org.jsoup.nodes.Element
 
 class SoParser {
     companion object {
-        private val mp3Regex = """\('(.*)'\)""".toRegex()
+        private const val MP3_TEMPLATE = "https://isolve-so-service.appspot.com/pronounce?id=%s"
 
-        private fun normalizePos(pos: String): Pos = when (pos) {
+        private fun normalizePos(pos: String): Pos = when (pos.trim().lowercase()) {
             "adjektiv" -> Pos.ADJECTIVE
             "adverb" -> Pos.ADVERB
             "konjunktion" -> Pos.CONJUNCTION
             "interjektion" -> Pos.INTERJECTION
+            "preposition" -> Pos.PREPOSITION
             "pronomen" -> Pos.PRONOUN
             "substantiv" -> Pos.NOUN
             "verb" -> Pos.VERB
             else -> Pos.UNKNOWN
         }
 
-        private fun parseGrammar(headword: Word, lemma: Element) {
-            lemma.selectFirst(".ordklass")?.let {
-                headword.pos = normalizePos(it.text().trim())
+        private fun obj(e: JsonElement?, key: String): JsonObject? =
+            e?.takeIf { it.isJsonObject }?.asJsonObject?.get(key)?.takeIf { it.isJsonObject }?.asJsonObject
+
+        private fun str(e: JsonElement?, key: String): String? =
+            e?.takeIf { it.isJsonObject }?.asJsonObject?.get(key)?.takeIf { it.isJsonPrimitive }?.asString
+
+        private fun arr(e: JsonElement?, key: String): List<JsonElement>? =
+            e?.takeIf { it.isJsonObject }?.asJsonObject?.get(key)?.takeIf { it.isJsonArray }?.asJsonArray?.toList()
+
+        private fun strings(e: JsonElement?, key: String): List<String> =
+            arr(e, key)
+                ?.mapNotNull { item -> item.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }?.asString }
+                ?: emptyList()
+
+        /**
+         * `svenska.se/api/autocomplete` responses: a `{"saol","so","saob"}` map of
+         * suggestion arrays. Each SO item carries `{label, word_class, target:
+         * {id,...}}` where `target.id` is the article `l_nr`; `uriOf` maps it onto
+         * the dictionary's article URL. The app's `SoDictionary` and the CLI share
+         * this decoder.
+         */
+        fun parseSearch(body: String, uriOf: (id: String) -> HttpUrl): List<SearchResult> {
+            val results = ArrayList<SearchResult>()
+            try {
+                val root = JsonParser.parseString(body)
+                if (!root.isJsonObject) return results
+                val so = root.asJsonObject.get("so")
+                if (so == null || !so.isJsonArray) return results
+                so.asJsonArray.forEach { el ->
+                    if (!el.isJsonObject) return@forEach
+                    val obj = el.asJsonObject
+                    val label = obj.get("label")?.takeIf { it.isJsonPrimitive }?.asString ?: return@forEach
+                    val target = obj.get("target")?.takeIf { it.isJsonObject }?.asJsonObject ?: return@forEach
+                    val id = target.get("id")?.takeIf { it.isJsonPrimitive }?.asString ?: return@forEach
+                    val summary = obj.get("word_class")?.takeIf { it.isJsonPrimitive }?.asString ?: ""
+                    results.add(SearchResult(label, summary, uriOf(id)))
+                }
+            } catch (_: Exception) {
             }
-
-            if (headword.pos != Pos.NOUN) {
-                return
-            }
-
-            val bojning = lemma.selectFirst(".bojning")?.text() ?: return
-            val definite = bojning.split(" ")[0].replace(",", "")
-
-            // vidkommande has "ingen böjning, neutr."
-            // exodus has "ingen böjning, n-genus el. neutr."
-            // underscore has "ingen böjning, neutr. äv n-genus"
-            val neutr = bojning.indexOf("neutr.")
-            val ngenus = bojning.indexOf("n-genus")
-
-            headword.gender =
-                if (definite.endsWith("t") || neutr >= 0 && (ngenus < 0 || neutr < ngenus)) {
-                    "t"
-                } else {
-                    "n"
-                }
-
-            // Highlight the plural for common gender but the definite form singular for neuter
-            // nouns, to help in applying the technique described in https://bit.ly/EN-ETT-in-Swedish.
-            lemma.selectFirst("span.bojning")?.let {
-                var html = it.html()
-                val parts = it.text().split("[ ,]".toRegex())
-                var plural: String = ""
-                var addPlural: Boolean = false
-
-                if (ngenus < 0 && neutr < 0) {
-                    if (parts.size == 2) {
-                        plural = parts[1]
-                        addPlural = true
-                    } else if (parts.size > 2 && parts[1] !in arrayOf("", "äv.", "el.", "plur.")) {
-                        plural = parts[1]
-                        addPlural = true
-                    } else if (parts.size > 2) {
-                        for ((i, word) in parts.withIndex()) {
-                            if (word == "plur.") {
-                                plural = parts[i + 1]
-                                break
-                            }
-                        }
-                    }
-                }
-
-                if (plural.isNotEmpty()) {
-                    if (addPlural) {
-                        html =
-                            html.replaceFirst(plural, "<span class=\"tempmm\">plur.</span> $plural")
-                    }
-
-                    if (headword.gender == "n") {
-                        html = html.replaceFirst(
-                            "<span class=\"tempmm\">plur.</span> $plural",
-                            "<span class=\"tempmm\">plur.</span> <strong>$plural</strong>"
-                        )
-                    }
-                }
-
-                if (headword.gender == "t") {
-                    html = html.replace(parts[0], "<strong>${parts[0]}</strong>")
-
-                    if (plural.isNotEmpty()) {
-                        // Third declension neuter nouns
-                        if (!headword.mTitle.endsWith("er") && plural.endsWith("er")) {
-                            html = html.replaceFirst(
-                                "<span class=\"tempmm\">plur.</span> $plural",
-                                "<span class=\"tempmm\">plur.</span> <strong>$plural</strong>"
-                            )
-                        }
-                    }
-                }
-
-                it.html(html)
-            }
+            return results
         }
 
-        private fun makeIdiom(fras: String, lexblock: Element): Word.Idiom? {
-            var def = lexblock.selectFirst(".idiomdef")?.text() ?: return null
+        /**
+         * Parses an SO article (the `svenska.se/api/article/so/<l_nr>` JSON: a
+         * `{"_source": {...}}` object, or a bare `_source`) into one JSON-renderable
+         * `Word`. Each SO homograph is its own numbered article, so one page yields
+         * exactly one word with no homograph navigation.
+         *
+         * `ortografi` is the headword, `ordklass` the POS label, `böjning` (HTML)
+         * the conjugation, `uttal` entries the pronunciation and pronunciation-clip
+         * filenames. Each `huvudbetydelse` sense becomes one `Word.Definition`
+         * (`definition_full` gloss, `syntex` examples, `bruklighetskommentar`
+         * register, `formkommentar` appended as a trailing parenthetical) whose
+         * nested `underbetydelser` become extra glosses with their own `typ` text
+         * and `syntex` examples. Idioms with a `hänvisning` cross-reference to
+         * another headword (e.g. "stor som ett hus") are dropped; real idioms
+         * (`idiombetydelser`) keep their leading `definitionsinledare`, definition,
+         * `definitionstillägg`, `exempel` example, and `bruklighetskommentar`.
+         */
+        fun parse(
+            page: String,
+            uri: HttpUrl,
+            tag: String = "foo",
+            baseUrl: String = "https://svenska.se"
+        ): List<Word> {
+            val words = ArrayList<Word>()
+            val root = try {
+                JsonParser.parseString(page)
+            } catch (_: Exception) {
+                return words
+            }
+            val source = obj(root, "_source") ?: root.takeIf { it.isJsonObject }?.asJsonObject ?: return words
 
-            lexblock.selectFirst(".idiomdeft")?.let {
-                def += " (${it.text()})"
+            val headword = str(source, "ortografi")?.takeIf { it.isNotBlank() } ?: return words
+            val ordklass = str(source, "ordklass") ?: ""
+
+            val word = Word(
+                tag, headword, headword, headword, page, uri, baseUrl,
+                Jsoup.parseBodyFragment("").body(), "",
+                xrefs = arrayListOf(str(source, "l_nr") ?: ""),
+                renderAsJson = true
+            )
+            word.rawHeadword = headword
+            word.pos = normalizePos(ordklass)
+
+            str(source, "böjning")?.let {
+                word.conjugation = Jsoup.parse(it).text().trim()
             }
 
-            lexblock.selectFirst(".ikom")?.let {
-                def += " [${it.text()}]"
+            val pronunciation = ArrayList<String>()
+            arr(source, "uttal")?.forEach { u ->
+                str(u, "lemmaMedTryckangivelse")?.let { pronunciation.add(it.trim()) }
+                str(u, "filnamnInlästUttal")?.let { filnamn ->
+                    word.audio.add(MP3_TEMPLATE.format(filnamn.replace(".m4a", ".mp3").replace(" ", "_")))
+                }
             }
+            word.pronunciation = pronunciation.joinToString(" / ")
 
-            lexblock.selectFirst(".idiomxnr")?.let {
-                def = "${it.text()}. $def"
-            }
+            arr(source, "huvudbetydelser")?.forEach { bite ->
+                val definition = parseBite(bite, ordklass)
+                if (definition != null) word.definitions.add(definition)
 
-            val obj = Word.Idiom(fras, def)
-
-            obj.examples.addAll(lexblock.select(".idiomex").map { it.text() })
-
-            return obj
-        }
-
-        /** Reads a query parameter out of a bare `?id=…&ref=…` href attribute. */
-        private fun queryParam(href: String, name: String): String? =
-            href.substringAfter('?', "")
-                .split('&')
-                .mapNotNull { part -> part.split('=', limit = 2).takeIf { it.size == 2 } }
-                .firstOrNull { it[0] == name }?.get(1)
-
-        fun parseDisambiguation(page: String): List<HttpUrl> {
-            val urls: ArrayList<HttpUrl> = ArrayList()
-            val doc = Jsoup.parse(page, "https://svenska.se/so/")
-            val element = doc.select(".artikel").first()
-
-            element.select("a.slank")?.forEach {
-                ("https://svenska.se" + it.attr("href")).toHttpUrlOrNull()?.let(urls::add)
-            }
-
-            return urls
-        }
-
-        fun parse(page: String, tag: String = "foo"): List<Word> {
-            val words: ArrayList<Word> = ArrayList()
-            val doc = Jsoup.parse(page, "https://svenska.se/so/")
-
-            val element = doc.select(".artikel").first()
-            val content = element.outerHtml()
-            val cleanpage = doc.head().html() + "<body>" + content
-            val header = doc.head().html() + "<body>"
-
-            val selfUrl = doc.select(".gold").first().parent().attr("href")
-                ?: return words
-            val id = queryParam(selfUrl, "id") ?: return words
-
-            doc.select(".superlemma")?.forEach lemma@{ lemma ->
-                val xrefs = ArrayList<String>()
-
-                xrefs.add(lemma.attr("id"))
-
-                val grundform = lemma.select("span.orto").first()?.text()
-                    ?: return words
-                val word = grundform.replace("`", "").replace("´", "")
-
-                val summary = StringBuilder(grundform)
-
-                lemma.select("span.uttal").first()?.let {
-                    summary.append(" ")
-                    summary.append(it.text())
-                }
-
-                lemma.select("span.expansion")?.forEach {
-                    it.removeClass("collapsed")
-                }
-
-                lemma.select("span.bojning").first()?.let {
-                    it.html(it.html().replace("~", word))
-
-                    val text = it.text()
-
-                    // ingen böjning
-                    if (text.contains("ingen")) {
-                        return@let
-                    }
-
-                    if (summary.isNotEmpty()) {
-                        summary.append(" ")
-                    }
-                    summary.append(text)
-                }
-
-                val audio = arrayListOf<String>()
-
-                lemma.select("a.ljudfil")?.forEach {
-                    val onclick = it.attr("onclick")?.toString() ?: return@forEach
-                    val mp3 = mp3Regex.find(onclick)?.groupValues?.get(1) ?: return@forEach
-                    val url = "https://isolve-so-service.appspot.com/pronounce?id=$mp3.mp3"
-
-                    it.attr("href", url)
-                    it.removeAttr("onclick")
-
-                    audio.add(url)
-                }
-
-                val wordUri = HttpUrl.Builder()
-                    .scheme("https")
-                    .host("svenska.se")
-                    .addPathSegment("so")
-                    .addQueryParameter("id", id)
-                    .addQueryParameter("ref", xrefs[0])
-                    .build()
-
-                val headword = Word(
-                    tag, word, word, summary.toString(), cleanpage, wordUri,
-                    // Required to avoid CORS errors in getCSS
-                    "file://",
-                    element, header, lemma
-                )
-
-                parseGrammar(headword, lemma)
-
-                if (headword.gender == "t") {
-                    lemma.addClass("neuter")
-                }
-
-                headword.audio.addAll(audio)
-
-                lemma.select(".lexem")?.forEach lexem@{ lexem ->
-                    xrefs.add(lexem.attr("id"))
-                    xrefs.add(lexem.selectFirst(".kernel").attr("id"))
-
-                    lexem.select(".idiom")?.forEach idiom@{ idiom ->
-                        val fras = idiom.selectFirst(".fras").text()
-
-                        if (idiom.selectFirst(".idiomlexblock") == null) {
-                            makeIdiom(fras, idiom)?.let {
-                                headword.idioms.add(it)
-                            }
-                        } else {
-                            // E.g. det står/är skrivet i stjärnorna
-                            idiom.select(".idiomlexblock").forEach { lexblock ->
-                                makeIdiom(fras, lexblock)?.let {
-                                    headword.idioms.add(it)
-                                }
-                            }
-                        }
-                    }
-
-                    val def = lexem.selectFirst(".def")?.text() ?: return@lexem
-                    val definition = Word.Definition(def, lexem)
-
-                    lexem.select(".syntex").forEach { exempelBlock ->
-                        definition.examples.add(exempelBlock.text())
-                    }
-
-                    headword.definitions.add(definition)
-                    lexem.remove()
-                }
-
-                headword.xrefs.addAll(xrefs)
-
-                lemma.remove()
-                words.add(headword)
-            }
-
-            element.select("br")?.remove()
-
-            if (words.size > 1) {
-                val homographs = words.map { SearchResult(it.mTitle, it.summary, it.uri) }
-
-                for (word in words) {
-                    word.mHomographs.addAll(homographs)
+                arr(bite, "idiom")?.forEach { idiomObj ->
+                    parseIdiom(idiomObj, ordklass)?.let { word.idioms.add(it) }
                 }
             }
 
+            words.add(word)
             return words
+        }
+
+        /** One primary sense plus its nested sub-senses. */
+        private fun parseBite(bite: JsonElement?, ordklass: String): Word.Definition? {
+            val glosses = ArrayList<Word.Gloss>()
+
+            val formkommentar = str(obj(bite, "formkommentar"), "text")
+            val full = str(bite, "definition_full") ?: str(bite, "definition")
+                ?: return null
+            val primary = Word.Gloss()
+            primary.definition = if (formkommentar.isNullOrBlank()) full else "$full ($formkommentar)"
+            primary.examples.addAll(strings(bite, "syntex"))
+            glosses.add(primary)
+
+            arr(bite, "underbetydelser")?.forEach { sub ->
+                val typ = str(sub, "typ") ?: return@forEach
+                val subForm = str(obj(sub, "formkommentar"), "text")
+                val gloss = Word.Gloss()
+                gloss.definition = if (subForm.isNullOrBlank()) typ else "$typ ($subForm)"
+                gloss.examples.addAll(strings(sub, "syntex"))
+                glosses.add(gloss)
+            }
+
+            val definition = Word.Definition(primary.definition, definitionElement(glosses))
+            definition.pos = ordklass
+            definition.grammar = ordklass
+            definition.register = str(bite, "bruklighetskommentar") ?: ""
+            definition.glosses.addAll(glosses)
+            definition.examples.addAll(primary.examples)
+            return definition
+        }
+
+        /** A plain HTML fragment per definition so Anki card backs are not empty. */
+        private fun definitionElement(glosses: List<Word.Gloss>): Element {
+            val body = Jsoup.parseBodyFragment("").body()
+            body.appendElement("div").addClass("gloss")
+                .appendElement("span").addClass("definition").text(glosses[0].definition)
+            glosses[0].examples.forEach {
+                body.appendElement("div").addClass("example").text(it)
+            }
+            for (i in 1 until glosses.size) {
+                body.appendElement("div").addClass("gloss")
+                    .appendElement("span").addClass("definition").text(glosses[i].definition)
+                glosses[i].examples.forEach {
+                    body.appendElement("div").addClass("example").text(it)
+                }
+            }
+            return body
+        }
+
+        /** One fixed expression with its senses; cross-reference-only idioms return null. */
+        private fun parseIdiom(idiomObj: JsonElement?, ordklass: String): Word.Idiom? {
+            val phrase = str(idiomObj, "idiom")?.takeIf { it.isNotBlank() } ?: return null
+            val senses = arr(idiomObj, "idiombetydelser") ?: return null
+            if (senses.isEmpty()) return null
+
+            val glosses = ArrayList<Word.Gloss>()
+            var register = ""
+            var first = ""
+            senses.forEach { sense ->
+                val parts = listOfNotNull(
+                    str(sense, "definitionsinledare"),
+                    str(sense, "definition"),
+                    str(sense, "definitionstillägg")
+                )
+                val defText = parts.joinToString(" ").trim()
+                if (defText.isEmpty()) return@forEach
+                if (first.isEmpty()) first = defText
+                val gloss = Word.Gloss()
+                gloss.definition = defText
+                str(sense, "exempel")?.let { gloss.examples.add(it.trim()) }
+                glosses.add(gloss)
+                if (register.isEmpty()) register = str(sense, "bruklighetskommentar") ?: ""
+            }
+            if (glosses.isEmpty()) return null
+
+            val idiom = Word.Idiom(phrase, first)
+            idiom.register = register
+            idiom.glosses.addAll(glosses)
+            idiom.examples.addAll(glosses.flatMap { it.examples })
+            return idiom
         }
     }
 }

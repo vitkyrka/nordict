@@ -33,11 +33,12 @@ sealed interface CardProposal {
  * Pure card-pipeline logic: enumerating the cards a [Word] proposes, building
  * each card's Back HTML, collecting the front examples, and assembling the
  * note fields. JSON-rendered dictionaries (DLE, EST, Collins, diccionari.cat,
- * Didac, and combined multi-dictionary words) get their Back rendered from the
- * definition fragments directly — there is no page skeleton to inject into
- * (combined words carry an empty `element`), and Collins' definitions are not
- * reached by any of [Word.getPage]'s container selectors. Legacy dictionaries
- * with a real page skeleton (SO) keep using [Word.getPage].
+ * Didac, SO, LeRobert, Linguee, Infopedia, Wiktionary, DDO/SDO, and combined
+ * multi-dictionary words) get their Back rendered from the definition
+ * fragments directly — there is no page skeleton to inject into (combined
+ * words carry an empty `element`), and Collins' definitions are not reached
+ * by any of [Word.getPage]'s container selectors. Legacy dictionaries with a
+ * real page skeleton keep using [Word.getPage].
  */
 object Cards {
     private val gson = Gson()
