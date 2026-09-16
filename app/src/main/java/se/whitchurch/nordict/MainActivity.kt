@@ -99,6 +99,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
+     * Runs a full search — the same navigation the search bar's
+     * enter action performs, landing on the search-results destination;
+     * used by the debug agent driver.
+     */
+    fun navigateToSearch(query: String) {
+        navController?.navigate(searchRoute(query)) { launchSingleTop = true }
+    }
+
+    /**
      * Navigates to a combined multi-dictionary word view; used by the debug
      * agent driver. The word is addressed by its [sources] probe list, so the
      * route stays on the merged page whatever the active dictionary is.

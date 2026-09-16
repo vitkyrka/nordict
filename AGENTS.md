@@ -209,7 +209,7 @@ output to the JS renderer for a browser preview:
 The debug build ships a loopback agent server (`app/src/debug/.../AgentServer`,
 `AgentProtocol.PORT = 42837`) bound to `127.0.0.1` on the device; the CLI's
 `repl` subcommand drives it. Each input line is one JSON `AgentCommand`
-(`{"op": "search"|"open"|"openUri"|"nextPage"|"back"|"openCards"|"createCard"|"audio"|"setDict"|"setLang"|"swapLang"|"state"|"quit",
+(`{"op": "search"|"runSearch"|"open"|"openUri"|"nextPage"|"back"|"openCards"|"createCard"|"audio"|"setDict"|"setLang"|"swapLang"|"state"|"quit",
 "query"?, "uri"?, "url"?, "tag"?, "lang"?, "index"?}`); each produces exactly one JSON
 `AgentResult` (`ok`, `error`, optional `state`/`word`), in order, over a
 persistent session until EOF or `quit`. `"word"` carries the loaded word's
@@ -218,7 +218,11 @@ app's live `Ordboken` + the single `MainActivity` navigation graph and are
 exercised by `AppDriverTest` (Robolectric — the app is one activity, so the
 word-view ops run end-to-end under Robolectric) and the on-device E2E;
 word-view ops never involve `startActivity` because all their routes live in
-one activity.
+one activity. `search` is the headless autocomplete list; `runSearch` is the
+UI path behind a search-bar enter — it navigates to the `search` destination
+(where `fullSearch` renders the current dictionary's results) and waits for the
+route to land, so a results-screen composition crash surfaces on the op. On the
+headless CLI driver (no UI) `runSearch` resolves the same result list.
 
 The card ops drive the AnkiDroid `CardActivity` (which *is* a separate
 activity, launched with the word view's "add card" intent): `openCards`

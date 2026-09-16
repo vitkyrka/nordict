@@ -76,6 +76,7 @@ class HeadlessAgentDriver(
         return try {
             when (command.op) {
                 AgentOps.SEARCH -> opSearch(command)
+                AgentOps.RUN_SEARCH -> opRunSearch(command)
                 AgentOps.OPEN -> opOpen(command)
                 AgentOps.OPEN_URI -> opOpenUri(command)
                 AgentOps.NEXT_PAGE -> opNextPage(command)
@@ -99,6 +100,24 @@ class HeadlessAgentDriver(
         return AgentResult(
             ok = true,
             op = AgentOps.SEARCH,
+            message = if (results.isEmpty()) "no search results for '$query'" else null,
+            state = snapshot(),
+            results = results.map { it.toSearchResultData() }
+        )
+    }
+
+    /**
+     * The desktop has no results screen, so `runSearch` resolves the same
+     * result list the on-device search destination renders (`search` for the
+     * dictionary — the full-search alias — under the current single selection).
+     */
+    private fun opRunSearch(command: AgentCommand): AgentResult {
+        val query = command.require("query", command.query)
+        lastQuery = query
+        val results = searchResults(query)
+        return AgentResult(
+            ok = true,
+            op = AgentOps.RUN_SEARCH,
             message = if (results.isEmpty()) "no search results for '$query'" else null,
             state = snapshot(),
             results = results.map { it.toSearchResultData() }

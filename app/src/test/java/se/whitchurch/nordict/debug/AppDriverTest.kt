@@ -181,6 +181,25 @@ class AppDriverTest {
         assertThat(search.results).isEmpty()
     }
 
+    /**
+     * `runSearch` is the navigation op behind "hit enter in the search bar":
+     * it lands on the search-results destination for the current dictionary.
+     * (The results list's own rendering — including the duplicate-uri LazyColumn
+     * key regression — is covered by [se.whitchurch.nordict.SearchScreenUiTest].)
+     */
+    @Test
+    fun runSearchNavigatesToTheResultsDestination() {
+        launchMain()
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse =
+                MockResponse().setBody("[]")
+        }
+
+        val search = drive(AgentCommand(op = AgentOps.RUN_SEARCH, query = "frente"))
+        assertThat(search.ok).isTrue()
+        assertThat(search.state?.activity).isEqualTo("search")
+    }
+
     @Test
     fun openRequiresExactMatch() {
         server.enqueue(MockResponse().setBody(

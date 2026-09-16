@@ -51,6 +51,7 @@ class AppDriver(private val app: android.app.Application) {
         return try {
             when (command.op) {
                 AgentOps.SEARCH -> opSearch(command)
+                AgentOps.RUN_SEARCH -> opRunSearch(command)
                 AgentOps.OPEN -> opOpen(command)
                 AgentOps.OPEN_URI -> opOpenUri(command)
                 AgentOps.NEXT_PAGE -> opNextPage(command)
@@ -78,6 +79,28 @@ class AppDriver(private val app: android.app.Application) {
             message = if (results.isEmpty()) "no search results for '$query'" else null,
             state = snapshot(),
             results = results.map { it.toSearchResultData() }
+        )
+    }
+
+    /**
+     * Runs a full search in the UI, exactly like hitting enter in the search
+     * bar: navigates to the search-results destination, whose `fullSearch`
+     * renders the current dictionary's results. Waits for the destination to
+     * land so a search-results composition crash (e.g. duplicate LazyColumn
+     * keys) surfaces here instead of racing the caller.
+     */
+    private fun opRunSearch(command: AgentCommand): AgentResult {
+        val query = command.require("query", command.query)
+        closeCardScreenIfUp()
+        onMain {
+            requireMainActivity().navigateToSearch(query)
+        }
+        await({ snapshot().activity == "search" }, 15_000)
+        return AgentResult(
+            ok = true,
+            op = AgentOps.RUN_SEARCH,
+            message = "search result screen up for '$query'",
+            state = snapshot()
         )
     }
 

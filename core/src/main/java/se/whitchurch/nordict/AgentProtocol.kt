@@ -26,6 +26,7 @@ object AgentProtocol {
 /** Semantic operation names (the `op` field of an [AgentCommand]). */
 object AgentOps {
     const val SEARCH = "search"
+    const val RUN_SEARCH = "runSearch"
     const val OPEN = "open"
     const val OPEN_URI = "openUri"
     const val NEXT_PAGE = "nextPage"

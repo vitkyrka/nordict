@@ -96,7 +96,7 @@ fun SearchScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(vertical = 4.dp)
             ) {
-                items(items, key = { it.uri.toString() }) { searchResult ->
+                items(items) { searchResult ->
                     Text(
                         text = searchResult.mTitle,
                         fontSize = 18.sp,

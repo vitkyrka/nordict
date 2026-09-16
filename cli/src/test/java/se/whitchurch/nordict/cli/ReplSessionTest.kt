@@ -101,6 +101,20 @@ class ReplSessionTest {
     }
 
     @Test
+    fun runSearchResolvesTheResultsDestinationList() {
+        val r = runScript(
+            driver(),
+            """{"op":"runSearch","query":"frente"}"""
+        )
+
+        ok(r[0])
+        assertThat(r[0].results).hasSize(2)
+        assertThat(r[0].results!![0].mTitle).isEqualTo("frente")
+        assertThat(r[0].results!![0].uri).isEqualTo("https://dle.rae.es/frente")
+        assertThat(r[0].state?.query).isEqualTo("frente")
+    }
+
+    @Test
     fun openUriAndNextPageWalkHomographs() {
         val r = runScript(
             driver(),
