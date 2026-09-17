@@ -561,6 +561,11 @@ class WordViewModel(
 
     private fun historySave() {
         val word = mWord ?: return
+        // A combined page's own uri/dict is only its first source's: persist
+        // the full sources probe list so history reopens the merged page,
+        // not the single dictionary. Single words keep an empty sources cell
+        // (old rows/openers behave as before).
+        val sourcesJson = MultiDict.sourcesToJson(sources)
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
                 val dbHelper = OrdbokenDbHelper(getApplication())
@@ -570,9 +575,18 @@ class WordViewModel(
                 values.put(HistoryEntry.COLUMN_NAME_DICT, word.dict)
                 values.put(HistoryEntry.COLUMN_NAME_SUMMARY, word.summary)
                 values.put(HistoryEntry.COLUMN_NAME_URL, word.uri.toString())
+                values.put(HistoryEntry.COLUMN_NAME_SOURCES, sourcesJson)
                 values.put(HistoryEntry.COLUMN_NAME_DATE, Date().time)
-                db.insert(HistoryEntry.TABLE_NAME, "null", values)
-                db.close()
+                try {
+                    db.insert(HistoryEntry.TABLE_NAME, "null", values)
+                } catch (e: Exception) {
+                    // A pre-migration database without the sources column:
+                    // retry without it rather than dropping the history write.
+                    values.remove(HistoryEntry.COLUMN_NAME_SOURCES)
+                    db.insert(HistoryEntry.TABLE_NAME, "null", values)
+                } finally {
+                    db.close()
+                }
             }
         }
     }

@@ -56,7 +56,13 @@ class MainActivity : AppCompatActivity() {
         var initialQuery = ""
         if (ordboken.mPrefs.contains("lastWhere")) {
             when (ordboken.lastWhere) {
-                Where.WORD -> ordboken.lastWhat?.let { initialRoute = wordRoute(it, "") }
+                Where.WORD -> ordboken.lastWhat?.let {
+                    initialRoute = wordRoute(
+                        it, "",
+                        sources = ordboken.lastSources,
+                        ref = ordboken.lastRef
+                    )
+                }
                 Where.MAIN -> ordboken.lastWhat?.takeIf { it.isNotBlank() }?.let {
                     initialQuery = it
                     initialRoute = searchRoute(it)

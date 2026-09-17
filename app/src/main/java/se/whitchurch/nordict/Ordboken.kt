@@ -420,9 +420,11 @@ class Ordboken private constructor(
         mPrefs.edit().putString("dicts_$lang", tags.joinToString(",")).apply()
     }
 
-    fun setLastView(where: Where, what: String) {
+    fun setLastView(where: Where, what: String, sources: String? = null, ref: String? = null) {
         lastWhere = where
         lastWhat = what
+        lastSources = sources?.takeIf { it.isNotBlank() }
+        lastRef = ref?.takeIf { it.isNotBlank() }
     }
 
     companion object {

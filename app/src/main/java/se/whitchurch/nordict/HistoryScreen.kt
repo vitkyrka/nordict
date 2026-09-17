@@ -32,7 +32,7 @@ import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
 fun HomeScreen(
     context: Context,
     ordboken: Ordboken,
-    onOpenWord: (title: String, url: String) -> Unit
+    onOpenWord: (title: String, url: String, sources: String) -> Unit
 ) {
     CommonListScreen(
         context = context,
@@ -42,6 +42,7 @@ fun HomeScreen(
         summaryCol = HistoryEntry.COLUMN_NAME_SUMMARY,
         dictCol = HistoryEntry.COLUMN_NAME_DICT,
         urlCol = HistoryEntry.COLUMN_NAME_URL,
+        sourcesCol = HistoryEntry.COLUMN_NAME_SOURCES,
         sortOrder = HistoryEntry.COLUMN_NAME_DATE + " DESC",
         limit = 100,
         onOpenWord = onOpenWord
@@ -53,7 +54,9 @@ data class WordRow(
     val dict: String,
     val title: String,
     val summary: String,
-    val url: String
+    val url: String,
+    // A combined multi-dictionary entry's sources probe JSON (empty = single).
+    val sources: String = ""
 )
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -66,13 +69,14 @@ fun CommonListScreen(
     summaryCol: String,
     dictCol: String,
     urlCol: String,
+    sourcesCol: String? = null,
     sortOrder: String,
     limit: Int? = null,
-    onOpenWord: (title: String, url: String) -> Unit
+    onOpenWord: (title: String, url: String, sources: String) -> Unit
 ) {
     var reloadToken by remember { mutableStateOf(0) }
     val rows by produceState(initialValue = emptyList<WordRow>(), key1 = reloadToken) {
-        value = loadRows(context, table, titleCol, summaryCol, dictCol, urlCol, sortOrder, limit)
+        value = loadRows(context, table, titleCol, summaryCol, dictCol, urlCol, sourcesCol, sortOrder, limit)
     }
 
     Column(modifier = Modifier.fillMaxSize()) {
@@ -110,7 +114,7 @@ fun CommonListScreen(
                         context = context,
                         row = row,
                         ordboken = ordboken,
-                        onOpen = { onOpenWord(row.title, row.url) },
+                        onOpen = { onOpenWord(row.title, row.url, row.sources) },
                         onDelete = {
                             deleteRow(context, table, row.url)
                             reloadToken++
@@ -187,20 +191,35 @@ private suspend fun loadRows(
     summaryCol: String,
     dictCol: String,
     urlCol: String,
+    sourcesCol: String?,
     sortOrder: String,
     limit: Int?
 ): List<WordRow> = withContext(Dispatchers.IO) {
     val dbHelper = OrdbokenDbHelper(context)
     val db = dbHelper.readableDatabase
     try {
-        val cursor = db.query(
-            table,
-            arrayOf(HistoryEntry._ID, dictCol, titleCol, summaryCol, urlCol),
-            null, null, null, null,
-            sortOrder,
-            limit?.toString()
-        )
+        val cols = mutableListOf(HistoryEntry._ID, dictCol, titleCol, summaryCol, urlCol)
+        if (sourcesCol != null) cols.add(sourcesCol)
+        val cursor = try {
+            db.query(
+                table,
+                cols.toTypedArray(),
+                null, null, null, null,
+                sortOrder,
+                limit?.toString()
+            )
+        } catch (e: Exception) {
+            // A pre-migration database without the sources column.
+            db.query(
+                table,
+                arrayOf(HistoryEntry._ID, dictCol, titleCol, summaryCol, urlCol),
+                null, null, null, null,
+                sortOrder,
+                limit?.toString()
+            )
+        }
         val rows = mutableListOf<WordRow>()
+        val sourcesIdx = runCatching { cursor.getColumnIndexOrThrow(sourcesCol) }.getOrNull()
         while (cursor.moveToNext()) {
             rows.add(
                 WordRow(
@@ -208,7 +227,8 @@ private suspend fun loadRows(
                     dict = cursor.getString(cursor.getColumnIndexOrThrow(dictCol)),
                     title = cursor.getString(cursor.getColumnIndexOrThrow(titleCol)),
                     summary = cursor.getString(cursor.getColumnIndexOrThrow(summaryCol)),
-                    url = cursor.getString(cursor.getColumnIndexOrThrow(urlCol))
+                    url = cursor.getString(cursor.getColumnIndexOrThrow(urlCol)),
+                    sources = sourcesIdx?.takeIf { it >= 0 }?.let { cursor.getString(it) } ?: ""
                 )
             )
         }

@@ -131,6 +131,18 @@ fun NordictApp(
         openWord(Uri.parse(rawUrl), title)
     }
 
+    // History rows carry the combined sources probe JSON (empty = single):
+    // a combined entry reopens the merged page, not the first dictionary.
+    fun openHistory(title: String, rawUrl: String, sourcesJson: String) {
+        scope.launch { searchBarState.animateToCollapsed() }
+        val sources = MultiDict.sourcesFromJson(sourcesJson)
+        if (sources.isEmpty()) {
+            openWord(Uri.parse(rawUrl), title)
+            return
+        }
+        navController.navigate(wordRoute(rawUrl, title, sources = sourcesJson))
+    }
+
     fun runSearch(query: String) {
         scope.launch { searchBarState.animateToCollapsed() }
         navController.navigate(searchRoute(query)) { launchSingleTop = true }
@@ -143,19 +155,46 @@ fun NordictApp(
 
     // Persist the currently displayed destination when the app goes to the
     // background so the next start resumes where the user left off: the word
-    // view saves the word it is showing, the search screen saves its query,
-    // and home clears the restore point. This mirrors the legacy contract
-    // where each activity saved its own screen in its onPause.
+    // view saves the word it is showing (a combined page saves its sources
+    // probe list + selected ref, since its own uri is only the first
+    // source's page), the search screen saves its query, and home clears the
+    // restore point. This mirrors the legacy contract where each activity
+    // saved its own screen in its onPause.
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, ordboken) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_PAUSE) {
                 val route = navController.currentDestination?.route
                 when {
-                    route != null && route.startsWith(WORD_ROUTE) ->
-                        ordboken.currentWord?.let {
-                            ordboken.setLastView(Ordboken.Where.WORD, it.uri.toString())
+                    route != null && route.startsWith(WORD_ROUTE) -> {
+                        val entry = navController.currentBackStackEntry
+                        val uriArg = entry?.arguments?.getString("uri").orEmpty()
+                        val sourcesArg = entry?.arguments?.getString("sources").orEmpty()
+                        val refArg = entry?.arguments?.getString("ref").orEmpty()
+                        val word = ordboken.currentWord
+                        if (word != null) {
+                            // A combined in-memory nextPage swap never pushes a
+                            // new destination, so the live word's xref is newer
+                            // than the route's ref arg.
+                            val ref = if (sourcesArg.isNotBlank()) {
+                                word.xrefs.firstOrNull()?.takeIf { it.isNotBlank() }
+                                    ?: refArg.takeIf { it.isNotBlank() }
+                            } else null
+                            val uri = uriArg.takeIf { it.isNotBlank() }
+                                ?: word.uri.toString()
+                            ordboken.setLastView(
+                                Ordboken.Where.WORD, uri,
+                                sources = sourcesArg.takeIf { it.isNotBlank() },
+                                ref = ref
+                            )
+                        } else if (uriArg.isNotBlank()) {
+                            ordboken.setLastView(
+                                Ordboken.Where.WORD, uriArg,
+                                sources = sourcesArg.takeIf { it.isNotBlank() },
+                                ref = refArg.takeIf { it.isNotBlank() }
+                            )
                         }
+                    }
                     route != null && route.startsWith(SEARCH_ROUTE) -> {
                         val query =
                             navController.currentBackStackEntry?.arguments?.getString("query") ?: ""
@@ -246,7 +285,7 @@ fun NordictApp(
                     HomeScreen(
                         context = context,
                         ordboken = ordboken,
-                        onOpenWord = { title, url -> openWordUrl(url, title) }
+                        onOpenWord = { title, url, sources -> openHistory(title, url, sources) }
                     )
                 }
                 composable(

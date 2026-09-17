@@ -262,6 +262,98 @@ class NavigationRegressionTest {
     }
 
     @Test
+    fun combinedWordPersistsAcrossRestart() {
+        awaitNav()
+
+        // Open the merged DLE+EST page for "frente" (the multidict A+B case).
+        dle.enqueue(MockResponse().setBody(dleFrente()))
+        est.enqueue(MockResponse().setBody(estFrente()))
+        onMain {
+            composeRule.activity.navigateToSources(
+                listOf(
+                    CombSource("DLE", dle.url("/frente")),
+                    CombSource("EST", est.url("/frente"))
+                ),
+                "frente",
+                null
+            )
+        }
+        awaitCondition(message = "combined DLE+EST page loads") {
+            ordboken().currentWord?.mHomonymEntries?.map { it.ref } == listOf("DLE::1", "EST::1")
+        }
+
+        // Backgrounding persists the combined address (first uri + sources),
+        // not just the first dictionary's page.
+        composeRule.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
+        assertThat(ordboken().lastWhere).isEqualTo(Ordboken.Where.WORD)
+        assertThat(ordboken().lastWhat).isEqualTo(dle.url("/frente").toString())
+        val persisted = MultiDict.sourcesFromJson(ordboken().lastSources.orEmpty())
+        assertThat(persisted.map { it.tag }).containsExactly("DLE", "EST").inOrder()
+
+        // Kill + restart: the app must come back on the merged page, not DLE.
+        dle.enqueue(MockResponse().setBody(dleFrente()))
+        est.enqueue(MockResponse().setBody(estFrente()))
+        composeRule.activityRule.scenario.recreate()
+        awaitCondition(message = "restart restores the combined page") {
+            ordboken().currentWord?.mHomonymEntries?.map { it.ref } == listOf("DLE::1", "EST::1")
+        }
+    }
+
+    @Test
+    fun combinedWordHistoryReopensCombinedPage() {
+        awaitNav()
+
+        dle.enqueue(MockResponse().setBody(dleFrente()))
+        est.enqueue(MockResponse().setBody(estFrente()))
+        onMain {
+            composeRule.activity.navigateToSources(
+                listOf(
+                    CombSource("DLE", dle.url("/frente")),
+                    CombSource("EST", est.url("/frente"))
+                ),
+                "frente",
+                null
+            )
+        }
+        awaitCondition(message = "combined DLE+EST page loads") {
+            ordboken().currentWord?.mHomonymEntries?.map { it.ref } == listOf("DLE::1", "EST::1")
+        }
+        val firstUri = dle.url("/frente").toString()
+
+        // History must store the sources probe list alongside the first uri.
+        var storedSources = emptyList<CombSource>()
+        awaitCondition(message = "history stores the combined sources") {
+            val db = OrdbokenDbHelper(app!!).readableDatabase
+            try {
+                db.query(
+                    "history", arrayOf("url", "sources"),
+                    "url=?", arrayOf(firstUri),
+                    null, null, null
+                ).use { cursor ->
+                    if (!cursor.moveToFirst()) return@awaitCondition false
+                    storedSources = MultiDict.sourcesFromJson(
+                        cursor.getString(cursor.getColumnIndexOrThrow("sources"))
+                    )
+                    storedSources.map { it.tag } == listOf("DLE", "EST")
+                }
+            } finally {
+                db.close()
+            }
+        }
+
+        // Opening that history entry (the history screen's sources-aware path)
+        // must reload the merged page, not the single DLE article.
+        dle.enqueue(MockResponse().setBody(dleFrente()))
+        est.enqueue(MockResponse().setBody(estFrente()))
+        onMain {
+            composeRule.activity.navigateToSources(storedSources, "frente", null)
+        }
+        awaitCondition(message = "history entry reopens the combined page") {
+            ordboken().currentWord?.mHomonymEntries?.map { it.ref } == listOf("DLE::1", "EST::1")
+        }
+    }
+
+    @Test
     fun backAfterDictSwitchExitsToTheDestinationNotTheStaleWord() {
         awaitNav()
 
