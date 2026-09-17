@@ -893,6 +893,56 @@ class NavigationRegressionTest {
         }
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Test
+    fun jsonWordScrollRestoreDoesNotDoubleCountTheHidBar() {
+        awaitNav()
+
+        // Word A is scrolled down with the word bar hidden (contentOffset
+        // negative) — the starting state for the bug: navigating away and
+        // coming back must not push the bar permanently out of reach.
+        est.enqueue(MockResponse().setBody(estFrente()))
+        openWord(est, "/frente")
+        val a = topWordViewModel()!!
+        onMain {
+            a.webView = scrolledWebView(800)
+            a.webViewScrolled(0, 800)
+            a.captureScroll()
+        }
+
+        // Push word B over A, then pop back to A exactly like the covered
+        // destination flow: the re-created WebView starts at the top and the
+        // page-finish listener restores the saved offset with
+        // restoreWebViewScroll.
+        est.enqueue(MockResponse().setBody(estMuerte()))
+        openWord(est, "/muerte")
+        onMain { composeRule.activity.navController?.popBackStack() }
+        awaitCondition(message = "back restores word A's view") {
+            val vm = topWordViewModel()
+            vm != null && vm.webView != null
+        }
+
+        // The scroll restore is programmatic: it must scroll the WebView but
+        // NOT feed the same offset through the webViewScrolled bridge a second
+        // time (the bar behavior restored its own state on recomposition).
+        // Before the fix that double-counting moved contentOffset another
+        // savedScrollY deep, so an up-scroll could only recover half of it and
+        // the bar never reappeared on word A.
+        val vm = topWordViewModel()!!
+        val before = onMain { vm.bottomBarScrollBehavior!!.state.contentOffset }
+        onMain { vm.restoreWebViewScroll() }
+        awaitCondition(message = "re-created WebView is scrolled back down") {
+            topWordViewModel()?.webView?.scrollY == 800
+        }
+        val after = onMain { vm.bottomBarScrollBehavior!!.state.contentOffset }
+        assertThat(after).isEqualTo(before)
+
+        // The user scrolls back up to the top: the bar must fully return.
+        onMain { vm.webViewScrolled(800, 0) }
+        assertThat(onMain { vm.bottomBarScrollBehavior!!.state.contentOffset })
+            .isAtLeast(0f)
+    }
+
     @Test
     fun jsonWordScrollCaptureReadsThePinnedWebView() {
         awaitNav()

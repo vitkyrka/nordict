@@ -260,7 +260,16 @@ class WordViewModel(
     fun restoreWebViewScroll() {
         if (savedScrollY > 0) {
             val view = webView ?: return
-            view.post { view.scrollTo(0, savedScrollY) }
+            view.post {
+                // The restore scroll is programmatic, not user-driven: feeding
+                // it into the scroll behavior would double-count the offset
+                // (the contentOffset state is restored from saved state and
+                // the WebView starts at the top), leaving the toolbar beyond
+                // the reach of a burst of scrolling back up. Ignore it.
+                suppressScrollBridge = true
+                view.scrollTo(0, savedScrollY)
+                suppressScrollBridge = false
+            }
         }
     }
 
@@ -381,6 +390,7 @@ class WordViewModel(
      * expects to collapse.
      */
     fun webViewScrolled(oldScrollY: Int, scrollY: Int) {
+        if (suppressScrollBridge) return
         val behavior = bottomBarScrollBehavior ?: return
         val delta = scrollY - oldScrollY
         if (delta == 0) return
@@ -390,6 +400,15 @@ class WordViewModel(
             source = NestedScrollSource.Drag,
         )
     }
+
+    /**
+     * When true, [webViewScrolled] ignores scroll events. This prevents the
+     * programmatic scroll restore in [restoreWebViewScroll] from double-counting
+     * the scroll offset: [bottomBarScrollBehavior]'s contentOffset is already
+     * restored from saved state, so feeding the restore scroll into it would
+     * push the toolbar permanently out of reach.
+     */
+    private var suppressScrollBridge = false
 
     fun loadWebView(word: Word) {
         val webView = this.webView ?: return
