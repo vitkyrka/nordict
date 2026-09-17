@@ -435,23 +435,24 @@ class WordViewModel(
      * match as usual. */
     fun linkSearch(query: String) {
         viewModelScope.launch {
+            val trimmed = query.trim()
             var combined: List<CombSource>? = null
             var exact: SearchResult? = null
             withContext(Dispatchers.IO) {
                 if (ordboken.activeDicts.isNotEmpty()) {
-                    val sources = MultiDict.resolveExact(ordboken.activeDicts, query)
+                    val sources = MultiDict.resolveExact(ordboken.activeDicts, trimmed)
                     combined = sources.takeIf { it.isNotEmpty() }
-                    if (combined == null) exact = SearchResult(query)
+                    if (combined == null) exact = SearchResult(trimmed)
                 } else {
-                    val results = ordboken.currentDictionary.search(query)
-                    exact = ExactMatch.resolve(query, results) ?: SearchResult(query)
+                    val results = ordboken.currentDictionary.search(trimmed)
+                    exact = ExactMatch.resolve(trimmed, results) ?: SearchResult(trimmed)
                 }
             }
             when {
                 combined != null ->
                     onOpenSources?.invoke(
                         SearchResult(
-                            mTitle = query,
+                            mTitle = trimmed,
                             uri = combined!!.first().uri,
                             dicts = combined!!.map { it.tag },
                             sources = combined!!

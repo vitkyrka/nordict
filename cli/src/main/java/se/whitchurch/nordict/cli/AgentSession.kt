@@ -93,7 +93,7 @@ class HeadlessAgentDriver(
     }
 
     private fun opSearch(command: AgentCommand): AgentResult {
-        val query = command.require("query", command.query)
+        val query = command.require("query", command.query).trim()
         lastQuery = query
         activity = "MainActivity"
         val results = searchResults(query)
@@ -112,7 +112,7 @@ class HeadlessAgentDriver(
      * dictionary — the full-search alias — under the current single selection).
      */
     private fun opRunSearch(command: AgentCommand): AgentResult {
-        val query = command.require("query", command.query)
+        val query = command.require("query", command.query).trim()
         lastQuery = query
         val results = searchResults(query)
         return AgentResult(
@@ -126,7 +126,7 @@ class HeadlessAgentDriver(
 
     private fun opOpen(command: AgentCommand): AgentResult {
         if (command.uri != null) return opOpenUri(command)
-        val query = command.require("query", command.query)
+        val query = command.require("query", command.query).trim()
         val results = searchResults(query)
         lastQuery = query
 
@@ -332,10 +332,12 @@ class HeadlessAgentDriver(
     }
 
     private fun searchResults(query: String): List<SearchResult> {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return emptyList()
         if (selection.size > 1) {
-            return MultiDict.search(activeDicts.map { it.asLookup(fetch) }, query)
+            return MultiDict.search(activeDicts.map { it.asLookup(fetch) }, trimmed)
         }
-        return active.searchResults(fetch(active.searchUrl(query)))
+        return active.searchResults(fetch(active.searchUrl(trimmed)))
     }
 
     private fun snapshot(): AgentState =

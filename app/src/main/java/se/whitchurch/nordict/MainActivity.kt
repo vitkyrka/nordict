@@ -110,7 +110,9 @@ class MainActivity : AppCompatActivity() {
      * used by the debug agent driver.
      */
     fun navigateToSearch(query: String) {
-        navController?.navigate(searchRoute(query)) { launchSingleTop = true }
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return
+        navController?.navigate(searchRoute(trimmed)) { launchSingleTop = true }
     }
 
     /**

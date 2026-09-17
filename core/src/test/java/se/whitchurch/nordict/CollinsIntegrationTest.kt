@@ -54,6 +54,28 @@ class CollinsIntegrationTest {
     }
 
     @Test
+    fun testSearchTrimsSurroundingWhitespace() {
+        val json = File("../testdata/colspan-search.json").readText()
+        server.enqueue(MockResponse().setBody(json))
+
+        val results = dictionary.search("  cagar  ")
+
+        assertThat(results).isNotEmpty()
+        assertThat(results[0].mTitle).isEqualTo("cagar")
+
+        val request = server.takeRequest()
+        assertThat(request.requestUrl?.queryParameter("q")).isEqualTo("cagar")
+    }
+
+    @Test
+    fun testSearchBlankReturnsEmptyWithoutRequest() {
+        val results = dictionary.search("   ")
+
+        assertThat(results).isEmpty()
+        assertThat(server.requestCount).isEqualTo(0)
+    }
+
+    @Test
     fun testGet() {
         val html = File("../testdata/colspan/morir.html").readText()
         server.enqueue(MockResponse().setBody(html))

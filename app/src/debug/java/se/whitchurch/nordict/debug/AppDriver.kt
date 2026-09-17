@@ -72,7 +72,7 @@ class AppDriver(private val app: android.app.Application) {
     }
 
     private fun opSearch(command: AgentCommand): AgentResult {
-        val query = command.require("query", command.query)
+        val query = command.require("query", command.query).trim()
         val results = ordboken().search(query, 0)
         return AgentResult(
             ok = true,
@@ -91,7 +91,7 @@ class AppDriver(private val app: android.app.Application) {
      * keys) surfaces here instead of racing the caller.
      */
     private fun opRunSearch(command: AgentCommand): AgentResult {
-        val query = command.require("query", command.query)
+        val query = command.require("query", command.query).trim()
         closeCardScreenIfUp()
         onMain {
             requireMainActivity().navigateToSearch(query)
@@ -107,7 +107,7 @@ class AppDriver(private val app: android.app.Application) {
 
     private fun opOpen(command: AgentCommand): AgentResult {
         if (command.uri != null) return opOpenUri(command)
-        val query = command.require("query", command.query)
+        val query = command.require("query", command.query).trim()
         val results = ordboken().search(query, 0)
         val exact = ExactMatch.resolve(query, results)
         if (exact == null) {

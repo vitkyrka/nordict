@@ -86,11 +86,13 @@ object MultiDict {
      * one [SearchResult] whose `dicts`/`sources` carry every dictionary's tag
      * and page (deduplicated per dictionary, first summary kept).
      */
-    fun search(lookups: List<WordLookup>, query: String): List<SearchResult> =
-        mergeSearch(lookups.map { lookup ->
+    fun search(lookups: List<WordLookup>, query: String): List<SearchResult> {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return emptyList()
+        return mergeSearch(lookups.map { lookup ->
             pool.submit<Pair<String, List<SearchResult>>> {
                 try {
-                    lookup.tag to lookup.search(query)
+                    lookup.tag to lookup.search(trimmed)
                 } catch (e: Exception) {
                     log.severe("combined search failed for ${lookup.tag}: ${e.message}")
                     lookup.tag to emptyList()
@@ -104,6 +106,7 @@ object MultiDict {
                 "" to emptyList()
             }
         })
+    }
 
     /**
      * Merges already-fetched per-dictionary [results] (tag, list) into one
@@ -144,10 +147,12 @@ object MultiDict {
      * word are skipped; the result keeps the selection's order.
      */
     fun resolveExact(lookups: List<WordLookup>, headword: String): List<CombSource> {
+        val trimmed = headword.trim()
+        if (trimmed.isEmpty()) return emptyList()
         val futures = lookups.map { lookup ->
             pool.submit<Pair<String, SearchResult?>> {
                 try {
-                    lookup.tag to ExactMatch.resolve(headword, lookup.search(headword))
+                    lookup.tag to ExactMatch.resolve(trimmed, lookup.search(trimmed))
                 } catch (e: Exception) {
                     log.severe("combined exact search failed for ${lookup.tag}: ${e.message}")
                     lookup.tag to null

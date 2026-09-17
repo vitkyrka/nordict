@@ -144,8 +144,10 @@ fun NordictApp(
     }
 
     fun runSearch(query: String) {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return
         scope.launch { searchBarState.animateToCollapsed() }
-        navController.navigate(searchRoute(query)) { launchSingleTop = true }
+        navController.navigate(searchRoute(trimmed)) { launchSingleTop = true }
     }
 
     LaunchedEffect(navController) { onNavController(navController) }
@@ -215,12 +217,13 @@ fun NordictApp(
     // a single-dict switch, where `activeDicts` (the only state
     // `selectionSignature` reads) never changes.
     LaunchedEffect(searchQuery, ordboken.currentIndex, ordboken.selectionSignature) {
-        if (searchQuery.isBlank()) {
+        val trimmed = searchQuery.trim()
+        if (trimmed.isEmpty()) {
             suggestions = emptyList()
             return@LaunchedEffect
         }
         delay(300)
-        suggestions = withContext(Dispatchers.IO) { ordboken.search(searchQuery, 50) }
+        suggestions = withContext(Dispatchers.IO) { ordboken.search(trimmed, 50) }
     }
 
     // The search field shared by the collapsed bar and the expanded fullscreen
@@ -367,8 +370,6 @@ fun NordictApp(
                 Box(modifier = Modifier.focusRequester(sheetFieldFocus)) {
                     inputField()
                 }
-                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
-
                 // The dictionary nav (language switcher + dict chips) lives on
                 // the search sheet rather than sharing a strip with every
                 // screen: it only matters while picking what to search, so it

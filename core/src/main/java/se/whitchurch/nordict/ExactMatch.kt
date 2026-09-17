@@ -15,7 +15,8 @@ object ExactMatch {
     fun resolve(query: String, results: List<SearchResult>): SearchResult? {
         if (results.isEmpty()) return null
 
-        val exact = results.filter { it.mTitle.equals(query, ignoreCase = true) }
+        val trimmed = query.trim()
+        val exact = results.filter { it.mTitle.equals(trimmed, ignoreCase = true) }
         return exact.singleOrNull()
     }
 }

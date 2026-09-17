@@ -408,10 +408,13 @@ class Main {
         }
 
         try {
-            val w = word ?: when {
+            val w = (word ?: when {
                 filePath != null -> fallbackWord(filePath)
                 url != null -> url.pathSegments.lastOrNull() ?: ""
                 else -> ""
+            }).trim()
+            if (w.isEmpty() && url == null && filePath == null) {
+                return error("empty query — type a word to look up")
             }
             if (url != null || filePath != null) {
                 if (selection.size > 1) {

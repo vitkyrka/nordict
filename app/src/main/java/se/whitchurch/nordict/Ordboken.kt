@@ -197,13 +197,15 @@ class Ordboken private constructor(
     }
 
     fun search(query: String, count: Int): List<SearchResult> {
-        val key = "$selectionSignature:$query"
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return emptyList()
+        val key = "$selectionSignature:$trimmed"
         var results: List<SearchResult>?
 
         results = mSearchResultCache.get(key)
         if (results == null) {
-            results = if (activeDicts.isNotEmpty()) MultiDict.search(activeDicts, query)
-            else currentDictionary.search(query)
+            results = if (activeDicts.isNotEmpty()) MultiDict.search(activeDicts, trimmed)
+            else currentDictionary.search(trimmed)
             mSearchResultCache.put(key, results)
         }
 

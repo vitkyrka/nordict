@@ -78,6 +78,14 @@ class ExactMatchTest {
     }
 
     @Test
+    fun surroundingWhitespaceStillMatches() {
+        val results = listOf(result("persona", "https://dict.example/persona"))
+        val match = ExactMatch.resolve("  persona  ", results)
+        assertThat(match).isNotNull()
+        assertThat(match!!.mTitle).isEqualTo("persona")
+    }
+
+    @Test
     fun exactMatchWithOtherDifferentResultsNavigates() {
         val results = listOf(
             result("cagar", "https://dict.example/cagar"),

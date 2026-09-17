@@ -37,7 +37,8 @@ fun SearchScreen(
     var error by remember(query, retries) { mutableStateOf<String?>(null) }
 
     LaunchedEffect(query, ordboken.currentIndex, retries) {
-        if (query.isBlank()) {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
             results = emptyList()
             isLoading = false
             error = null
@@ -50,7 +51,7 @@ fun SearchScreen(
                 null
             } else {
                 try {
-                    ordboken.currentDictionary.fullSearch(query)
+                    ordboken.currentDictionary.fullSearch(trimmed)
                 } catch (e: Exception) {
                     null
                 }

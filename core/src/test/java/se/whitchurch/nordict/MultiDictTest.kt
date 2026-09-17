@@ -227,6 +227,16 @@ class MultiDictTest {
     }
 
     @Test
+    fun combinedSearchTrimsSurroundingWhitespace() {
+        val padded = MultiDict.search(lookups(), "  frente  ")
+
+        assertThat(padded).isNotEmpty()
+        assertThat(padded.first { it.mTitle == "frente" }.dicts)
+            .containsExactly("DLE", "EST").inOrder()
+        assertThat(MultiDict.search(lookups(), "   ")).isEmpty()
+    }
+
+    @Test
     fun resolveExactKeepsMatchingDictionariesInSelectionOrder() {
         val both = MultiDict.resolveExact(lookups(), "frente")
         assertThat(both.map { it.tag }).containsExactly("DLE", "EST").inOrder()

@@ -52,9 +52,11 @@ abstract class CollinsDictionary(
     }
 
     override fun search(query: String): List<SearchResult> {
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) return emptyList()
         val base = baseUrl.toHttpUrlOrNull()!!
         val url = base.resolve("/autocomplete/")!!.newBuilder()!!
-            .addQueryParameter("q", query)
+            .addQueryParameter("q", trimmed)
             .addQueryParameter("dictCode", dictCode)
             .build()
 
