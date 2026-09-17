@@ -129,7 +129,19 @@ class ImagePicker : AppCompatActivity() {
 
         @JavascriptInterface
         fun pushPickerHtml(html: String) {
-            // Not needed - handled by onPageFinished
+            runOnUiThread {
+                // Render the picker at the gstatic origin: the thumbnails were
+                // extracted as host-relative /images?q=tbn:... URLs, so with the
+                // GSTATIC_SERVER base they resolve back onto google's thumbnail
+                // server and stay same-origin, keeping toDataURL()'s canvas from
+                // tainting. The navigation to GSTATIC_SERVER also flips
+                // blockNetworkImage off in onPageFinished.
+                ImagePickerWebViewHolder.current?.loadDataWithBaseURL(
+                    GSTATIC_SERVER,
+                    html + "<script>" + getImagePickerJs() + "</script>",
+                    "text/html", "UTF-8", null
+                )
+            }
         }
     }
 

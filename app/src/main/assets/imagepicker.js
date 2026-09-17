@@ -80,6 +80,18 @@ var getPickerHtml = function(...args) {
         console.log("src: " + src);
         console.log("data-src: " + els[i].dataset.src);
 
+        /*
+         * The modern results grid is littered with tiny data-URL icons
+         * (logo/account/feature glyphs) and blur-up placeholders. Real
+         * thumbnails have a layout size of at least 100px; skip anything
+         * smaller so it doesn't flood the picker.
+         */
+        var w = els[i].width;
+        var h = els[i].height;
+        if (w && h && Math.min(w, h) < 100) {
+            continue;
+        }
+
         if (src && (src.substr(0, 5) == 'data:' || src.indexOf('q=tbn') != -1)) {
             html += imgElement(src);
         }
