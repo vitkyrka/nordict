@@ -107,6 +107,14 @@ class WordViewModel(
     var onReplaceSources: ((SearchResult) -> Unit)? = null
     var onReplaceWord: ((Uri, String) -> Unit)? = null
 
+    // Gate for the selection-reload path. NordictApp sets this to false while
+    // the search sheet is expanded: the language/dictionary picker lives on
+    // the sheet, so switches made there scope the upcoming search and must
+    // not reload the word underneath (switching away to B and back to A would
+    // otherwise look like a same-language change on return and pop+reload the
+    // word, collapsing the sheet).
+    var selectionReloadAllowed: () -> Boolean = { true }
+
     var mWord: Word? by mutableStateOf(null)
     var autoPlay: Boolean by mutableStateOf(false)
     var webViewVisible: Boolean by mutableStateOf(false)
@@ -463,6 +471,10 @@ class WordViewModel(
      * the word, so there is nothing to cross-search.
      */
     fun onSelectionChanged() {
+        // Selection changes made while the search sheet is expanded scope the
+        // upcoming search; they must neither reload the covered word nor
+        // collapse the sheet (see selectionReloadAllowed).
+        if (!selectionReloadAllowed()) return
         val word = mWord
         if (word == null) {
             // A quick change can land while this destination's word is still
@@ -605,7 +617,8 @@ fun WordScreen(
     onOpenExternal: (List<Uri>) -> Unit,
     onFillSearch: (String) -> Unit,
     onReplaceSources: (SearchResult) -> Unit,
-    onReplaceWord: (Uri, String) -> Unit
+    onReplaceWord: (Uri, String) -> Unit,
+    isSearchExpanded: () -> Boolean = { false }
 ) {
     vm.onOpenUri = onOpenUri
     vm.onOpenSources = onOpenSources
@@ -613,6 +626,7 @@ fun WordScreen(
     vm.onFillSearch = onFillSearch
     vm.onReplaceSources = onReplaceSources
     vm.onReplaceWord = onReplaceWord
+    vm.selectionReloadAllowed = { !isSearchExpanded() }
 
     val word = vm.mWord
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -915,12 +929,13 @@ fun WordRoute(
     onOpenExternal: (List<Uri>) -> Unit,
     onFillSearch: (String) -> Unit,
     onReplaceSources: (SearchResult) -> Unit = onOpenSources,
-    onReplaceWord: (Uri, String) -> Unit = onOpenUri
+    onReplaceWord: (Uri, String) -> Unit = onOpenUri,
+    isSearchExpanded: () -> Boolean = { false }
 ) {
     val vm: WordViewModel = viewModel(entry)
     Log.i("word", "rendering word route for ${vm.mWord}")
     WordScreen(
         vm, ordboken, onOpenUri, onOpenSources, onOpenExternal, onFillSearch,
-        onReplaceSources, onReplaceWord
+        onReplaceSources, onReplaceWord, isSearchExpanded
     )
 }

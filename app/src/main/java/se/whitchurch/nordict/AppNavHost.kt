@@ -288,7 +288,8 @@ fun NordictApp(
                             scope.launch { searchBarState.animateToExpanded() }
                         },
                         onReplaceSources = { result -> replaceSources(result) },
-                        onReplaceWord = { uri, title -> replaceWord(uri, title) }
+                        onReplaceWord = { uri, title -> replaceWord(uri, title) },
+                        isSearchExpanded = { searchBarState.currentValue != SearchBarValue.Collapsed }
                     )
                 }
             }

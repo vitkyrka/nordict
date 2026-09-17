@@ -117,7 +117,12 @@ class NavigationRegressionTest {
             client,
             arrayOf(
                 DleDictionary(client, dleBase()),
-                EstDictionary(client, estBase())
+                EstDictionary(client, estBase()),
+                // A second language for the language-switch tests. It is never
+                // fetched (switches to it skip the cross-dictionary reload and
+                // nothing ever searches through it), so the live default base
+                // URL is fine.
+                GdlcDictionary(client)
             )
         )
         // Create the history tables exactly once, before the activity
@@ -534,6 +539,77 @@ class NavigationRegressionTest {
             .assertDoesNotExist()
         assertThat(composeRule.activity.navController?.currentDestination?.route)
             .startsWith("word?")
+    }
+
+    @Test
+    fun languageSwitchAwayAndBackWithSearchOpenKeepsTheSheetOpen() {
+        awaitNav()
+
+        // Open the DLE word "frente" with the search sheet closed.
+        dle.enqueue(MockResponse().setBody(dleFrente()))
+        openWord(dle, "/frente")
+        assertThat(ordboken().currentWord?.dict).isEqualTo("DLE")
+        val wordUri = ordboken().currentWord!!.uri.toString()
+
+        // Open the search sheet (synthetic touch tap, see the back-collapse
+        // test): the language menu proves the sheet (and its dictionary nav)
+        // is showing.
+        composeRule.onNode(hasSetTextAction())
+            .performTouchInput {
+                down(center)
+                up()
+            }
+        composeRule.waitForIdle()
+        val langMenu = app!!.getString(R.string.change_language)
+        composeRule.onNodeWithContentDescription(langMenu).assertExists()
+        val vmBefore = topWordViewModel()
+        assertThat(vmBefore).isNotNull()
+
+        // If the word reloaded under the sheet (the bug), the return switch
+        // would search DLE for the headword and re-fetch the page: pre-enqueue
+        // both so a regressed run completes instead of stalling on the
+        // MockWebServer.
+        dle.enqueue(MockResponse().setBody("""["frente|frente"]"""))
+        dle.enqueue(MockResponse().setBody(dleFrente()))
+
+        // Switch to Catalan and back while the sheet stays open.
+        onMain { ordboken().setLanguage("ca") }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithContentDescription(langMenu).assertExists()
+        onMain { ordboken().setLanguage("es") }
+
+        // Give a regressed reload (search + re-fetch + pop-then-push +
+        // collapse) time to land before asserting; stop early if the sheet
+        // already collapsed.
+        val start = System.currentTimeMillis()
+        while (System.currentTimeMillis() - start < 3000) {
+            shadowOf(Looper.getMainLooper()).idle()
+            try {
+                composeRule.waitForIdle()
+            } catch (t: Throwable) {
+                // idling can be interrupted while a fresh destination recomposes
+            }
+            val sheetOpen = try {
+                composeRule.onAllNodesWithContentDescription(langMenu)
+                    .fetchSemanticsNodes().size > 0
+            } catch (t: Throwable) {
+                true
+            }
+            if (!sheetOpen) break
+            Thread.sleep(50)
+        }
+
+        // The sheet must still be open...
+        composeRule.onNodeWithContentDescription(langMenu).assertExists()
+        // ...over the untouched word (same destination, same article): the
+        // return switch must not have reloaded the covered word.
+        assertThat(topWordViewModel()).isSameInstanceAs(vmBefore)
+        assertThat(ordboken().currentWord?.dict).isEqualTo("DLE")
+        assertThat(ordboken().currentWord?.uri?.toString()).isEqualTo(wordUri)
+        // And the sheet kept following the restored language.
+        composeRule.onNodeWithText("DLE").assertExists()
+        composeRule.onNodeWithText("EST").assertExists()
+        composeRule.onNodeWithText("GDLC").assertDoesNotExist()
     }
 
     @Test
