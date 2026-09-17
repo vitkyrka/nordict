@@ -669,6 +669,32 @@ class NavigationRegressionTest {
     }
 
     @Test
+    fun dictionaryNavLivesOnTheExpandedSearchSheetOnly() {
+        awaitNav()
+
+        // Collapsed: the dictionary nav (language switcher + dict chips) moved
+        // off the main screens — only the search bar remains, so the nav
+        // controls are absent from the home screen.
+        composeRule.onNodeWithText("DLE").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription(app!!.getString(R.string.change_language))
+            .assertDoesNotExist()
+
+        // Expanding the search sheet reveals the dictionary nav pinned above
+        // the suggestions panel (the language split button + the combining
+        // chips of the current language).
+        composeRule.onNode(hasSetTextAction())
+            .performTouchInput {
+                down(center)
+                up()
+            }
+        composeRule.waitForIdle()
+        composeRule.onNodeWithText("DLE").assertExists()
+        composeRule.onNodeWithText("EST").assertExists()
+        composeRule.onNodeWithContentDescription(app!!.getString(R.string.change_language))
+            .assertExists()
+    }
+
+    @Test
     fun collapsedSearchBarMatchesTheMaterial3Geometry() {
         awaitNav()
 

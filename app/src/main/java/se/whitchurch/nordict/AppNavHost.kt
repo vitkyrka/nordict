@@ -63,9 +63,10 @@ fun searchRoute(query: String): String =
 
 /**
  * The single-activity app shell: one globally visible MD3 [SearchBar] (with
- * debounced live suggestions from [Ordboken.search]) and the
- * [DictionaryNav] row above a Navigation-Compose [NavHost] with three
- * destinations — home (history), search results, and the word view.
+ * debounced live suggestions from [Ordboken.search]) and a
+ * Navigation-Compose [NavHost] with three destinations — home (history),
+ * search results, and the word view. The [DictionaryNav] (language switcher +
+ * dictionary chips) lives on the expanded search sheet, above the suggestions.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -235,8 +236,6 @@ fun NordictApp(
             inputField = inputField
         )
 
-        DictionaryNav(ordboken = ordboken, modifier = Modifier.padding(horizontal = 8.dp))
-
         HorizontalDivider()
 
         Box(modifier = Modifier.weight(1f)) {
@@ -322,7 +321,6 @@ fun NordictApp(
                 modifier = Modifier
                     .fillMaxSize()
                     .imePadding()
-                    .verticalScroll(rememberScrollState())
             ) {
                 // Single focusable copy of the field lives in the sheet while
                 // it is open, so the caret/selection is visible in the window
@@ -332,89 +330,104 @@ fun NordictApp(
                 }
                 HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
 
-                val currentWord = ordboken.currentWord
-                if (searchQuery.isBlank() && currentWord != null) {
-                    // Artificial first suggestion with an empty search bar: the
-                    // current word. The trailing north-west arrow fills the word
-                    // into the search field for easy manual editing (as the legacy
-                    // SearchView's query-refinement arrow did), placing the caret
-                    // at the end so a backspace strips trailing suffixes; tapping
-                    // the row itself reopens the word, like any other suggestion.
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { openWord(currentWord.uri.toAndroidUri(), currentWord.mTitle) }
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = currentWord.searchHeadword,
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Medium,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            if (currentWord.dictionary.isNotEmpty()) {
-                                Text(
-                                    text = currentWord.dictionary,
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
-                        IconButton(
-                            onClick = { textFieldState.setTextAndPlaceCursorAtEnd(currentWord.searchHeadword) }
-                        ) {
-                            Icon(
-                                Icons.Filled.NorthWest,
-                                contentDescription = context.getString(R.string.search_fill_current_word),
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                } else if (suggestions.isEmpty()) {
-                    Text(
-                        text = context.getString(R.string.no_results),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(16.dp)
-                    )
-                } else {
-                    suggestions.forEach { result ->
+                // The dictionary nav (language switcher + dict chips) lives on
+                // the search sheet rather than sharing a strip with every
+                // screen: it only matters while picking what to search, so it
+                // pins above the live suggestions here (and re-renders as the
+                // selection changes). The collapsed header holds just the
+                // search bar, its leading flag showing the current language.
+                DictionaryNav(ordboken = ordboken, modifier = Modifier.padding(horizontal = 8.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
+
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    val currentWord = ordboken.currentWord
+                    if (searchQuery.isBlank() && currentWord != null) {
+                        // Artificial first suggestion with an empty search bar: the
+                        // current word. The trailing north-west arrow fills the word
+                        // into the search field for easy manual editing (as the legacy
+                        // SearchView's query-refinement arrow did), placing the caret
+                        // at the end so a backspace strips trailing suffixes; tapping
+                        // the row itself reopens the word, like any other suggestion.
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { openSources(result) }
+                                .clickable { openWord(currentWord.uri.toAndroidUri(), currentWord.mTitle) }
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = result.mTitle,
+                                    text = currentWord.searchHeadword,
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.Medium,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis
                                 )
-                                if (result.dicts.isNotEmpty()) {
+                                if (currentWord.dictionary.isNotEmpty()) {
                                     Text(
-                                        text = result.dicts.joinToString(" · "),
+                                        text = currentWord.dictionary,
                                         fontSize = 11.sp,
                                         color = MaterialTheme.colorScheme.primary,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                 }
-                                if (result.mSummary.isNotEmpty()) {
+                            }
+                            IconButton(
+                                onClick = { textFieldState.setTextAndPlaceCursorAtEnd(currentWord.searchHeadword) }
+                            ) {
+                                Icon(
+                                    Icons.Filled.NorthWest,
+                                    contentDescription = context.getString(R.string.search_fill_current_word),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                    } else if (suggestions.isEmpty()) {
+                        Text(
+                            text = context.getString(R.string.no_results),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(16.dp)
+                        )
+                    } else {
+                        suggestions.forEach { result ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { openSources(result) }
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = result.mSummary,
-                                        fontSize = 13.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        text = result.mTitle,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Medium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
+                                    if (result.dicts.isNotEmpty()) {
+                                        Text(
+                                            text = result.dicts.joinToString(" · "),
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                    if (result.mSummary.isNotEmpty()) {
+                                        Text(
+                                            text = result.mSummary,
+                                            fontSize = 13.sp,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
                         }
