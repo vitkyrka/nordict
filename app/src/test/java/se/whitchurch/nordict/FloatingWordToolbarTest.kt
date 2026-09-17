@@ -122,11 +122,18 @@ class FloatingWordToolbarTest {
         val visible = composeRule
             .onNodeWithContentDescription(string(R.string.menu_play_audio))
             .getBoundsInRoot()
+        // The pill measured itself and published its travel distance (M3's
+        // BottomAppBarLayout does the same for the real bottom bar); without it
+        // heightOffset could never leave 0.
+        assertThat(behavior.state.heightOffsetLimit).isLessThan(0f)
 
-        // A downward WebView scroll feeds a negative contentOffset; the bar
-        // must translate down by its own height + the bottom padding, so the
-        // play button's top is pushed at least to where its bottom used to be.
-        composeRule.runOnIdle { behavior.state.contentOffset = -10_000f }
+        // A downward WebView scroll drives the clamped heightOffset to that
+        // limit; the bar must translate down by its own height + the bottom
+        // padding, so the play button's top is pushed at least to where its
+        // bottom used to be.
+        composeRule.runOnIdle {
+            behavior.state.heightOffset = behavior.state.heightOffsetLimit
+        }
         composeRule.waitForIdle()
         val hidden = composeRule
             .onNodeWithContentDescription(string(R.string.menu_play_audio))
@@ -134,7 +141,7 @@ class FloatingWordToolbarTest {
         assertThat(hidden.top.value).isAtLeast(visible.bottom.value)
 
         // A scroll back up returns it to its resting spot.
-        composeRule.runOnIdle { behavior.state.contentOffset = 0f }
+        composeRule.runOnIdle { behavior.state.heightOffset = 0f }
         composeRule.waitForIdle()
         val restored = composeRule
             .onNodeWithContentDescription(string(R.string.menu_play_audio))

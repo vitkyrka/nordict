@@ -130,7 +130,8 @@ class WordViewModel(
     // The word action bar's exit-always scroll behavior, wired by WordScreen
     // on every composition. It owns the nested-scroll connection that the bar
     // listens to; the pinned WebView feeds it through webViewScrolled, and the
-    // floating bar reads its state's contentOffset to slide off/on screen.
+    // floating bar reads its state's clamped heightOffset to slide off/on
+    // screen.
     var bottomBarScrollBehavior: BottomAppBarScrollBehavior? = null
 
     /**
@@ -260,16 +261,7 @@ class WordViewModel(
     fun restoreWebViewScroll() {
         if (savedScrollY > 0) {
             val view = webView ?: return
-            view.post {
-                // The restore scroll is programmatic, not user-driven: feeding
-                // it into the scroll behavior would double-count the offset
-                // (the contentOffset state is restored from saved state and
-                // the WebView starts at the top), leaving the toolbar beyond
-                // the reach of a burst of scrolling back up. Ignore it.
-                suppressScrollBridge = true
-                view.scrollTo(0, savedScrollY)
-                suppressScrollBridge = false
-            }
+            view.post { view.scrollTo(0, savedScrollY) }
         }
     }
 
@@ -390,7 +382,6 @@ class WordViewModel(
      * expects to collapse.
      */
     fun webViewScrolled(oldScrollY: Int, scrollY: Int) {
-        if (suppressScrollBridge) return
         val behavior = bottomBarScrollBehavior ?: return
         val delta = scrollY - oldScrollY
         if (delta == 0) return
@@ -400,15 +391,6 @@ class WordViewModel(
             source = NestedScrollSource.Drag,
         )
     }
-
-    /**
-     * When true, [webViewScrolled] ignores scroll events. This prevents the
-     * programmatic scroll restore in [restoreWebViewScroll] from double-counting
-     * the scroll offset: [bottomBarScrollBehavior]'s contentOffset is already
-     * restored from saved state, so feeding the restore scroll into it would
-     * push the toolbar permanently out of reach.
-     */
-    private var suppressScrollBridge = false
 
     fun loadWebView(word: Word) {
         val webView = this.webView ?: return
@@ -763,10 +745,11 @@ fun WordScreen(
         // Floating word action bar: a rounded, elevated pill floating above
         // the WebView, which runs behind it all the way to the screen bottom
         // so the bar can slide away and reveal the page's last lines. Its
-        // vertical position follows the M3 exit-always scroll behavior —
-        // contentOffset grows negative as the pinned WebView scrolls down, and
-        // the bar translates down by that amount (clamped so it fully exits),
-        // sliding back in on a scroll up.
+        // vertical position follows the M3 exit-always scroll behavior:
+        // heightOffset is clamped to the bar's travel distance, so the bar is
+        // fully out once the page has scrolled down by its own height and
+        // slides back in as soon as the user scrolls up — regardless of how
+        // far down the page is.
         if (word != null) {
             FloatingWordToolbar(
                 modifier = Modifier
@@ -802,10 +785,13 @@ fun WordScreen(
  *  menu rightmost, sized to wrap its content.
  *
  *  Like the M3 bottom-app-bar it replaced, the bar hides on a downward content
- *  scroll and returns on an upward one: the pinned WebView's scroll feeds
- *  [scrollBehavior], whose [BottomAppBarState.contentOffset] grows negative on
- *  scroll-down, and the bar is translated down by that amount — clamped so it
- *  fully leaves the screen — staying off-screen until the user scrolls back up.
+ *  scroll and returns on an upward one. M3's own bottom bar measures itself and
+ *  sets [BottomAppBarState.heightOffsetLimit] to minus its height, so its
+ *  `heightOffset` stays clamped to the bar's travel distance; a custom bar has
+ *  to do the same, otherwise the limit stays 0 and the bar can never move (the
+ *  unbounded `contentOffset` is not a substitute: once it is past the travel
+ *  distance the bar is stuck off-screen until the page is back near the top).
+ *  Position the pill from the clamped `heightOffset`.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -826,10 +812,17 @@ internal fun FloatingWordToolbar(
     var toolbarHeight by remember { mutableIntStateOf(0) }
     Surface(
         modifier = modifier
-            .onSizeChanged { toolbarHeight = it.height }
+            .onSizeChanged {
+                toolbarHeight = it.height
+                // M3's BottomAppBarLayout does this in its measure pass; with
+                // a custom bar nothing else sets it, so without it
+                // heightOffset stays pinned at 0.
+                scrollBehavior.state.heightOffsetLimit =
+                    -(it.height + bottomPaddingPx).toFloat()
+            }
             .offset {
                 val hideDistance = (toolbarHeight + bottomPaddingPx).coerceAtLeast(1)
-                val slideDown = (-scrollBehavior.state.contentOffset)
+                val slideDown = (-scrollBehavior.state.heightOffset)
                     .coerceIn(0f, hideDistance.toFloat())
                     .roundToInt()
                 IntOffset(0, slideDown)

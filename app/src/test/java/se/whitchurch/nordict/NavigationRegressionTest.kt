@@ -785,22 +785,33 @@ class NavigationRegressionTest {
         awaitCondition(message = "word renders and wires the bar behavior") {
             vm.bottomBarScrollBehavior != null
         }
-
-        // Words scroll inside the pinned WebView (invisible to Compose
-        // nested scroll), so WordScreen bridges it to the bar behavior: a
-        // downward WebView scroll must hide the bar, an upward one restore
-        // it (the size the platform scroll listener reports in real use).
-        // The floating bar slides by contentOffset, the same state the
-        // bottom-app-bar height used to carry.
-        onMain { vm.webViewScrolled(0, 800) }
-        awaitCondition(message = "scrolling the WebView down hides the bar") {
-            vm.bottomBarScrollBehavior!!.state.contentOffset < 0f
+        val behavior = vm.bottomBarScrollBehavior!!
+        // The custom pill must measure itself and set the travel limit, like
+        // M3's BottomAppBarLayout does; without it heightOffset stays 0.
+        awaitCondition(message = "the bar recorded its travel distance") {
+            behavior.state.heightOffsetLimit < 0f
         }
 
-        onMain { vm.webViewScrolled(800, 0) }
-        awaitCondition(message = "scrolling the WebView back up restores the bar") {
-            vm.bottomBarScrollBehavior!!.state.contentOffset == 0f
-        }
+        val rootHeight = composeRule.onRoot().fetchSemanticsNode().size.height.toFloat()
+        val restingTop = toolbarTop()
+        assertThat(restingTop).isLessThan(rootHeight)
+
+        // Words scroll inside the pinned WebView (invisible to Compose nested
+        // scroll), so WordScreen bridges it to the bar behavior: a downward
+        // scroll hides the bar by its own travel distance, leaving the pill
+        // fully below the root.
+        onMain { vm.webViewScrolled(0, 8000) }
+        assertThat(toolbarTop()).isAtLeast(rootHeight)
+
+        // A small scroll back up starts revealing it immediately, however far
+        // down the page is (the regression: reading the unbounded contentOffset
+        // kept the bar off-screen until the page was back near the top).
+        onMain { vm.webViewScrolled(8000, 7980) }
+        assertThat(toolbarTop()).isLessThan(rootHeight)
+
+        // Scrolling all the way back restores the resting position.
+        onMain { vm.webViewScrolled(7980, 0) }
+        assertThat(toolbarTop()).isWithin(0.5f).of(restingTop)
     }
 
     @Test
@@ -857,6 +868,17 @@ class NavigationRegressionTest {
     private fun scrolledWebView(scrollY: Int): WebView =
         WebView(composeRule.activity).also { it.scrollTo(0, scrollY) }
 
+    /** The top edge of the floating word bar (its always-present add-card
+     * button) relative to the root; at or below the root height when the bar is
+     * fully out. Uses `positionInRoot` because `boundsInRoot` clips a node that
+     * is off-screen back to the origin. */
+    private fun toolbarTop(): Float {
+        composeRule.waitForIdle()
+        return composeRule
+            .onNodeWithContentDescription(app!!.getString(R.string.menu_add_card))
+            .fetchSemanticsNode().positionInRoot.y
+    }
+
     @Test
     fun jsonWordScrollPositionSurvivesAnotherWordCoveringItAndBack() {
         awaitNav()
@@ -895,25 +917,29 @@ class NavigationRegressionTest {
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Test
-    fun jsonWordScrollRestoreDoesNotDoubleCountTheHidBar() {
+    fun jsonWordScrollRestoreDoesNotStrandTheHidBar() {
         awaitNav()
 
-        // Word A is scrolled down with the word bar hidden (contentOffset
-        // negative) — the starting state for the bug: navigating away and
-        // coming back must not push the bar permanently out of reach.
+        // Word A is scrolled far down with the word bar fully hidden.
         est.enqueue(MockResponse().setBody(estFrente()))
         openWord(est, "/frente")
         val a = topWordViewModel()!!
+        awaitCondition(message = "the bar recorded its travel distance") {
+            a.bottomBarScrollBehavior?.state?.heightOffsetLimit ?: 0f < 0f
+        }
+        val rootHeight = composeRule.onRoot().fetchSemanticsNode().size.height.toFloat()
         onMain {
             a.webView = scrolledWebView(800)
-            a.webViewScrolled(0, 800)
+            a.webViewScrolled(0, 8000)
             a.captureScroll()
         }
+        assertThat(toolbarTop()).isAtLeast(rootHeight)
 
         // Push word B over A, then pop back to A exactly like the covered
         // destination flow: the re-created WebView starts at the top and the
         // page-finish listener restores the saved offset with
-        // restoreWebViewScroll.
+        // restoreWebViewScroll, whose programmatic scroll fires the bridge
+        // again ("double-counting" the raw offset).
         est.enqueue(MockResponse().setBody(estMuerte()))
         openWord(est, "/muerte")
         onMain { composeRule.activity.navController?.popBackStack() }
@@ -922,25 +948,22 @@ class NavigationRegressionTest {
             vm != null && vm.webView != null
         }
 
-        // The scroll restore is programmatic: it must scroll the WebView but
-        // NOT feed the same offset through the webViewScrolled bridge a second
-        // time (the bar behavior restored its own state on recomposition).
-        // Before the fix that double-counting moved contentOffset another
-        // savedScrollY deep, so an up-scroll could only recover half of it and
-        // the bar never reappeared on word A.
         val vm = topWordViewModel()!!
-        val before = onMain { vm.bottomBarScrollBehavior!!.state.contentOffset }
         onMain { vm.restoreWebViewScroll() }
         awaitCondition(message = "re-created WebView is scrolled back down") {
             topWordViewModel()?.webView?.scrollY == 800
         }
-        val after = onMain { vm.bottomBarScrollBehavior!!.state.contentOffset }
-        assertThat(after).isEqualTo(before)
 
-        // The user scrolls back up to the top: the bar must fully return.
-        onMain { vm.webViewScrolled(800, 0) }
-        assertThat(onMain { vm.bottomBarScrollBehavior!!.state.contentOffset })
-            .isAtLeast(0f)
+        // Because the bar is positioned from the clamped heightOffset, the
+        // re-fed restore scroll can't push it out of reach: it is still exactly
+        // one travel distance out...
+        assertThat(toolbarTop()).isAtLeast(rootHeight)
+
+        // ...and a small scroll up brings it straight back on screen (before,
+        // the unbounded contentOffset ended a full savedScrollY deeper than any
+        // up-scroll could recover, so the bar never reappeared on word A).
+        onMain { vm.webViewScrolled(800, 780) }
+        assertThat(toolbarTop()).isLessThan(rootHeight)
     }
 
     @Test
