@@ -105,7 +105,7 @@ object MultiDict {
                 log.severe("combined search interrupted: ${e.message}")
                 "" to emptyList()
             }
-        })
+        }, trimmed)
     }
 
     /**
@@ -114,9 +114,11 @@ object MultiDict {
      * and "trinidad" are one entry, keeping the first-seen casing); the merged
      * entries are then ordered alphabetically by title, ignoring case, so the
      * combined list reads as one case-folded dictionary rather than per-source
-     * selection order.
+     * selection order. Entries whose title starts with [query] (case-folded)
+     * sort before all others, so an exact/prefix match like "frente" is not
+     * buried under "al frente".
      */
-    fun mergeSearch(results: List<Pair<String, List<SearchResult>>>): List<SearchResult> {
+    fun mergeSearch(results: List<Pair<String, List<SearchResult>>>, query: String = ""): List<SearchResult> {
         val merged = LinkedHashMap<String, MutableReadySearch>()
         for ((tag, list) in results) {
             for (r in list) {
@@ -134,8 +136,14 @@ object MultiDict {
                 }
             }
         }
+        val prefix = query.trim().lowercase()
         return merged.values
-            .sortedBy { it.title.lowercase() }
+            .sortedWith(
+                compareBy(
+                    { !(prefix.isNotEmpty() && it.title.lowercase().startsWith(prefix)) },
+                    { it.title.lowercase() }
+                )
+            )
             .map {
                 SearchResult(it.title, it.summary, it.uri, it.dicts.toList(), it.sources.toList())
             }

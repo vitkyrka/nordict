@@ -524,7 +524,8 @@ class Main {
         // Combined search: every selection dictionary's autocomplete runs in
         // parallel and merges by headword, tagging each result with its sources.
         val results = MultiDict.mergeSearch(
-            selection.map { d -> d.tag to d.searchResults(fetch(d.searchUrl(query))) }
+            selection.map { d -> d.tag to d.searchResults(fetch(d.searchUrl(query))) },
+            query
         )
         if (results.isEmpty()) {
             System.err.println("no search results for '$query' from ${selection.joinToString(",") { it.tag }}")

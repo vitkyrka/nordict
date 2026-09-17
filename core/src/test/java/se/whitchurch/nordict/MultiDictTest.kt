@@ -99,13 +99,14 @@ class MultiDictTest {
         assertThat(frente.sources[0].uri.toString()).contains("/frente")
         assertThat(frente.sources[1].tag).isEqualTo("EST")
 
-        // DLE-only and EST-only results appear once, ordered alphabetically
-        // ignoring case across all dictionaries.
+        // DLE-only and EST-only results appear once: entries starting
+        // with the query sort before the rest, alphabetically within each
+        // group, so "frente" is not buried under "al frente".
         assertThat(merged.map { it.mTitle })
-            .containsExactly("al frente", "con la frente muy alta",
-                "dar un paso al frente", "de frente", "dos dedos de frente",
-                "en frente", "frente", "frente a", "frente a frente",
-                "frente por frente", "frentero").inOrder()
+            .containsExactly("frente", "frente a", "frente a frente",
+                "frente por frente", "frentero", "al frente",
+                "con la frente muy alta", "dar un paso al frente", "de frente",
+                "dos dedos de frente", "en frente").inOrder()
         assertThat(merged.first { it.mTitle == "frentero" }.dicts).containsExactly("DLE")
         assertThat(merged.first { it.mTitle == "al frente" }.dicts).containsExactly("EST")
     }
@@ -136,6 +137,39 @@ class MultiDictTest {
         // ...ordered before "Trinidad y Tobago" on a case-insensitive sort.
         assertThat(merged.map { it.mTitle })
             .containsExactly("Trinidad", "Trinidad y Tobago").inOrder()
+    }
+
+    @Test
+    fun mergeSearchSortsQueryPrefixMatchesBeforeOthers() {
+        val results = listOf(
+            "COLSPAN" to listOf(
+                SearchResult("al frente", "", server.url("/al-frente")),
+                SearchResult("frente a", "", server.url("/frente-a"))
+            ),
+            "EST" to listOf(
+                SearchResult("con la frente muy alta", "", server.url("/diccionario-estudiante/con")),
+                SearchResult("frente", "", server.url("/diccionario-estudiante/frente"))
+            )
+        )
+
+        // Prefix matches ("frente", "frente a") sort before the rest,
+        // alphabetically within each group.
+        assertThat(MultiDict.mergeSearch(results, "frente").map { it.mTitle })
+            .containsExactly(
+                "frente", "frente a", "al frente", "con la frente muy alta"
+            ).inOrder()
+
+        // Matching is case-folded and trims the query.
+        assertThat(MultiDict.mergeSearch(results, "  Frente ").map { it.mTitle })
+            .containsExactly(
+                "frente", "frente a", "al frente", "con la frente muy alta"
+            ).inOrder()
+
+        // Without a query the list stays purely alphabetical.
+        assertThat(MultiDict.mergeSearch(results).map { it.mTitle })
+            .containsExactly(
+                "al frente", "con la frente muy alta", "frente", "frente a"
+            ).inOrder()
     }
 
     @Test
