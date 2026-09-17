@@ -105,7 +105,11 @@ data class AgentState(
     // `dict` is its comma-joined rendering.
     val dicts: List<String>? = null,
     val query: String? = null,
-    val word: WordResult? = null
+    val word: WordResult? = null,
+    // The word bar's pronunciation control: true when the loaded word carries
+    // playable audio (the play button is enabled), false when it has none (the
+    // button is disabled), and null when no word is loaded.
+    val sound: Boolean? = null
 )
 
 /** One entry of a multi-entry (homograph) page, in page order. */

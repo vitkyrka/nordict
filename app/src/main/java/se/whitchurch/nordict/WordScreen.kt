@@ -15,6 +15,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.OpenInNew
@@ -27,10 +28,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.AndroidViewModel
@@ -55,6 +60,7 @@ import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
 import java.io.StringReader
 import java.net.URLDecoder
 import java.util.Date
+import kotlin.math.roundToInt
 
 
 sealed interface WordUiStatus {
@@ -123,7 +129,8 @@ class WordViewModel(
 
     // The word action bar's exit-always scroll behavior, wired by WordScreen
     // on every composition. It owns the nested-scroll connection that the bar
-    // listens to; the pinned WebView feeds it through webViewScrolled.
+    // listens to; the pinned WebView feeds it through webViewScrolled, and the
+    // floating bar reads its state's contentOffset to slide off/on screen.
     var bottomBarScrollBehavior: BottomAppBarScrollBehavior? = null
 
     /**
@@ -611,8 +618,8 @@ fun WordScreen(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    // The docked word action bar uses the M3 exit-always scroll behavior: it
-    // collapses when the word content is scrolled down and reappears on a
+    // The floating word action bar uses the M3 exit-always scroll behavior: it
+    // slides out when the word content is scrolled down and reappears on a
     // scroll back up. The connection lives on the screen's root (as the M3
     // wiring does); the pinned WebView feeds it through vm.webViewScrolled
     // since its internal scroll is invisible to the Compose nested-scroll
@@ -734,103 +741,155 @@ fun WordScreen(
                 }
             }
         }
-        // Docked word action bar: an M3 bottom app bar overlaid on the
-        // WebView, which runs behind it all the way to the screen bottom so
-        // the bar can collapse away and reveal the page's last lines.
-        // exitAlwaysScrollBehavior hides the bar when the content is scrolled
-        // down and brings it back on a scroll up; the pinned WebView's
-        // scroll feeds it through vm.webViewScrolled. The Anki-card FAB is
-        // folded in as a regular action.
+        // Floating word action bar: a rounded, elevated pill floating above
+        // the WebView, which runs behind it all the way to the screen bottom
+        // so the bar can slide away and reveal the page's last lines. Its
+        // vertical position follows the M3 exit-always scroll behavior —
+        // contentOffset grows negative as the pinned WebView scrolls down, and
+        // the bar translates down by that amount (clamped so it fully exits),
+        // sliding back in on a scroll up.
         if (word != null) {
-            BottomAppBar(
-                modifier = Modifier.align(Alignment.BottomCenter),
-                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            FloatingWordToolbar(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 16.dp, vertical = 16.dp),
                 scrollBehavior = bottomBarScrollBehavior,
-                content = {
-                    IconButton(onClick = {
-                        vm.mWord?.audio?.let { audio -> vm.playAudio(audio) }
-                    }) {
-                        Icon(
-                            painterResource(R.drawable.play),
-                            contentDescription = context.getString(R.string.menu_play_audio)
+                audioEnabled = word.audio.isNotEmpty(),
+                autoPlay = vm.autoPlay,
+                onPlayAudio = { vm.mWord?.audio?.let { audio -> vm.playAudio(audio) } },
+                onOpenInBrowser = {
+                    vm.mWord?.let { w ->
+                        onOpenExternal(
+                            MultiDict.externalUris(w, vm.sources)
+                                .map { it.toAndroidUri() }
                         )
                     }
-                    Box {
-                        var menuExpanded by remember { mutableStateOf(false) }
-                        IconButton(onClick = { menuExpanded = true }) {
-                            Icon(
-                                Icons.Filled.MoreVert,
-                                contentDescription = context.getString(R.string.menu_more)
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = menuExpanded,
-                            onDismissRequest = { menuExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(context.getString(R.string.open_in_browser)) },
-                                leadingIcon = {
-                                    Icon(Icons.Filled.OpenInNew, contentDescription = null)
-                                },
-                                onClick = {
-                                    vm.mWord?.let { w ->
-                                        onOpenExternal(
-                                            MultiDict.externalUris(w, vm.sources)
-                                                .map { it.toAndroidUri() }
-                                        )
-                                    }
-                                    menuExpanded = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(context.getString(R.string.menu_autoplay)) },
-                                leadingIcon = {
-                                    Icon(
-                                        painterResource(
-                                            if (vm.autoPlay) R.drawable.autoplay_on
-                                            else R.drawable.autoplay_off
-                                        ),
-                                        contentDescription = null,
-                                        tint = if (vm.autoPlay) MaterialTheme.colorScheme.primary
-                                        else Color.Unspecified
-                                    )
-                                },
-                                onClick = {
-                                    vm.autoPlay = !vm.autoPlay
-                                    ordboken.mPrefs.edit()
-                                        .putBoolean("autoPlay", vm.autoPlay).apply()
-                                    menuExpanded = false
-                                }
-                            )
-                            DropdownMenuItem(
-                                text = { Text(context.getString(R.string.menu_reset_zoom)) },
-                                leadingIcon = {
-                                    Icon(Icons.Filled.ZoomIn, contentDescription = null)
-                                },
-                                onClick = {
-                                    vm.resetZoom()
-                                    menuExpanded = false
-                                }
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.weight(1f))
-
-                    FilledTonalIconButton(
-                        onClick = { vm.share() },
-                        colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer,
-                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    ) {
-                        Icon(
-                            painterResource(R.drawable.add_card),
-                            contentDescription = context.getString(R.string.menu_add_card)
-                        )
-                    }
-                }
+                },
+                onToggleAutoPlay = {
+                    vm.autoPlay = !vm.autoPlay
+                    ordboken.mPrefs.edit()
+                        .putBoolean("autoPlay", vm.autoPlay).apply()
+                },
+                onResetZoom = { vm.resetZoom() },
+                onAddCard = { vm.share() }
             )
+        }
+    }
+}
+
+/** The word destination's floating action bar: a rounded, elevated pill
+ *  showing the pronunciation [IconButton] (disabled when [audioEnabled] is
+ *  false — the word carries no audio), the add-card action, and the overflow
+ *  menu rightmost, sized to wrap its content.
+ *
+ *  Like the M3 bottom-app-bar it replaced, the bar hides on a downward content
+ *  scroll and returns on an upward one: the pinned WebView's scroll feeds
+ *  [scrollBehavior], whose [BottomAppBarState.contentOffset] grows negative on
+ *  scroll-down, and the bar is translated down by that amount — clamped so it
+ *  fully leaves the screen — staying off-screen until the user scrolls back up.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun FloatingWordToolbar(
+    scrollBehavior: BottomAppBarScrollBehavior,
+    audioEnabled: Boolean,
+    autoPlay: Boolean,
+    onPlayAudio: () -> Unit,
+    onOpenInBrowser: () -> Unit,
+    onToggleAutoPlay: () -> Unit,
+    onResetZoom: () -> Unit,
+    onAddCard: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val density = LocalDensity.current
+    val bottomPadding = 16.dp
+    val bottomPaddingPx = with(density) { bottomPadding.roundToPx() }
+    var toolbarHeight by remember { mutableIntStateOf(0) }
+    Surface(
+        modifier = modifier
+            .onSizeChanged { toolbarHeight = it.height }
+            .offset {
+                val hideDistance = (toolbarHeight + bottomPaddingPx).coerceAtLeast(1)
+                val slideDown = (-scrollBehavior.state.contentOffset)
+                    .coerceIn(0f, hideDistance.toFloat())
+                    .roundToInt()
+                IntOffset(0, slideDown)
+            },
+        shape = RoundedCornerShape(28.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 3.dp,
+        shadowElevation = 8.dp
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onPlayAudio, enabled = audioEnabled) {
+                Icon(
+                    painterResource(R.drawable.play),
+                    contentDescription = stringResource(R.string.menu_play_audio)
+                )
+            }
+
+            IconButton(onClick = onAddCard) {
+                Icon(
+                    painterResource(R.drawable.add_card),
+                    contentDescription = stringResource(R.string.menu_add_card)
+                )
+            }
+
+            Box {
+                var menuExpanded by remember { mutableStateOf(false) }
+                IconButton(onClick = { menuExpanded = true }) {
+                    Icon(
+                        Icons.Filled.MoreVert,
+                        contentDescription = stringResource(R.string.menu_more)
+                    )
+                }
+                DropdownMenu(
+                    expanded = menuExpanded,
+                    onDismissRequest = { menuExpanded = false }
+                ) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.open_in_browser)) },
+                        leadingIcon = {
+                            Icon(Icons.Filled.OpenInNew, contentDescription = null)
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onOpenInBrowser()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.menu_autoplay)) },
+                        leadingIcon = {
+                            Icon(
+                                painterResource(
+                                    if (autoPlay) R.drawable.autoplay_on
+                                    else R.drawable.autoplay_off
+                                ),
+                                contentDescription = null,
+                                tint = if (autoPlay) MaterialTheme.colorScheme.primary
+                                else Color.Unspecified
+                            )
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onToggleAutoPlay()
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.menu_reset_zoom)) },
+                        leadingIcon = {
+                            Icon(Icons.Filled.ZoomIn, contentDescription = null)
+                        },
+                        onClick = {
+                            menuExpanded = false
+                            onResetZoom()
+                        }
+                    )
+                }
+            }
         }
     }
 }

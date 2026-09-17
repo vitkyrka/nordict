@@ -419,7 +419,8 @@ class AppDriver(private val app: android.app.Application) {
             dict = signature,
             lang = ordboken().currentDictionary.lang,
             dicts = ordboken().activeDicts.takeIf { it.isNotEmpty() }?.map { it.tag },
-            word = word?.let { wordResultOf(it) }
+            word = word?.let { wordResultOf(it) },
+            sound = word?.audio?.isNotEmpty()
         )
     }
 

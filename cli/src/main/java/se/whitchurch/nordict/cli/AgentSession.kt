@@ -345,7 +345,8 @@ class HeadlessAgentDriver(
             dicts = if (selection.size > 1) selection.map { it.tag } else null,
             lang = selection.first().lang,
             query = lastQuery,
-            word = loadedWord?.let { wordResultOf(it, currentPage) }
+            word = loadedWord?.let { wordResultOf(it, currentPage) },
+            sound = loadedWord?.audio?.isNotEmpty()
         )
 
     private fun okPayload(op: String, state: AgentState): AgentResult =

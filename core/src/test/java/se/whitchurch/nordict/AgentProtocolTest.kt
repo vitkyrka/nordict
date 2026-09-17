@@ -116,6 +116,33 @@ class AgentProtocolTest {
     }
 
     @Test
+    fun stateSoundTriStateRoundTrips() {
+        // The `sound` flag is the word bar's pronunciation enablement: true
+        // when the word has audio, false when it has none, null when no word
+        // is loaded — all three must cross the wire unchanged.
+        assertThat(gson.fromJson(gson.toJson(
+            AgentState(activity = "word", lang = "es", dict = "DLE", sound = true)
+        ), AgentState::class.java).sound).isTrue()
+
+        assertThat(gson.fromJson(gson.toJson(
+            AgentState(activity = "word", lang = "es", dict = "DLE", sound = false)
+        ), AgentState::class.java).sound).isFalse()
+
+        val parsed = gson.fromJson(gson.toJson(
+            AgentState(activity = "home", lang = "es", dict = "DLE")
+        ), AgentState::class.java)
+        assertThat(parsed.sound).isNull()
+        assertThat(parsed).isEqualTo(AgentState(activity = "home", lang = "es", dict = "DLE"))
+
+        // Unknown fields on the wire (older agents) stay ignored.
+        val older = gson.fromJson(
+            """{"activity":"word","lang":"es","dict":"DLE"}""",
+            AgentState::class.java
+        )
+        assertThat(older.sound).isNull()
+    }
+
+    @Test
     fun requireReturnsArgumentOrThrows() {
         val cmd = AgentCommand(op = AgentOps.SEARCH)
         assertThat(cmd.require("query", "frente")).isEqualTo("frente")

@@ -28,6 +28,7 @@ import se.whitchurch.nordict.CardActivity
 import se.whitchurch.nordict.DleDictionary
 import se.whitchurch.nordict.EstDictionary
 import se.whitchurch.nordict.GdlcDictionary
+import se.whitchurch.nordict.LeRobertDictionary
 import se.whitchurch.nordict.MainActivity
 import se.whitchurch.nordict.Ordboken
 import java.io.File
@@ -616,6 +617,61 @@ class AppDriverTest {
         val result = drive(AgentCommand(op = AgentOps.AUDIO))
         assertThat(result.ok).isFalse()
         assertThat(result.error).contains("has no audio URLs")
+    }
+
+    @Test
+    fun stateReportsSoundDisabledForAWordWithoutAudio() {
+        // The A/V is on-screen so `sound` must be false (play button disabled)
+        // for a loaded word with no audio — here DLE's /frente fixture.
+        seedAndOpenWord()
+        val state = drive(AgentCommand(op = AgentOps.STATE))
+        assertThat(state.state?.word).isNotNull()
+        assertThat(state.state?.sound).isFalse()
+    }
+
+    @Test
+    fun stateReportsSoundNullWhenNoWordIsLoaded() {
+        launchMain()
+        val state = drive(AgentCommand(op = AgentOps.STATE))
+        assertThat(state.state?.word).isNull()
+        assertThat(state.state?.sound).isNull()
+    }
+
+    @Test
+    fun stateReportsSoundEnabledForAWordWithAudio() {
+        // Serve the LE ROBERT fixture: DLE and EST probe the page first (each
+        // consumes a response and finds nothing), then ROB parses it into a
+        // word whose audio list is non-empty, so `sound` must be true (play
+        // button enabled).
+        val html = File("../testdata/rob/table.html").readText()
+        repeat(3) { server.enqueue(MockResponse().setBody(html)) }
+
+        // Temporarily reseed the app with the ROB dictionary added so the
+        // getWord probe loop reaches it after the es dictionaries return null.
+        Ordboken.reset()
+        val testClient = OkHttpClient()
+        Ordboken.getInstance(
+            app!!,
+            testClient,
+            arrayOf(
+                DleDictionary(testClient, server.url("/").toString().removeSuffix("/")),
+                EstDictionary(testClient, server.url("/").toString().removeSuffix("/")),
+                LeRobertDictionary(testClient, server.url("/").toString().removeSuffix("/"))
+            )
+        )
+        driver = AppDriver(app!!)
+        launchMain()
+
+        val open = drive(AgentCommand(
+            op = AgentOps.OPEN_URI,
+            uri = server.url("/definition/table").toString()
+        ))
+        assertThat(open.ok).isTrue()
+        assertThat(open.state?.word).isNotNull()
+        assertThat(open.state?.sound).isTrue()
+
+        val state = drive(AgentCommand(op = AgentOps.STATE))
+        assertThat(state.state?.sound).isTrue()
     }
 
     private fun trackedActivity(): android.app.Activity? =

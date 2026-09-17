@@ -186,6 +186,9 @@ class Word(
             word.idioms.addAll(base.idioms)
             word.definitions.addAll(base.definitions)
             word.audio.addAll(base.audio)
+            if (word.audio.isEmpty()) {
+                word.audio.addAll(entries.flatMap { it.audio }.distinct())
+            }
             word.mHomonymEntries.addAll(entries)
             return word
         }

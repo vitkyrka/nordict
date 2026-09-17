@@ -162,6 +162,53 @@ class MultiDictTest {
     }
 
     @Test
+    fun combinedWordFallsBackToEntryAudioWhenBaseHasNone() {
+        // The DLE face "frente" page carries no pronunciation clips, but the
+        // combined word may resolve from another dictionary that does (e.g.
+        // COLSPAN's ES-ES sound). The word bar's play button must not sit
+        // disabled: when the base word's audio is empty, merge the entries'.
+        val base = dle.get(server.url("/frente"))!!
+        assertThat(base.audio).isEmpty()
+        val silentEntry = Word.toHomonymEntry(base)
+        val audioEntry = Word.toHomonymEntry(base).apply {
+            audio.add("https://example.com/pron.mp3")
+        }
+
+        val combined = Word.combined(base, "DLE", listOf(silentEntry, audioEntry), "frente", null)
+        assertThat(combined.audio).containsExactly("https://example.com/pron.mp3")
+
+        // Duplicated clips across entries collapse to one.
+        val doubled = Word.combined(
+            base, "DLE",
+            listOf(audioEntry, Word.toHomonymEntry(base).apply {
+                audio.addAll(audioEntry.audio)
+            }),
+            "frente", null
+        )
+        assertThat(doubled.audio).containsExactly("https://example.com/pron.mp3")
+    }
+
+    @Test
+    fun combinedWordKeepsBaseAudioWhenItHasSome() {
+        // When the base word already carries audio, its clips win and the
+        // entries' audio is NOT bolted on (no surprise duplicates in the
+        // play button's playlist).
+        val base = dle.get(server.url("/frente"))!!
+        val baseWithAudio = Word.toHomonymEntry(base).apply {
+            audio.add("https://example.com/base.mp3")
+        }
+        val audioEntry = Word.toHomonymEntry(base).apply {
+            audio.add("https://example.com/pron.mp3")
+        }
+        val baseWord = base.apply { audio.add("https://example.com/base.mp3") }
+
+        val combined = Word.combined(
+            baseWord, "DLE", listOf(baseWithAudio, audioEntry), "frente", null
+        )
+        assertThat(combined.audio).containsExactly("https://example.com/base.mp3")
+    }
+
+    @Test
     fun combinedFetchReflectsRefSelection() {
         // The EST "muerte" page has three entries; a combined fetch over it
         // (with a namespaced ref) aggregates page order + labels and selects.

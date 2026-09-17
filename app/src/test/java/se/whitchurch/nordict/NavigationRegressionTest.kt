@@ -788,16 +788,18 @@ class NavigationRegressionTest {
 
         // Words scroll inside the pinned WebView (invisible to Compose
         // nested scroll), so WordScreen bridges it to the bar behavior: a
-        // downward WebView scroll must collapse the bar, an upward one restore
+        // downward WebView scroll must hide the bar, an upward one restore
         // it (the size the platform scroll listener reports in real use).
+        // The floating bar slides by contentOffset, the same state the
+        // bottom-app-bar height used to carry.
         onMain { vm.webViewScrolled(0, 800) }
-        awaitCondition(message = "scrolling the WebView down collapses the bar") {
-            vm.bottomBarScrollBehavior!!.state.heightOffset < 0f
+        awaitCondition(message = "scrolling the WebView down hides the bar") {
+            vm.bottomBarScrollBehavior!!.state.contentOffset < 0f
         }
 
         onMain { vm.webViewScrolled(800, 0) }
         awaitCondition(message = "scrolling the WebView back up restores the bar") {
-            vm.bottomBarScrollBehavior!!.state.heightOffset == 0f
+            vm.bottomBarScrollBehavior!!.state.contentOffset == 0f
         }
     }
 
