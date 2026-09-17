@@ -271,11 +271,55 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
                         .padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    TextButton(onClick = {
+                    IconButton(onClick = {
+                        Intent(this@CardActivity, ImagePicker::class.java).also {
+                            it.putExtra(Intent.EXTRA_TEXT, title)
+                            it.putExtra("dictionaryImages", mDictImages)
+                            currentCardId = proposal.id
+                            ordboken.images = ArrayList()
+                            startActivityForResult(it, IMAGE_PICKER_REQUEST)
+                        }
+                    }) {
+                        Icon(painterResource(R.drawable.ic_add_image), contentDescription = "Add image")
+                    }
+
+                    IconButton(onClick = {
+                        Intent(this@CardActivity, CameraActivity::class.java).also {
+                            it.putExtra(Intent.EXTRA_TEXT, title)
+                            currentCardId = proposal.id
+                            ordboken.images = ArrayList()
+                            startActivityForResult(it, CAMERA_REQUEST)
+                        }
+                    }) {
+                        Icon(painterResource(R.drawable.ic_add_camera), contentDescription = "Take photo")
+                    }
+
+                    IconButton(onClick = {
+                        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val item = clipboard.primaryClip?.getItemAt(0)
+                        val pasteData = item?.text
+
+                        if (pasteData != null) {
+                            extraExamples.add(pasteData.toString())
+                        }
+                    }) {
+                        Icon(painterResource(R.drawable.ic_add_clipboard), contentDescription = "Paste from clipboard")
+                    }
+
+                    IconButton(onClick = {
+                        imagesMap[proposal.id] = emptyList()
+                        extraExamples.clear()
+                    }) {
+                        Icon(painterResource(R.drawable.ic_clear), contentDescription = "Clear")
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    Button(onClick = {
                         val effectiveDefs =
                             if (selectedDefinitions.isEmpty()) listOf(definition)
                             else selectedDefinitions.toList()
@@ -289,53 +333,13 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                         )
                         onCreate(effectiveDefs)
                     }) {
-                        Icon(painterResource(R.drawable.ic_done), contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            painterResource(R.drawable.ic_done),
+                            contentDescription = null,
+                            modifier = Modifier.size(ButtonDefaults.IconSize)
+                        )
+                        Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
                         Text("Create")
-                    }
-
-                    TextButton(onClick = {
-                        Intent(this@CardActivity, ImagePicker::class.java).also {
-                            it.putExtra(Intent.EXTRA_TEXT, title)
-                            it.putExtra("dictionaryImages", mDictImages)
-                            currentCardId = proposal.id
-                            ordboken.images = ArrayList()
-                            startActivityForResult(it, IMAGE_PICKER_REQUEST)
-                        }
-                    }) {
-                        Icon(painterResource(R.drawable.ic_add_image), contentDescription = null, modifier = Modifier.size(16.dp))
-                    }
-
-                    TextButton(onClick = {
-                        Intent(this@CardActivity, CameraActivity::class.java).also {
-                            it.putExtra(Intent.EXTRA_TEXT, title)
-                            currentCardId = proposal.id
-                            ordboken.images = ArrayList()
-                            startActivityForResult(it, CAMERA_REQUEST)
-                        }
-                    }) {
-                        Icon(painterResource(R.drawable.ic_add_camera), contentDescription = null, modifier = Modifier.size(16.dp))
-                    }
-
-                    TextButton(onClick = {
-                        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val item = clipboard.primaryClip?.getItemAt(0)
-                        val pasteData = item?.text
-
-                        if (pasteData != null) {
-                            extraExamples.add(pasteData.toString())
-                        }
-                    }) {
-                        Icon(painterResource(R.drawable.ic_add_clipboard), contentDescription = "Paste from clipboard", modifier = Modifier.size(16.dp))
-                    }
-
-                    TextButton(onClick = {
-                        imagesMap[proposal.id] = emptyList()
-                        extraExamples.clear()
-                    }) {
-                        Icon(painterResource(R.drawable.ic_clear), contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Clear")
                     }
                 }
             }
@@ -395,8 +399,13 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                         modifier = Modifier.padding(top = 4.dp)
                     )
                 }
-                Row(modifier = Modifier.padding(top = 4.dp)) {
-                    TextButton(onClick = {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    Button(onClick = {
                         createCard(
                             Cards.idiomBack(idiom),
                             Cards.idiomExamples(idiom),
@@ -405,8 +414,12 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                         )
                         onCreate()
                     }) {
-                        Icon(painterResource(R.drawable.ic_done), contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            painterResource(R.drawable.ic_done),
+                            contentDescription = null,
+                            modifier = Modifier.size(ButtonDefaults.IconSize)
+                        )
+                        Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
                         Text("Create")
                     }
                 }
