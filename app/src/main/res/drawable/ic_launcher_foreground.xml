@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher foreground: an open book carrying "A" / "Å" (words, Nordic),
+     with a translation bubble (two opposing arrows) for language exchange.
+     108x108dp adaptive-icon foreground; key art stays in the central safe zone. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Open book -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M22,54 C34,50 44,48 54,48 C64,48 74,50 86,54 L86,78 C74,74 64,72 54,72 C44,72 34,74 22,78 Z" />
+    <!-- Right-page shade -->
+    <path
+        android:fillColor="#CFE0F1"
+        android:pathData="M54,48 C64,48 74,50 86,54 L86,78 C74,74 64,72 54,72 Z" />
+    <!-- Spine shadow -->
+    <path
+        android:fillColor="#10365C"
+        android:fillAlpha="0.2"
+        android:pathData="M53,48 L55,48 L55,72 L53,72 Z" />
+
+    <!-- Left page glyph: "A" -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#10365C"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M38,56 L32,68 M38,56 L44,68 M34.6,64 L41.4,64" />
+    <!-- Right page glyph: "Å" -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#10365C"
+        android:strokeWidth="3"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M70,57 L64.5,68 M70,57 L75.5,68 M66.6,64.5 L73.4,64.5" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#10365C"
+        android:strokeWidth="2.4"
+        android:strokeLineCap="round"
+        android:pathData="M67.8,52.5 a2.2,2.2 0 1,0 4.4,0 a2.2,2.2 0 1,0 -4.4,0" />
+    <!-- Word lines under the glyphs -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#7FA8C9"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:pathData="M33,72 L43,72 M65,72 L75,72" />
+
+    <!-- Translation bubble -->
+    <path
+        android:fillColor="#FFC636"
+        android:pathData="M63,22 L79,22 A7,7 0 0,1 86,29 L86,39 A7,7 0 0,1 79,46 L63,46 A7,7 0 0,1 56,39 L56,29 A7,7 0 0,1 63,22 Z" />
+    <path
+        android:fillColor="#FFC636"
+        android:pathData="M62,46 L58,54 L70,46 Z" />
+    <!-- Opposing translation arrows -->
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M61,30 L81,30 M74,24.5 L81,30 L74,35.5" />
+    <path
+        android:fillColor="#00000000"
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.2"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M81,39 L61,39 M68,33.5 L61,39 L68,44.5" />
+</vector>
