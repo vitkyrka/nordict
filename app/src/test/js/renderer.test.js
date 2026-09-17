@@ -36,7 +36,7 @@ test('renders basic word information', () => {
     expect($('.definitions li .definition').text()).toContain('Parte superior de la cara');
     expect($('.definitions li .gloss .grammar').text()).toContain('f.');
     expect($('.examples li').text()).toBe('Ejemplo 1');
-    expect($('.idiom-name').text()).toBe('al frente');
+    expect($('.idiom-heading').text()).toBe('al frente');
 });
 
 test('renders simple markup inside definition text', () => {
@@ -79,7 +79,7 @@ test('renders simple markup inside definition text', () => {
 
     expect($('.definitions li .gloss:eq(0) .definition b').text()).toBe("cap d'any");
     expect($('.definitions li .gloss:eq(1) .definition i').text()).toBe('Jo canto');
-    expect($('.idiom-list li .definition b').text()).toBe('fa cap');
+    expect($('section.idiom .definition b').text()).toBe('fa cap');
     // Plain-text read still yields the running copy with the markup inline.
     expect($('.definitions li .gloss:eq(0) .definition').text())
         .toBe("El cap d'any és el primer dia de l'any.");
@@ -130,8 +130,8 @@ test('renders geo for definition and idiom', () => {
     renderWord(word);
 
     expect($('.definitions li .geo').text()).toBe('América');
-    expect($('.idiom-list li .geo').text()).toBe('América');
-    expect($('.idiom-list li .gloss .grammar').text()).toBe('locución adverbial');
+    expect($('section.idiom .geo').text()).toBe('América');
+    expect($('section.idiom .gloss .grammar').text()).toBe('locución adverbial');
 });
 
 test('omits domain and geo elements when absent', () => {
@@ -178,7 +178,7 @@ test('renders plev for definition and idiom', () => {
     renderWord(word);
 
     expect($('.definitions li .plev').text()).toBe('malsonante');
-    expect($('.idiom-list li .plev').text()).toBe('malsonante');
+    expect($('section.idiom .plev').text()).toBe('malsonante');
 });
 
 test('omits plev element when absent', () => {
@@ -204,7 +204,7 @@ test('omits plev element when absent', () => {
     renderWord(word);
 
     expect($('.definitions li .plev').length).toBe(0);
-    expect($('.idiom-list li .plev').length).toBe(0);
+    expect($('section.idiom .plev').length).toBe(0);
 });
 
 test('colors each gloss based on its gender', () => {
@@ -235,7 +235,7 @@ test('colors each gloss based on its gender', () => {
     expect($('.definitions li .grammar.masculine').length).toBe(1);
     expect($('.grammar.feminine').closest('.gloss').find('.definition').text()).toContain('Parte superior de la cara');
     expect($('.grammar.masculine').closest('.gloss').find('.definition').text()).toContain('Zona de contacto');
-    expect($('.idiom-list li .gloss .grammar').hasClass('feminine')).toBe(false);
+    expect($('section.idiom .gloss .grammar').hasClass('feminine')).toBe(false);
 });
 
 test('exposes shared gender constants', () => {
@@ -590,7 +590,7 @@ test('renders sense numbers on definitions and interleaved idioms', () => {
     expect($('ol.definitions li .sense-number').map((_, el) => $(el).text()).get())
         .toEqual(['1.1', '1.4', '3.1']);
     expect($('ol.definitions li .idiom-name').text()).toBe('abaixar el cap');
-    expect($('.idiom-list').length).toBe(0);
+    expect($('section.idiom').length).toBe(0);
 });
 
 test('omits sense numbers and auto-number class when absent', () => {
@@ -671,7 +671,7 @@ test('renders domain on idioms', () => {
 
     renderWord(word);
 
-    expect($('.idiom-list li .domain').text()).toBe('Milicia');
+    expect($('section.idiom .domain').text()).toBe('Milicia');
 });
 
 test('renders register marker on definitions', () => {
@@ -710,7 +710,7 @@ test('renders register marker on idioms', () => {
 
     renderWord(word);
 
-    expect($('.idiom-list li .register').text()).toBe('coloquial');
+    expect($('section.idiom .register').text()).toBe('coloquial');
 });
 
 test('renders synonyms on definitions', () => {
@@ -856,7 +856,7 @@ test('renders idiom defP glosses with grammar and example attribution', () => {
 
     renderWord(word);
 
-    const glosses = $('.idiom-list li .gloss');
+    const glosses = $('section.idiom .gloss');
     expect(glosses.length).toBe(3);
 
     expect(glosses.eq(0).find('.grammar').text()).toBe('expresión');
@@ -874,8 +874,9 @@ test('renders idiom defP glosses with grammar and example attribution', () => {
 test('renders grouped idiom senses with per-gloss numbers under one header', () => {
     // EST/DLE group N numbered aceps under one locution header: one Idiom,
     // one gloss per sense, the orden on the gloss. The header appears once
-    // and the senses stay in the Locuciones section (not interleaved with
-    // the definitions like diccionari.cat numbered idioms).
+    // and the senses stay in their own per-idiom section below the
+    // definitions (not interleaved with the definitions like diccionari.cat
+    // numbered idioms).
     const word = {
         mTitle: 'frente',
         definitions: [
@@ -900,10 +901,13 @@ test('renders grouped idiom senses with per-gloss numbers under one header', () 
 
     renderWord(word);
 
-    // One header for the three senses.
-    expect($('.idiom-list li').length).toBe(1);
-    expect($('.idiom-list li .idiom-name').text()).toBe('al frente');
-    const glosses = $('.idiom-list li .gloss');
+    // One section with one h2 heading for the three senses.
+    expect($('section.idiom').length).toBe(1);
+    expect($('section.idiom .idiom-heading').text()).toBe('al frente');
+    expect($('section.idiom .idiom-heading').prop('tagName')).toBe('H2');
+    expect($('section.idioms').length).toBe(0);
+    expect($('h3').filter((_, el) => $(el).text() === 'Locuciones').length).toBe(0);
+    const glosses = $('section.idiom .gloss');
     expect(glosses.length).toBe(3);
     expect(glosses.map((_, el) => $(el).find('.sense-number').text()).get())
         .toEqual(['1', '2', '3']);
@@ -911,7 +915,7 @@ test('renders grouped idiom senses with per-gloss numbers under one header', () 
     expect($('ol.definitions li').length).toBe(1);
     expect($('ol.definitions li .sense-number').text()).toBe('1');
     expect($('ol.definitions').hasClass('sense-numbered')).toBe(true);
-    expect($('.idiom-list').length).toBe(1);
+    expect($('section.idiom').length).toBe(1);
 });
 
 test('omits gloss sense numbers when absent', () => {
@@ -938,7 +942,7 @@ test('omits gloss sense numbers when absent', () => {
     renderWord(word);
 
     expect($('.definitions li .gloss .sense-number').length).toBe(0);
-    expect($('.idiom-list li .gloss .sense-number').length).toBe(0);
+    expect($('section.idiom .gloss .sense-number').length).toBe(0);
     expect($('.definitions li > .sense-number').text()).toBe('1');
 });
 test('renders dictionary label for bilingual word', () => {

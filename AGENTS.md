@@ -120,7 +120,7 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
   `renderer.js` are skipped (the regex already skips anchor content). Needs
   to keep working if selectors in `renderer.js` change.
 - **`assets/renderer.css`** — styling for the JSON-rendered content
-  (`span.grammar`/`domain`/`geo`, `ol.definitions`, `ul.idiom-list`, gender
+   (`span.grammar`/`domain`/`geo`, `ol.definitions`, `section.idiom`, gender
   backgrounds, small-screen layout). Loaded by `word_template.html`.
 
 ### The JSON rendering + testing pipeline (what most parser work touches)

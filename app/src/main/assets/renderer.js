@@ -108,17 +108,34 @@ const renderDefinitionBlock = (def) => `
     </li>
 `;
 
-const renderIdiomBlock = (idiom) => `
-    <li>
+const renderIdiomMeta = (idiom) => `
         ${idiom.senseNumber ? `<span class="sense-number">${idiom.senseNumber}</span> ` : ''}
-        <b class="idiom-name">${idiom.idiom}</b>:
         ${idiom.register ? `<span class="register">${idiom.register}</span> ` : ''}
         ${idiom.domain ? `<span class="domain">${idiom.domain}</span> ` : ''}
         ${idiom.geo ? `<span class="geo">${idiom.geo}</span> ` : ''}
         ${idiom.plev ? `<span class="plev">${idiom.plev}</span> ` : ''}
+`;
+
+const renderIdiomBlock = (idiom) => `
+    <li>
+        ${renderIdiomMeta(idiom)}
+        <b class="idiom-name">${idiom.idiom}</b>:
         ${renderGlosses(idiom.glosses)}
     </li>
 `;
+
+// Standalone locutions (DLE/EST-style): one section per idiom under its own
+// <h2> (one level below the h1 headword), no "Locuciones" heading, no list.
+const renderIdiomSection = (idiom) => {
+    const meta = renderIdiomMeta(idiom).trim();
+    return `
+    <section class="idiom">
+        <h2 class="idiom-heading">${idiom.idiom}</h2>
+        ${meta ? `<div class="idiom-markers">${meta}</div>` : ''}
+        ${renderGlosses(idiom.glosses)}
+    </section>
+`;
+};
 
 const template = (word) => {
     const defs = word.definitions || [];
@@ -129,7 +146,7 @@ const template = (word) => {
     // carry an idiom-level senseNumber. Render them inline in the single
     // numbered list, sorted back into page order. DLE/EST group their senses
     // under one locution header (one Idiom, one gloss per numbered sense, the
-    // number on the gloss) and keep the separate locutions section below.
+    // number on the gloss) and keep the separate per-idiom sections below.
     const numberedIdioms = idioms.some(i => i.senseNumber);
     const senses = numberedIdioms
         ? [...defs, ...idioms].sort(compareSenses)
@@ -165,12 +182,7 @@ const template = (word) => {
             </ol>
         ` : ''}
         ${!numberedIdioms && idioms.length > 0 ? `
-            <section class="idioms">
-                <h3>Locuciones</h3>
-                <ul class="idiom-list">
-                    ${idioms.map(renderIdiomBlock).join('')}
-                </ul>
-            </section>
+            ${idioms.map(renderIdiomSection).join('')}
         ` : ''}
     </article>
 `;

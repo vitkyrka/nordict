@@ -231,10 +231,24 @@ span.antonym {
     margin-top: 0.3em;
 }
 
-ol.definitions,
-ul.idiom-list {
+ol.definitions {
     padding-left: 0;
     list-style-position: inside;
+}
+
+/* ---- Idioms (one section per locution, h2 under the h1 headword) ---- */
+
+section.idiom {
+    margin-top: 1em;
+}
+
+section.idiom h2.idiom-heading {
+    font-size: 1.2em;
+    margin: 0 0 0.3em 0;
+}
+
+section.idiom .idiom-markers {
+    margin-bottom: 0.3em;
 }
 
 /* Definitions that carry their original page numbering (senseNumber, e.g.
