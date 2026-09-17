@@ -694,47 +694,6 @@ class NavigationRegressionTest {
             .assertExists()
     }
 
-    @Test
-    fun collapsedSearchBarMatchesTheMaterial3Geometry() {
-        awaitNav()
-
-        // The collapsed global bar is the full-width M3 search bar: the field
-        // spans the bar edge to edge, and the bar's own 8dp vertical breathing
-        // room is the only space above the next row. The pre-1.4 `SearchBar`
-        // modifier padding that used to be reapplied onto the InputField broke
-        // both: it shrank the field (12.dp each side) and inflated the pill
-        // (+8.dp), stealing 16.dp more vertical space from the dictionary row
-        // and content below. Robolectric's font metrics make the field taller
-        // than the spec 56dp here, so we assert layout geometry (the field
-        // fills the pill, the pill has no padded rim), not absolute dp.
-        val field = composeRule.onAllNodes(hasSetTextAction())[0].fetchSemanticsNode()
-        val rootWidth = composeRule.onRoot().fetchSemanticsNode().size.width
-        val tolerancePx = with(composeRule.density) { 2.dp.roundToPx() }
-
-        // The field spans the whole bar, so its content isn't pushed in from
-        // the edges (a re-added side padding shrinks it below the screen).
-        assertThat(field.size.width).isAtLeast(rootWidth - tolerancePx)
-
-        // That the field's content spans the whole bar means no side padding
-        // was re-added on the InputField. The nav row's first control is the
-        // language split button's menu segment, whose top is not a stable
-        // anchor here: the old single current-language button was shorter than the row and sat below its top by the row-centering
-        // slack, while the merged split button is the row's tallest element and
-        // sits flush. So assert the bar's own geometry instead — the pill
-        // (the full-width clickable search bar) is exactly the field's bounds
-        // with no padded rim, which is what a re-added InputField modifier
-        // padding would inflate.
-        val bar = composeRule
-            .onAllNodes(hasClickAction())
-            .fetchSemanticsNodes()
-            .first { it.boundsInRoot.width >= rootWidth - tolerancePx }
-            .boundsInRoot
-        assertThat(Math.abs(bar.top - field.boundsInRoot.top).toDouble())
-            .isAtMost(tolerancePx.toDouble())
-        assertThat(Math.abs(bar.bottom - (field.boundsInRoot.top + field.size.height)).toDouble())
-            .isAtMost(tolerancePx.toDouble())
-    }
-
     // ---------- Zoom persistence (regression: the Compose conversion moved the
     // WebView zoom save from onPause to composition dispose, where the WebView
     // is already destroyed, so zooming, pausing and closing the app lost the

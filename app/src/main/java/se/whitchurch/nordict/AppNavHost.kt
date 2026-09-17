@@ -296,12 +296,12 @@ fun NordictApp(
     }
 
     // Fullscreen expanded search sheet, drawn as an in-window overlay rather
-    // than a dialog: the M3 1.4 fullscreen dialog swallows the system back
-    // button (its DialogWrapper overrides cancel() to a no-op and only
-    // dismisses on predictive-back gestures), so KEYCODE_BACK would do
-    // nothing while the sheet was open. Inside this activity's own window the
-    // BackHandler below receives the key and collapses the sheet without
-    // popping the destination underneath it.
+    // than a dialog: the M3 fullscreen search dialog (1.4 and the 1.5 alphas)
+    // swallows the system back button (its DialogWrapper overrides cancel() to
+    // a no-op and only dismisses on predictive-back gestures), so KEYCODE_BACK
+    // would do nothing while the sheet was open. Inside this activity's own
+    // window the BackHandler below receives the key and collapses the sheet
+    // without popping the destination underneath it.
     if (searchBarState.currentValue != SearchBarValue.Collapsed) {
         val sheetFieldFocus = remember { FocusRequester() }
         LaunchedEffect(searchBarState.currentValue) {

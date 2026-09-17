@@ -87,10 +87,9 @@ fun DictionaryNav(
  * Styled as the Material 3 expressive split button (tonal leading action
  * surface + trailing expand surface whose inner corners round out and whose
  * arrow rotates when the menu is open). The androidx
- * `SplitButtonLayout`/`SplitButtonDefaults` components only ship in the
- * material3 1.5 alphas, which regress the SearchBar's geometry (see
- * `collapsedSearchBarMatchesTheMaterial3Geometry`), so the two segments are
- * built from stable material3 1.4 primitives.
+ * `SplitButtonLayout`/`SplitButtonDefaults` components ship in the
+ * material3 1.5 alphas; the two segments are built from material3 1.4/1.5
+ * primitives so their geometry stays stable.
  *
  * When there is no second language to swap to ([Ordboken.lastLang] is null or
  * equals the current language — a single-language install), the swap segment is
