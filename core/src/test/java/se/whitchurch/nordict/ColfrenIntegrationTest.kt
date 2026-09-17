@@ -62,41 +62,58 @@ class ColfrenIntegrationTest {
         val word = dictionary.get(uri)
 
         assertThat(word).isNotNull()
-        assertThat(word?.mTitle).isEqualTo("table")
-        assertThat(word?.dictionary).isEqualTo("Collins French-English")
+        // Default (no __ref) -> the easy-learning headword.
+        assertThat(word?.mTitle).isEqualTo("la table")
+        assertThat(word?.dictionary).isEqualTo("Collins Easy Learning")
         assertThat(word?.definitions).hasSize(1)
         assertThat(word?.definitions?.get(0)?.pos).isEqualTo("feminine noun")
         assertThat(word?.definitions?.get(0)?.glosses).hasSize(1)
         assertThat(word?.audio).hasSize(1)
-        assertThat(word?.audio?.get(0)).contains("FR-")
+        assertThat(word?.audio?.get(0)).contains("/fr_")
+    }
+
+    @Test
+    fun testGetRefResolvesMainHeadword() {
+        val html = File("../testdata/colfren/table.html").readText()
+
+        // __ref=2 -> the main dictionary headword.
+        server.enqueue(MockResponse().setBody(html))
+        val refUri: HttpUrl = server.url("/dictionary/french-english/table").newBuilder()
+            .addQueryParameter("__ref", "2").build()
+        val main = dictionary.get(refUri)
+        assertThat(main).isNotNull()
+        assertThat(main?.mTitle).isEqualTo("table")
+        assertThat(main?.dictionary).isEqualTo("Collins French-English")
+        assertThat(main?.audio).hasSize(1)
+        assertThat(main?.audio?.get(0)).contains("FR-")
     }
 
     @Test
     fun testGetRefResolvesEasyLearning() {
         val html = File("../testdata/colfren/table.html").readText()
 
-        // Default (no __ref) -> main dictionary headword.
+        // Default (no __ref) -> easy-learning headword.
         server.enqueue(MockResponse().setBody(html))
         val mainUri: HttpUrl = server.url("/dictionary/french-english/table")
         val main = dictionary.get(mainUri)
         assertThat(main).isNotNull()
-        assertThat(main?.mTitle).isEqualTo("table")
-        assertThat(main?.dictionary).isEqualTo("Collins French-English")
-        // The combined page carries every headword (main + easy-learning).
+        assertThat(main?.mTitle).isEqualTo("la table")
+        assertThat(main?.dictionary).isEqualTo("Collins Easy Learning")
+        // The combined page carries every headword (easy-learning + main).
         assertThat(main?.mHomonymEntries).hasSize(2)
         assertThat(main?.mHomonymEntries?.map { it.mTitle })
-            .containsExactly("table", "la table").inOrder()
+            .containsExactly("la table", "table").inOrder()
 
-        // __ref=1 -> the easy-learning headword.
+        // __ref=2 -> the main dictionary headword.
         server.enqueue(MockResponse().setBody(html))
         val refUri: HttpUrl = server.url("/dictionary/french-english/table").newBuilder()
-            .addQueryParameter("__ref", "1").build()
+            .addQueryParameter("__ref", "2").build()
         val easy = dictionary.get(refUri)
         assertThat(easy).isNotNull()
-        assertThat(easy?.mTitle).isEqualTo("la table")
-        assertThat(easy?.dictionary).isEqualTo("Collins Easy Learning")
+        assertThat(easy?.mTitle).isEqualTo("table")
+        assertThat(easy?.dictionary).isEqualTo("Collins French-English")
         assertThat(easy?.audio).hasSize(1)
-        assertThat(easy?.audio?.get(0)).contains("/fr_")
+        assertThat(easy?.audio?.get(0)).contains("FR-")
     }
 
     @Test

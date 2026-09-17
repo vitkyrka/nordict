@@ -33,7 +33,7 @@ abstract class CollinsDictionary(
             if (candidates.isNotEmpty()) return candidates[0]
         }
 
-        // No __ref: the parser orders the main dictionary headword first.
+        // No __ref: the parser orders the easy-learning headword first.
         return words[0]
     }
 

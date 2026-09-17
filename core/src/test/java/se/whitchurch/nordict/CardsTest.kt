@@ -33,7 +33,7 @@ class CardsTest {
             page,
             httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/frente"),
             "COLSPAN", "spanish-english"
-        ).first()
+        ).first { it.dictionary == "Collins Spanish-English" }
     }
 
     private fun parseCollinsMorir(): Word {
@@ -42,7 +42,7 @@ class CardsTest {
             page,
             httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/morir"),
             "COLSPAN", "spanish-english"
-        ).first()
+        ).first { it.dictionary == "Collins Spanish-English" }
     }
 
     // ---- proposals ----

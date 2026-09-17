@@ -108,10 +108,10 @@ class CollinsParser {
                 }
             }
 
-            // Default (no-__ref) view shows the main dictionary headwords first;
-            // easy-learning headwords follow. Order within each group is the
+            // Default (no-__ref) view shows the easy-learning headwords first;
+            // main dictionary headwords follow. Order within each group is the
             // document order.
-            heads.sortBy { if (it.isMain) 0 else 1 }
+            heads.sortBy { if (it.isMain) 1 else 0 }
 
             heads.forEachIndexed { index, head ->
                 // The first headword keeps the canonical (search-result) URL so

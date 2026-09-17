@@ -84,42 +84,60 @@ class CollinsIntegrationTest {
         val word = dictionary.get(uri)
 
         assertThat(word).isNotNull()
+        // Default (no __ref) -> the first easy-learning headword.
         assertThat(word?.mTitle).isEqualTo("morir")
-        assertThat(word?.dictionary).isEqualTo("Collins Spanish-English")
+        assertThat(word?.dictionary).isEqualTo("Collins Easy Learning")
         assertThat(word?.definitions).hasSize(1)
-        assertThat(word?.definitions?.get(0)?.pos).isEqualTo("intransitive verb")
-        assertThat(word?.definitions?.get(0)?.idioms).isEmpty()
-        assertThat(word?.definitions?.get(0)?.phrases).isEmpty()
-        assertThat(word?.definitions?.get(0)?.glosses).hasSize(2)
-        assertThat(word?.definitions?.get(0)?.glosses?.get(0)?.idioms).hasSize(1)
-        assertThat(word?.definitions?.get(0)?.glosses?.get(0)?.phrases).hasSize(5)
-        assertThat(word?.audio).hasSize(1)
+        assertThat(word?.definitions?.get(0)?.pos).isEqualTo("verb")
+        assertThat(word?.audio).isEmpty()
+    }
+
+    @Test
+    fun testGetRefResolvesMainHeadword() {
+        val html = File("../testdata/colspan/morir.html").readText()
+
+        // __ref=2 -> the first main dictionary headword.
+        server.enqueue(MockResponse().setBody(html))
+        val refUri: HttpUrl = server.url("/dictionary/spanish-english/morir").newBuilder()
+            .addQueryParameter("__ref", "2").build()
+        val main = dictionary.get(refUri)
+        assertThat(main).isNotNull()
+        assertThat(main?.mTitle).isEqualTo("morir")
+        assertThat(main?.dictionary).isEqualTo("Collins Spanish-English")
+        assertThat(main?.definitions).hasSize(1)
+        assertThat(main?.definitions?.get(0)?.pos).isEqualTo("intransitive verb")
+        assertThat(main?.definitions?.get(0)?.idioms).isEmpty()
+        assertThat(main?.definitions?.get(0)?.phrases).isEmpty()
+        assertThat(main?.definitions?.get(0)?.glosses).hasSize(2)
+        assertThat(main?.definitions?.get(0)?.glosses?.get(0)?.idioms).hasSize(1)
+        assertThat(main?.definitions?.get(0)?.glosses?.get(0)?.phrases).hasSize(5)
+        assertThat(main?.audio).hasSize(1)
     }
 
     @Test
     fun testGetRefResolvesEasyLearning() {
         val html = File("../testdata/colspan/frente.html").readText()
 
-        // Default (no __ref) -> main dictionary headword.
+        // Default (no __ref) -> the first easy-learning headword.
         server.enqueue(MockResponse().setBody(html))
         val mainUri: HttpUrl = server.url("/dictionary/spanish-english/frente")
         val main = dictionary.get(mainUri)
         assertThat(main).isNotNull()
-        assertThat(main?.mTitle).isEqualTo("frente")
-        assertThat(main?.dictionary).isEqualTo("Collins Spanish-English")
-        // The combined page carries every headword (main + easy-learning).
+        assertThat(main?.mTitle).isEqualTo("la frente")
+        assertThat(main?.dictionary).isEqualTo("Collins Easy Learning")
+        // The combined page carries every headword (easy-learning + main).
         assertThat(main?.mHomonymEntries).hasSize(4)
         assertThat(main?.mHomonymEntries?.map { it.mTitle })
-            .containsExactly("frente", "frente", "la frente", "el frente").inOrder()
+            .containsExactly("la frente", "el frente", "frente", "frente").inOrder()
 
-        // __ref=1 -> the first easy-learning headword.
+        // __ref=3 -> the first main dictionary headword.
         server.enqueue(MockResponse().setBody(html))
         val refUri: HttpUrl = server.url("/dictionary/spanish-english/frente").newBuilder()
-            .addQueryParameter("__ref", "1").build()
-        val easy = dictionary.get(refUri)
-        assertThat(easy).isNotNull()
-        assertThat(easy?.mTitle).isEqualTo("la frente")
-        assertThat(easy?.dictionary).isEqualTo("Collins Easy Learning")
+            .addQueryParameter("__ref", "3").build()
+        val spanish = dictionary.get(refUri)
+        assertThat(spanish).isNotNull()
+        assertThat(spanish?.mTitle).isEqualTo("frente")
+        assertThat(spanish?.dictionary).isEqualTo("Collins Spanish-English")
 
         // __ref=2 -> the second easy-learning headword.
         server.enqueue(MockResponse().setBody(html))

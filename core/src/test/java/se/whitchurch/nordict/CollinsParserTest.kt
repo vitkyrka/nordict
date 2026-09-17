@@ -33,8 +33,24 @@ class CollinsParserTest {
 
         assertThat(words).hasSize(4)
 
-        // Main dictionary headwords first: each POS-group hom is its own Word.
-        val fem = words[0]
+        // Easy-learning headwords first, then main dictionary headwords: each
+        // POS-group hom is its own Word.
+        val easyLa = words[0]
+        assertThat(easyLa.mTitle).isEqualTo("la frente")
+        assertThat(easyLa.rawHeadword).isEqualTo("frente")
+        assertThat(easyLa.dictionary).isEqualTo("Collins Easy Learning")
+        assertThat(easyLa.audio).isEmpty()
+        assertThat(easyLa.uri.toString()).doesNotContain("__ref")
+        assertThat(easyLa.xrefs).containsExactly("1")
+
+        val easyEl = words[1]
+        assertThat(easyEl.mTitle).isEqualTo("el frente")
+        assertThat(easyEl.rawHeadword).isEqualTo("frente")
+        assertThat(easyEl.dictionary).isEqualTo("Collins Easy Learning")
+        assertThat(easyEl.uri.toString()).contains("__ref=2")
+        assertThat(easyEl.xrefs).containsExactly("2")
+
+        val fem = words[2]
         assertThat(fem.mTitle).isEqualTo("frente")
         assertThat(fem.dictionary).isEqualTo("Collins Spanish-English")
         assertThat(fem.audio).hasSize(1)
@@ -54,7 +70,7 @@ class CollinsParserTest {
         // Second main headword: masculine noun. Its 9 phrases belong to the
         // senses they are nested in (e.g. "al frente" is part of definition 1),
         // not hoisted to the end of the POS group.
-        val masc = words[1]
+        val masc = words[3]
         assertThat(masc.mTitle).isEqualTo("frente")
         assertThat(masc.dictionary).isEqualTo("Collins Spanish-English")
         assertThat(masc.definitions).hasSize(1)
@@ -72,37 +88,37 @@ class CollinsParserTest {
         assertThat(masc.definitions[0].glosses[5].phrases).hasSize(1)
         assertThat(masc.definitions[0].glosses[5].phrases[0].headword).isEqualTo("frente mío/suyo")
 
-        // Main headwords keep the canonical URL for the first, __ref for the rest.
-        assertThat(fem.uri.toString()).doesNotContain("__ref")
+        // First main headword keeps its __ref (only the first easy entry is canonical).
+        assertThat(fem.uri.toString()).contains("__ref=3")
         assertThat(fem.xrefs).containsExactly("3")
         assertThat(masc.uri.toString()).contains("__ref=4")
         assertThat(masc.xrefs).containsExactly("4")
 
-        // Every word on the page carries the full renderable entry list (main
-        // headwords first, then easy-learning), itself included.
+        // Every word on the page carries the full renderable entry list (easy-
+        // learning first, then main headwords), itself included.
         for (w in words) {
             assertThat(w.mHomonymEntries).hasSize(4)
-            assertThat(w.mHomonymEntries.map { it.ref }).containsExactly("3", "4", "1", "2").inOrder()
+            assertThat(w.mHomonymEntries.map { it.ref }).containsExactly("1", "2", "3", "4").inOrder()
         }
         assertThat(fem.mHomonymEntries.map { it.mTitle })
-            .containsExactly("frente", "frente", "la frente", "el frente").inOrder()
-        assertThat(fem.mHomonymEntries[1].definitions[0].pos).isEqualTo("masculine noun")
-        assertThat(fem.mHomonymEntries[1].audio).hasSize(1)
-        assertThat(fem.mHomonymEntries[3].dictionary).isEqualTo("Collins Easy Learning")
+            .containsExactly("la frente", "el frente", "frente", "frente").inOrder()
+        assertThat(fem.mHomonymEntries[3].definitions[0].pos).isEqualTo("masculine noun")
+        assertThat(fem.mHomonymEntries[3].audio).hasSize(1)
+        assertThat(fem.mHomonymEntries[0].dictionary).isEqualTo("Collins Easy Learning")
         // Every entry snapshot carries its own content.
-        assertThat(words[2].mHomonymEntries[2].mTitle).isEqualTo("la frente")
+        assertThat(words[2].mHomonymEntries[2].mTitle).isEqualTo("frente")
 
-        // Easy-learning headwords follow (no audio).
-        assertThat(words[2].mTitle).isEqualTo("la frente")
-        assertThat(words[2].rawHeadword).isEqualTo("frente")
-        assertThat(words[2].dictionary).isEqualTo("Collins Easy Learning")
-        assertThat(words[2].audio).isEmpty()
-        assertThat(words[2].uri.toString()).contains("__ref=1")
+        // Easy-learning headwords lead (first is canonical, no audio).
+        assertThat(words[0].mTitle).isEqualTo("la frente")
+        assertThat(words[0].rawHeadword).isEqualTo("frente")
+        assertThat(words[0].dictionary).isEqualTo("Collins Easy Learning")
+        assertThat(words[0].audio).isEmpty()
+        assertThat(words[0].uri.toString()).doesNotContain("__ref")
 
-        assertThat(words[3].mTitle).isEqualTo("el frente")
-        assertThat(words[3].rawHeadword).isEqualTo("frente")
-        assertThat(words[3].dictionary).isEqualTo("Collins Easy Learning")
-        assertThat(words[3].uri.toString()).contains("__ref=2")
+        assertThat(words[1].mTitle).isEqualTo("el frente")
+        assertThat(words[1].rawHeadword).isEqualTo("frente")
+        assertThat(words[1].dictionary).isEqualTo("Collins Easy Learning")
+        assertThat(words[1].uri.toString()).contains("__ref=2")
 
         assertGolden(words, "frente")
     }
@@ -154,7 +170,15 @@ class CollinsParserTest {
 
         assertThat(words).hasSize(3)
 
-        val intr = words[0]
+        // Easy-learning entry first.
+        val easyMorir = words[0]
+        assertThat(easyMorir.mTitle).isEqualTo("morir")
+        assertThat(easyMorir.dictionary).isEqualTo("Collins Easy Learning")
+        assertThat(easyMorir.definitions).hasSize(1)
+        assertThat(easyMorir.definitions[0].pos).isEqualTo("verb")
+        assertThat(easyMorir.uri.toString()).doesNotContain("__ref")
+
+        val intr = words[1]
         assertThat(intr.mTitle).isEqualTo("morir")
         assertThat(intr.dictionary).isEqualTo("Collins Spanish-English")
         assertThat(intr.definitions).hasSize(1)
@@ -170,17 +194,11 @@ class CollinsParserTest {
         assertThat(intr.definitions[0].glosses[1].idioms[0].headword).isEqualTo("y allí muere")
 
         // single-sense reflexive cross-ref
-        val reflex = words[1]
+        val reflex = words[2]
         assertThat(reflex.mTitle).isEqualTo("morir")
         assertThat(reflex.definitions).hasSize(1)
         assertThat(reflex.definitions[0].pos).isEqualTo("reflexive verb")
         assertThat(reflex.definitions[0].glosses).hasSize(1)
-
-        // Easy-learning entry
-        assertThat(words[2].mTitle).isEqualTo("morir")
-        assertThat(words[2].dictionary).isEqualTo("Collins Easy Learning")
-        assertThat(words[2].definitions).hasSize(1)
-        assertThat(words[2].definitions[0].pos).isEqualTo("verb")
 
         assertGolden(words, "morir")
     }
@@ -194,7 +212,15 @@ class CollinsParserTest {
 
         assertThat(words).hasSize(2)
 
-        val main = words[0]
+        // Easy-learning entry first: the two roaming phrases stay at definition level.
+        val easy = words[0]
+        assertThat(easy.mTitle).isEqualTo("la muerte")
+        assertThat(easy.rawHeadword).isEqualTo("muerte")
+        assertThat(easy.dictionary).isEqualTo("Collins Easy Learning")
+        assertThat(easy.definitions[0].phrases).hasSize(2)
+        assertThat(easy.uri.toString()).doesNotContain("__ref")
+
+        val main = words[1]
         assertThat(main.mTitle).isEqualTo("muerte")
         assertThat(main.dictionary).isEqualTo("Collins Spanish-English")
         assertThat(main.definitions).hasSize(1)
@@ -209,13 +235,7 @@ class CollinsParserTest {
         // Phrases of sense 1 include "una lucha a muerte"
         assertThat(main.definitions[0].glosses[0].phrases[0].headword).isEqualTo("una lucha a muerte")
         assertThat(main.definitions[0].glosses[0].phrases[0].examples).hasSize(4)
-
-        // Easy-learning entry: the two roaming phrases stay at definition level.
-        val easy = words[1]
-        assertThat(easy.mTitle).isEqualTo("la muerte")
-        assertThat(easy.rawHeadword).isEqualTo("muerte")
-        assertThat(easy.dictionary).isEqualTo("Collins Easy Learning")
-        assertThat(easy.definitions[0].phrases).hasSize(2)
+        assertThat(main.uri.toString()).contains("__ref=2")
 
         assertGolden(words, "muerte")
     }
@@ -229,8 +249,18 @@ class CollinsParserTest {
 
         assertThat(words).hasSize(3)
 
+        // Easy-learning entry first: roaming phrases on the definition, two on sense 1
+        val easyOtro = words[0]
+        assertThat(easyOtro.mTitle).isEqualTo("otro")
+        assertThat(easyOtro.dictionary).isEqualTo("Collins Easy Learning")
+        assertThat(easyOtro.definitions).hasSize(1)
+        assertThat(easyOtro.definitions[0].pos).isEqualTo("adjective or pronoun")
+        assertThat(easyOtro.definitions[0].glosses).hasSize(2)
+        assertThat(easyOtro.definitions[0].phrases).hasSize(6)
+        assertThat(easyOtro.definitions[0].glosses[0].phrases).hasSize(2)
+
         // adjective: 3 glosses; 5 phrases spread across the senses
-        val adj = words[0]
+        val adj = words[1]
         assertThat(adj.mTitle).isEqualTo("otro")
         assertThat(adj.dictionary).isEqualTo("Collins Spanish-English")
         assertThat(adj.definitions).hasSize(1)
@@ -241,7 +271,7 @@ class CollinsParserTest {
         assertThat(adj.definitions[0].glosses[1].phrases).hasSize(2)
 
         // pronoun: 4 glosses; 1 idiom and 3 phrases on the senses they belong to
-        val pron = words[1]
+        val pron = words[2]
         assertThat(pron.mTitle).isEqualTo("otro")
         assertThat(pron.definitions).hasSize(1)
         assertThat(pron.definitions[0].pos).isEqualTo("pronoun")
@@ -252,15 +282,6 @@ class CollinsParserTest {
         assertThat(pron.definitions[0].glosses[3].idioms).hasSize(1)
         assertThat(pron.definitions[0].glosses[3].idioms[0].headword).isEqualTo("¡otro que tal (baila)!")
         assertThat(pron.definitions[0].glosses[3].phrases).hasSize(1)
-
-        // Easy-learning entry: roaming phrases on the definition, two on sense 1
-        assertThat(words[2].mTitle).isEqualTo("otro")
-        assertThat(words[2].dictionary).isEqualTo("Collins Easy Learning")
-        assertThat(words[2].definitions).hasSize(1)
-        assertThat(words[2].definitions[0].pos).isEqualTo("adjective or pronoun")
-        assertThat(words[2].definitions[0].glosses).hasSize(2)
-        assertThat(words[2].definitions[0].phrases).hasSize(6)
-        assertThat(words[2].definitions[0].glosses[0].phrases).hasSize(2)
 
         assertGolden(words, "otro")
     }
