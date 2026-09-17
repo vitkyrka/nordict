@@ -236,8 +236,6 @@ fun NordictApp(
             inputField = inputField
         )
 
-        HorizontalDivider()
-
         Box(modifier = Modifier.weight(1f)) {
             NavHost(
                 navController = navController,
