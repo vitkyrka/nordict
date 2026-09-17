@@ -326,7 +326,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                             extraExamples.add(pasteData.toString())
                         }
                     }) {
-                        Text("Clipboard")
+                        Icon(painterResource(R.drawable.ic_add_clipboard), contentDescription = "Paste from clipboard", modifier = Modifier.size(16.dp))
                     }
 
                     TextButton(onClick = {
