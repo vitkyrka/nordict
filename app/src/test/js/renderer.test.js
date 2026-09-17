@@ -870,6 +870,77 @@ test('renders idiom defP glosses with grammar and example attribution', () => {
     expect(glosses.eq(2).find('.grammar').hasClass('masculine')).toBe(true);
     expect(glosses.eq(2).find('.examples li').text()).toBe('Los mueras contra el general ahogaban los vítores de sus partidarios.');
 });
+
+test('renders grouped idiom senses with per-gloss numbers under one header', () => {
+    // EST/DLE group N numbered aceps under one locution header: one Idiom,
+    // one gloss per sense, the orden on the gloss. The header appears once
+    // and the senses stay in the Locuciones section (not interleaved with
+    // the definitions like diccionari.cat numbered idioms).
+    const word = {
+        mTitle: 'frente',
+        definitions: [
+            {
+                senseNumber: '1',
+                glosses: [
+                    { definition: 'Parte superior de la cara.', grammar: 'nombre femenino', gender: '', examples: [] }
+                ]
+            }
+        ],
+        idioms: [
+            {
+                idiom: 'al frente',
+                glosses: [
+                    { definition: 'Hacia delante.', grammar: 'locución adverbial', gender: '', examples: [], senseNumber: '1' },
+                    { definition: 'Dirigiendo o mandando.', grammar: 'locución adverbial', gender: '', examples: [], senseNumber: '2' },
+                    { definition: 'Enfrente.', grammar: 'locución adverbial', gender: '', examples: [], senseNumber: '3' }
+                ]
+            }
+        ]
+    };
+
+    renderWord(word);
+
+    // One header for the three senses.
+    expect($('.idiom-list li').length).toBe(1);
+    expect($('.idiom-list li .idiom-name').text()).toBe('al frente');
+    const glosses = $('.idiom-list li .gloss');
+    expect(glosses.length).toBe(3);
+    expect(glosses.map((_, el) => $(el).find('.sense-number').text()).get())
+        .toEqual(['1', '2', '3']);
+    // Grouped idioms keep the separate section: definitions stay in <ol>.
+    expect($('ol.definitions li').length).toBe(1);
+    expect($('ol.definitions li .sense-number').text()).toBe('1');
+    expect($('ol.definitions').hasClass('sense-numbered')).toBe(true);
+    expect($('.idiom-list').length).toBe(1);
+});
+
+test('omits gloss sense numbers when absent', () => {
+    const word = {
+        mTitle: 'cagar',
+        definitions: [
+            {
+                senseNumber: '1',
+                glosses: [
+                    { definition: 'Evacuar el vientre.', grammar: 'verbo intransitivo', gender: '', examples: [] }
+                ]
+            }
+        ],
+        idioms: [
+            {
+                idiom: 'cagarla',
+                glosses: [
+                    { definition: 'Cometer un error de difícil solución.', grammar: 'locución verbal', gender: '', examples: [] }
+                ]
+            }
+        ]
+    };
+
+    renderWord(word);
+
+    expect($('.definitions li .gloss .sense-number').length).toBe(0);
+    expect($('.idiom-list li .gloss .sense-number').length).toBe(0);
+    expect($('.definitions li > .sense-number').text()).toBe('1');
+});
 test('renders dictionary label for bilingual word', () => {
     const word = {
         mTitle: 'frente',

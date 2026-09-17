@@ -12,6 +12,7 @@ const genderClass = (gender) =>
 
 const renderGlosses = (glosses) => (glosses || []).map(gloss => `
     <div class="gloss">
+        ${gloss.senseNumber ? `<span class="sense-number">${gloss.senseNumber}</span> ` : ''}
         ${gloss.headword ? `<span class="headword">${gloss.headword}</span> ` : ''}
         ${gloss.grammar ? `<span class="grammar ${genderClass(gloss.gender)}">${gloss.grammar}</span> ` : ''}
         <span class="definition">${gloss.definition}</span>
@@ -125,9 +126,10 @@ const template = (word) => {
 
     // diccionari.cat and DIDAC keep locutions interleaved with the senses in
     // the source page (no separate "locuciones" section), so their idioms
-    // carry a senseNumber. Render them inline in the single numbered list,
-    // sorted back into page order. DLE/EST idioms are unnumbered and keep
-    // the separate locutions section below.
+    // carry an idiom-level senseNumber. Render them inline in the single
+    // numbered list, sorted back into page order. DLE/EST group their senses
+    // under one locution header (one Idiom, one gloss per numbered sense, the
+    // number on the gloss) and keep the separate locutions section below.
     const numberedIdioms = idioms.some(i => i.senseNumber);
     const senses = numberedIdioms
         ? [...defs, ...idioms].sort(compareSenses)

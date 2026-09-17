@@ -52,9 +52,11 @@ class CardsTest {
         val word = parseDleOtro()
         val proposals = Cards.proposals(word)
 
-        assertThat(proposals).hasSize(14)
+        // DLE otro groups its 7 li idiom senses under 4 h3 headers, so one
+        // card per grouped idiom (not per sense).
+        assertThat(proposals).hasSize(11)
         assertThat(proposals.filterIsInstance<CardProposal.Definition>()).hasSize(7)
-        assertThat(proposals.filterIsInstance<CardProposal.Idiom>()).hasSize(7)
+        assertThat(proposals.filterIsInstance<CardProposal.Idiom>()).hasSize(4)
 
         val first = proposals.first()
         assertThat(first).isInstanceOf(CardProposal.Definition::class.java)
@@ -62,7 +64,7 @@ class CardsTest {
         assertThat(first.title).isEqualTo("otro, tra")
 
         val last = proposals.last()
-        assertThat(last.id).isEqualTo("i6")
+        assertThat(last.id).isEqualTo("i3")
         assertThat(last).isInstanceOf(CardProposal.Idiom::class.java)
         assertThat((last as CardProposal.Idiom).idiom.idiom).isNotEmpty()
     }

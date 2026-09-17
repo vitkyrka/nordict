@@ -34,7 +34,34 @@ class EstParserTest {
 
         assertThat(word.mTitle).isEqualTo("frente")
         assertThat(word.definitions).hasSize(6)
-        assertThat(word.idioms).hasSize(14)
+        // One Idiom per .fc header (the original groups N numbered aceps
+        // under one headword): 9 headers on the frente page.
+        assertThat(word.idioms).hasSize(9)
+        assertThat(word.idioms.map { it.idiom }).containsExactly(
+            "al frente",
+            "con la frente muy alta",
+            "de frente",
+            "en frente",
+            "frente a",
+            "frente a frente",
+            "frente por frente",
+            "hacer frente (a alguien o algo)",
+            "llevarlo, o traerlo, alguien escrito en la frente"
+        ).inOrder()
+
+        // Definitions carry their span.orden numbers.
+        assertThat(word.definitions.map { it.senseNumber })
+            .containsExactly("1", "2", "3", "4", "5", "6").inOrder()
+
+        // Grouped senses keep their per-acep numbers on the first gloss of
+        // each acep; secondary .defP glosses stay unnumbered.
+        val alFrente = word.idioms[0]
+        assertThat(alFrente.glosses.map { it.senseNumber })
+            .containsExactly("1", "2", "3").inOrder()
+        val deFrente = word.idioms[2]
+        assertThat(deFrente.glosses.map { it.definition }).contains("Sin desviar la vista.")
+        assertThat(deFrente.glosses.map { it.senseNumber })
+            .containsExactly("1", "", "2", "3", "4", "").inOrder()
 
         assertGolden(words, "../testdata/est.json")
     }
@@ -68,6 +95,9 @@ class EstParserTest {
         assertThat(word.definitions[1].glosses[0].headword).isEqualTo("")
         assertThat(word.definitions[2].glosses[0].headword).isEqualTo("cagarse")
         assertThat(word.definitions[3].glosses[0].headword).isEqualTo("cagarse")
+
+        assertThat(word.definitions.map { it.senseNumber })
+            .containsExactly("1", "2", "3", "4").inOrder()
 
         assertGolden(words, "../testdata/est/cagar.json")
     }
@@ -186,7 +216,8 @@ class EstParserTest {
         assertThat(word.mTitle).isEqualTo("muerte")
         // 3 main definitions; the .sols sub-entries are separate headwords
         assertThat(word.definitions).hasSize(3)
-        assertThat(word.idioms).hasSize(7)
+        // One Idiom per .fc header: the two "a muerte" aceps group into one.
+        assertThat(word.idioms).hasSize(6)
         assertThat(word.conjugation).isEmpty()
         assertThat(word.participle).isEmpty()
         assertThat(word.xrefs).containsExactly("1")
@@ -203,16 +234,25 @@ class EstParserTest {
         // Regression: every idiom must be a real acep, not the <a class="acep">
         // cross-reference anchors in the definition text (which produced ghost,
         // zero-gloss duplicates). "la Muerte" must appear exactly once.
-        assertThat(word.idioms.map { it.glosses.size }).containsExactly(1, 3, 2, 1, 1, 2, 1)
+        assertThat(word.idioms.map { it.glosses.size }).containsExactly(1, 5, 1, 1, 2, 1)
         assertThat(word.idioms.map { it.idiom }).containsExactly(
             "a la muerte",
-            "a muerte",
             "a muerte",
             "dar muerte (a alguien)",
             "de mala muerte",
             "de muerte",
             "la Muerte"
         ).inOrder()
+
+        // The grouped "a muerte" keeps both aceps' numbers on their first
+        // glosses; secondary .defP glosses stay unnumbered.
+        val aMuerte = word.idioms[1]
+        assertThat(aMuerte.glosses.map { it.senseNumber })
+            .containsExactly("1", "", "", "2", "").inOrder()
+
+        // Definitions carry their span.orden numbers.
+        assertThat(word.definitions.map { it.senseNumber })
+            .containsExactly("1", "2", "3").inOrder()
 
         // .sols sub-entries are parsed as separate headwords, each with its
         // own __ref, not as trailing definitions of the parent lemma.

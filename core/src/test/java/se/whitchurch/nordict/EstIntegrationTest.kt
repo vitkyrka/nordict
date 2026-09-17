@@ -56,7 +56,7 @@ class EstIntegrationTest {
         assertThat(word).isNotNull()
         assertThat(word?.mTitle).isEqualTo("frente")
         assertThat(word?.definitions).hasSize(6)
-        assertThat(word?.idioms).hasSize(14)
+        assertThat(word?.idioms).hasSize(9)
 
         assertThat(word?.definitions?.get(0)?.definition).contains("Parte superior de la cara")
         assertThat(word?.definitions?.get(0)?.examples).contains("Cayó de bruces y se hizo una herida en la frente.")
@@ -105,6 +105,6 @@ class EstIntegrationTest {
         assertThat(word3).isNotNull()
         assertThat(word3?.mTitle).isEqualTo("muerte")
         assertThat(word3?.definitions).hasSize(3)
-        assertThat(word3?.idioms).hasSize(7)
+        assertThat(word3?.idioms).hasSize(6)
     }
 }

@@ -31,7 +31,10 @@ class DleParserTest {
 
         assertThat(word.mTitle).isEqualTo("frente")
         assertThat(word.definitions).hasSize(14)
-        assertThat(word.idioms).hasSize(25)
+        // One Idiom per h3 header (the original groups N numbered li senses
+        // under one headword): 19 headers with senses on the frente page
+        // ("en frente" heads only a "V. enfrente." cross-reference).
+        assertThat(word.idioms).hasSize(19)
         assertThat(word.etymology).contains("Del antiguo fruente")
 
         val def1 = word.definitions[0]
@@ -64,6 +67,25 @@ class DleParserTest {
         assertThat(lastIdiom.idiom).isEqualTo("traerlo alguien escrito en la frente")
         assertThat(lastIdiom.glosses[0].definition).contains("No acertar a disimular")
 
+        // Grouped senses keep their per-li .n_acep numbers on each gloss.
+        val alFrente = word.idioms.find { it.idiom == "al frente" }
+        assertThat(alFrente).isNotNull()
+        assertThat(alFrente!!.glosses).hasSize(2)
+        assertThat(alFrente.glosses.map { it.senseNumber })
+            .containsExactly("1", "2").inOrder()
+        val deFrente = word.idioms.find { it.idiom == "de frente" }
+        assertThat(deFrente).isNotNull()
+        assertThat(deFrente!!.glosses).hasSize(3)
+        assertThat(deFrente.glosses.map { it.senseNumber })
+            .containsExactly("1", "2", "3").inOrder()
+
+        // Definitions carry their .n_acep numbers.
+        assertThat(word.definitions.map { it.senseNumber })
+            .containsExactly(
+                "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
+                "11", "12", "13", "14"
+            ).inOrder()
+
         assertGolden(words, "../testdata/dle/frente.json")
     }
 
@@ -95,6 +117,9 @@ class DleParserTest {
 
         val idiom1 = word.idioms[0]
         assertThat(idiom1.idiom).isEqualTo("cagarla")
+
+        assertThat(word.definitions.map { it.senseNumber })
+            .containsExactly("1", "2", "3").inOrder()
 
         assertGolden(words, "../testdata/dle/cagar.json")
     }
@@ -132,6 +157,9 @@ class DleParserTest {
         val piantaSyn = def1.synonyms.find { it.text == "piantarse" }
         assertThat(piantaSyn).isNotNull()
         assertThat(piantaSyn!!.href).isEqualTo("https://dle.rae.es/?id=SrurElO")
+
+        assertThat(word.definitions.map { it.senseNumber })
+            .containsExactly("1", "2", "3", "4", "5", "6", "7", "8").inOrder()
 
         assertGolden(words, "../testdata/dle/morir.json")
     }
@@ -182,7 +210,8 @@ class DleParserTest {
         assertThat(word.mTitle).isEqualTo("otro, tra")
         assertThat(word.rawHeadword).isEqualTo("otro")
         assertThat(word.definitions).hasSize(7)
-        assertThat(word.idioms).hasSize(7)
+        // Grouped by h3 header: 7 li senses under 4 headwords.
+        assertThat(word.idioms).hasSize(4)
         assertThat(word.etymology).contains("alter")
 
         val def1 = word.definitions[0]

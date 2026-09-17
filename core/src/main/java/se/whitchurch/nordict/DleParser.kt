@@ -84,11 +84,25 @@ class DleParser {
 
                 headword.xrefs.add(ref.toString())
 
+                // Idioms: one Idiom per h3 header (matching the original page,
+                // which groups N numbered li senses under one headword). Each
+                // li's gloss carries its .n_acep number; idiom-level markers
+                // come from the first li. h3.l2 cross-references (e.g. "V.
+                // enfrente.") head no senses and are skipped.
                 var currentIdiom: String? = null
+                val pendingIdiomItems = ArrayList<Element>()
+
+                fun flushIdiomGroup() {
+                    if (currentIdiom != null && pendingIdiomItems.isNotEmpty()) {
+                        headword.idioms.add(parseIdiomGroup(currentIdiom!!, pendingIdiomItems))
+                        pendingIdiomItems.clear()
+                    }
+                }
 
                 lemma.select("h3, ol.c-definitions > li").forEach { child ->
                     if (child.tagName() == "h3") {
-                        currentIdiom = child.text()
+                        flushIdiomGroup()
+                        currentIdiom = if (child.hasClass("l2")) null else child.text()
                         return@forEach
                     }
 
@@ -99,9 +113,10 @@ class DleParser {
                         headword.definitions.add(parseDefinition(defItem, meaning, finalBaseUrl))
                         meaning.remove()
                     } else {
-                        headword.idioms.add(parseIdiom(currentIdiom!!, defItem))
+                        pendingIdiomItems.add(defItem)
                     }
                 }
+                flushIdiomGroup()
 
                 lemma.remove()
                 words.add(headword)
@@ -118,9 +133,15 @@ class DleParser {
             return words
         }
 
+        // The original page number of a definition/idiom sense (DLE
+        // `.n_acep`, e.g. "1. "). Stored without the trailing dot.
+        private fun senseNumberOf(defItem: Element): String =
+            defItem.selectFirst(".n_acep")?.text()?.trim()?.trimEnd('.')?.trim() ?: ""
+
         // Parse a definition <li> element into a Word.Definition.
         private fun parseDefinition(defItem: Element, meaning: Element, baseUrl: String): Word.Definition {
             val definition = Word.Definition(defItem.text(), meaning.clone())
+            definition.senseNumber = senseNumberOf(defItem)
 
             val mainDiv = defItem.children().firstOrNull { it.tagName() == "div" && !it.hasClass("c-definitions__item-footer") }
                 ?: defItem
@@ -173,30 +194,43 @@ class DleParser {
             return Word.Synonym(synEl.text(), href, plev)
         }
 
-        private fun parseIdiom(idiomName: String, defItem: Element): Word.Idiom {
-            val idiom = Word.Idiom(idiomName, defItem.text())
+        // Parse one h3 idiom group (all li senses under the header) into a
+        // single Word.Idiom. Each sense becomes one gloss carrying its
+        // .n_acep number; idiom-level markers come from the first sense.
+        private fun parseIdiomGroup(idiomName: String, items: List<Element>): Word.Idiom {
+            val first = items.first()
+            val firstMain = first.children().firstOrNull { it.tagName() == "div" && !it.hasClass("c-definitions__item-footer") }
+                ?: first
 
-            val mainDiv = defItem.children().firstOrNull { it.tagName() == "div" && !it.hasClass("c-definitions__item-footer") }
-                ?: defItem
+            val (grammar, register, domain, geo, _) = parseMainDiv(firstMain)
 
-            val (grammar, register, domain, geo, defText) = parseMainDiv(mainDiv)
-
+            val idiom = Word.Idiom(idiomName, first.text())
             idiom.grammar = grammar
             idiom.register = register
             idiom.domain = domain
             idiom.geo = geo
             idiom.gender = genderOf(grammar)
 
-            if (defText.isNotEmpty()) {
+            items.forEach { defItem ->
+                val mainDiv = defItem.children().firstOrNull { it.tagName() == "div" && !it.hasClass("c-definitions__item-footer") }
+                    ?: defItem
+
+                val (g, _, _, _, defText) = parseMainDiv(mainDiv)
+                if (defText.isEmpty()) return@forEach
+
                 val gloss = Word.Gloss()
                 gloss.definition = defText
-                gloss.grammar = grammar
-                gloss.gender = idiom.gender
+                gloss.grammar = g.ifEmpty { grammar }
+                gloss.gender = genderOf(gloss.grammar)
+                gloss.senseNumber = senseNumberOf(defItem)
+                mainDiv.select("span.h").forEach { example ->
+                    gloss.examples.add(example.text())
+                }
                 idiom.glosses.add(gloss)
             }
 
-            mainDiv.select("span.h").forEach { example ->
-                idiom.glosses.firstOrNull()?.examples?.add(example.text())
+            idiom.glosses.firstOrNull()?.let {
+                idiom.examples.addAll(it.examples)
             }
 
             return idiom

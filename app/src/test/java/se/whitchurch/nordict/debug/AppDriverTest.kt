@@ -550,8 +550,8 @@ class AppDriverTest {
         seedAndOpenWord()
         launchCardActivity()
 
-        // The DLE fixture proposes 7 definitions + 7 idioms, so index 2 is the
-        // 3rd definition.
+        // The DLE fixture proposes 7 definitions + 4 grouped idioms, so
+        // index 2 is the 3rd definition.
         val created = drive(AgentCommand(op = AgentOps.CREATE_CARD, index = 2))
         assertThat(created.ok).isTrue()
         assertThat(created.message).contains("note id 42")

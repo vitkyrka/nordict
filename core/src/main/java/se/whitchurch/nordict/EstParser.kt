@@ -81,16 +81,36 @@ class EstParser {
                     meaning.remove()
                 }
 
-                // Idioms
+                // Idioms: one Idiom per .fc header (matching the original
+                // page, which groups N numbered aceps under one headword).
+                // Each acep's first gloss carries its span.orden number;
+                // secondary .defP glosses belong to the same sense and stay
+                // unnumbered. Idiom-level markers come from the first acep
+                // (same convention as SO/Infopedia).
                 lemma.select(".locs .fc").forEach { fc ->
                     val idiomName = fc.selectFirst(".headword-fc")?.text() ?: ""
-                    fc.select("div.acep").forEach { meaning ->
-                        val primaryDef = meaning.selectFirst(".def")?.text() ?: meaning.text()
-                        val idiom = Word.Idiom(idiomName, primaryDef)
-                        fillTarget(idiom, parseAcep(meaning))
-                        applyHeadwords(idiom.glosses, word)
-                        headword.idioms.add(idiom)
+                    val aceps = fc.select("div.acep")
+                    if (aceps.isEmpty()) return@forEach
+                    val firstMeaning = aceps.first()
+                    val primaryDef = firstMeaning.selectFirst(".def")?.text() ?: firstMeaning.text()
+                    val idiom = Word.Idiom(idiomName, primaryDef)
+                    var firstAcep = true
+                    aceps.forEach { meaning ->
+                        val orden = meaning.selectFirst(".orden")?.text()?.trim() ?: ""
+                        val acep = parseAcep(meaning)
+                        acep.glosses.firstOrNull()?.senseNumber = orden
+                        if (firstAcep) {
+                            fillTarget(idiom, acep)
+                            firstAcep = false
+                        } else {
+                            idiom.glosses.addAll(acep.glosses)
+                            acep.glosses.firstOrNull()?.let {
+                                idiom.examples.addAll(it.examples)
+                            }
+                        }
                     }
+                    applyHeadwords(idiom.glosses, word)
+                    headword.idioms.add(idiom)
                 }
 
                 words.add(headword)
@@ -138,6 +158,7 @@ class EstParser {
         private fun parseDefinition(meaning: Element, finalBaseUrl: String): Word.Definition {
             val primaryDef = meaning.selectFirst(".def")?.text() ?: meaning.text()
             val definition = Word.Definition(primaryDef, meaning.clone())
+            definition.senseNumber = meaning.selectFirst(".orden")?.text()?.trim() ?: ""
             val acep = parseAcep(meaning)
             definition.domain = meaning.selectFirst(".domain")?.attr("title") ?: ""
             fillTarget(definition, acep)

@@ -46,6 +46,12 @@ class Word(
         var headword: String = ""
         var grammar: String = ""
         var gender: String = ""
+        // Original page numbering of the acep/sense that produced this gloss
+        // (EST `span.orden`, DLE `.n_acep`). Secondary `.defP` glosses share
+        // their acep's number only when they start a new numbered sense; usage
+        // notes attached to the same sense leave this empty. Lets grouped
+        // idioms (one header, N numbered senses) render per-sense numbers.
+        var senseNumber: String = ""
         val examples: ArrayList<String> = ArrayList()
 
         // The source fragment for this sense (Collins `div.sense`, cloned

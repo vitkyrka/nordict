@@ -57,7 +57,8 @@ object WordJson {
         val headword: String,
         val grammar: String,
         val gender: String,
-        val examples: List<String>
+        val examples: List<String>,
+        val senseNumber: String = ""
     )
 
     data class IdiomData(
@@ -85,7 +86,8 @@ object WordJson {
             headword = headword,
             grammar = grammar,
             gender = gender,
-            examples = examples
+            examples = examples,
+            senseNumber = senseNumber
         )
     }
 
