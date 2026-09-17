@@ -1,6 +1,7 @@
 package se.whitchurch.nordict
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
@@ -32,6 +33,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 
@@ -84,9 +86,11 @@ fun DictionaryNav(
  * flag next to a swap glyph; the trailing segment opens the [DropdownMenu] with
  * every language, each choice going through [Ordboken.setLanguage].
  *
- * Styled as the Material 3 expressive split button (tonal leading action
- * surface + trailing expand surface whose inner corners round out and whose
- * arrow rotates when the menu is open). The androidx
+ * Styled as a low-emphasis outlined split button (surface fill +
+ * outlineVariant border + onSurfaceVariant content, echoing the outlined
+ * dictionary [FilterChip]s) so it stays subordinate to the search bar's
+ * leading flag, which is the single indicator of the current language.
+ * The androidx
  * `SplitButtonLayout`/`SplitButtonDefaults` components ship in the
  * material3 1.5 alphas; the two segments are built from material3 1.4/1.5
  * primitives so their geometry stays stable.
@@ -120,12 +124,13 @@ fun LanguageTopBar(ordboken: Ordboken) {
             // corners at the seam between the two segments.
             Surface(
                 onClick = { ordboken.swapLang() },
-                color = MaterialTheme.colorScheme.secondaryContainer,
-                contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                color = MaterialTheme.colorScheme.surface,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 shape = RoundedCornerShape(
                     topStart = 20.dp, bottomStart = 20.dp,
                     topEnd = 6.dp, bottomEnd = 6.dp
                 ),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
                 modifier = Modifier
                     .height(40.dp)
                     .semantics(mergeDescendants = true) {
@@ -137,11 +142,14 @@ fun LanguageTopBar(ordboken: Ordboken) {
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     modifier = Modifier.padding(start = 16.dp, end = 12.dp)
                 ) {
-                    LanguageFlag(ordboken.langFlag(lastLang))
+                    // Kept smaller than the search bar's 24.dp current-language
+                    // flag so the two flags never compete about which language
+                    // is active.
+                    LanguageFlag(ordboken.langFlag(lastLang), size = 20.dp)
                     Icon(
                         imageVector = Icons.Filled.SyncAlt,
                         contentDescription = null,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
             }
@@ -156,9 +164,10 @@ fun LanguageTopBar(ordboken: Ordboken) {
 
 /**
  * The split button's trailing segment — or the whole button when [standalone]
- * (a single-language install with nothing to swap to): the tonal [Surface] that
- * expands the language [DropdownMenu]. Its arrow rotates 180° while the menu is
- * open, echoing the M3 expressive expanding action.
+ * (a single-language install with nothing to swap to): the outlined [Surface]
+ * that expands the language [DropdownMenu]. Its arrow rotates 180° while the
+ * menu is open, echoing the M3 expressive expanding action. The open state
+ * fills with surfaceContainerHigh as transient feedback.
  */
 @Composable
 private fun LanguageMenuToggle(
@@ -173,10 +182,10 @@ private fun LanguageMenuToggle(
         Surface(
             onClick = { langMenuExpanded = true },
             color = if (langMenuExpanded)
-                MaterialTheme.colorScheme.tertiaryContainer
+                MaterialTheme.colorScheme.surfaceContainerHigh
             else
-                MaterialTheme.colorScheme.secondaryContainer,
-            contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                MaterialTheme.colorScheme.surface,
+            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
             shape = if (standalone) {
                 RoundedCornerShape(20.dp)
             } else {
@@ -185,6 +194,7 @@ private fun LanguageMenuToggle(
                     topEnd = 20.dp, bottomEnd = 20.dp
                 )
             },
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
             modifier = Modifier
                 .height(40.dp)
                 .then(if (standalone) Modifier.width(40.dp) else Modifier.padding(start = 1.dp))
@@ -241,11 +251,11 @@ private fun LanguageDropdown(
 }
 
 @Composable
-private fun LanguageFlag(flagRes: Int) {
+private fun LanguageFlag(flagRes: Int, size: Dp = 24.dp) {
     Image(
         painter = painterResource(flagRes),
         contentDescription = null,
-        modifier = Modifier.size(24.dp),
+        modifier = Modifier.size(size),
         contentScale = ContentScale.Fit
     )
 }
