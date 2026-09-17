@@ -48,6 +48,11 @@ class Word(
         var gender: String = ""
         val examples: ArrayList<String> = ArrayList()
 
+        // The source fragment for this sense (Collins `div.sense`, cloned
+        // after examples/idioms are pruned). Lets card Backs render one
+        // sense instead of the whole POS-group `hom`. Excluded from JSON.
+        @Transient var element: Element? = null
+
         // Collins idioms and phrases nested inside this sense (gloss).
         // The renderer shows these inline under the specific definition
         // they belong to, instead of at the end of the POS group.

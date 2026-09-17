@@ -82,6 +82,61 @@ class CardsTest {
     }
 
     @Test
+    fun proposals_collinsMasculineFrente_splitsGlossesIntoSeparateCards() {
+        val page = File("../testdata/colspan/frente.html").readText()
+        val words = CollinsParser.parse(
+            page,
+            httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/frente"),
+            "COLSPAN", "spanish-english"
+        )
+        val masc = words.single {
+            it.dictionary == "Collins Spanish-English" &&
+                it.definitions.singleOrNull()?.pos == "masculine noun"
+        }
+        assertThat(masc.definitions).hasSize(1)
+        assertThat(masc.definitions[0].glosses).hasSize(6)
+
+        val proposals = Cards.proposals(masc)
+        // One card per sense, not one combined card for the POS group.
+        assertThat(proposals).hasSize(6)
+        val defs = proposals.filterIsInstance<CardProposal.Definition>()
+        assertThat(defs).hasSize(6)
+        assertThat(defs.map { it.id }).containsExactly("d0", "d1", "d2", "d3", "d4", "d5").inOrder()
+        for (proposal in defs) {
+            assertThat(proposal.definition.glosses).hasSize(1)
+            assertThat(proposal.title).isEqualTo("frente")
+        }
+        // Each card previews and renders just its own sense.
+        assertThat(defs.map { Cards.definitionText(it.definition) }.toSet()).hasSize(6)
+        val backs = defs.map { Cards.definitionBack(masc, listOf(it.definition), "") }
+        assertThat(backs.toSet()).hasSize(6)
+        // The first sense keeps its phrases; other senses keep their own.
+        assertThat(defs[0].definition.glosses[0].phrases.map { it.headword }).contains("al frente")
+        val firstGlossExamples = defs[0].definition.glosses[0].examples
+        val expectedFirst = if (firstGlossExamples.isNotEmpty()) firstGlossExamples else listOf("frente")
+        assertThat(Cards.examples(masc, listOf(defs[0].definition), emptyList()))
+            .containsExactlyElementsIn(expectedFirst)
+    }
+
+    @Test
+    fun proposals_multiGlossNonCollinsDefinition_staysWhole() {
+        // EST morir def1 carries a secondary "También prnl." gloss; those are
+        // one sense with extra grammar, not separate cards.
+        val page = File("../testdata/est/morir.html").readText()
+        val word = EstParser.parse(
+            page, httpUrl("https://www.rae.es/diccionario-estudiante/morir"), "EST"
+        ).first { w -> w.definitions.any { it.glosses.size > 1 } }
+        val multi = word.definitions.first { it.glosses.size > 1 }
+        assertThat(multi.definition).isNotEmpty()
+
+        val proposals = Cards.proposals(word)
+        assertThat(proposals.filterIsInstance<CardProposal.Definition>()).hasSize(word.definitions.size)
+        val kept = proposals.filterIsInstance<CardProposal.Definition>()
+            .single { it.definition === multi }
+        assertThat(kept.definition.glosses).hasSize(multi.glosses.size)
+    }
+
+    @Test
     fun proposals_combinedWord_coversEverySelectedDictionary() {
         val dle = parseDleOtro()
         val est = parseEstOtro()

@@ -43,12 +43,15 @@ object Cards {
     private val gson = Gson()
 
     /** The cards a word's card screen offers: one per definition, then one
-     * per idiom, in page order. Combined multi-dictionary words stack every
-     * selected dictionary's entry on one page (`mHomonymEntries` carries the
-     * whole set while the word's own `definitions`/`idioms` only hold the
-     * first entry), so their proposals flatten every entry, mirroring the
-     * page; plain words propose the loaded word's own definitions and
-     * idioms. */
+     * per idiom, in page order. Collins POS-group definitions carry no
+     * top-level text and keep each sense in `glosses`, so those split into
+     * one card per gloss (e.g. frente masculine noun offers its 6 senses,
+     * not one combined card), like the other dictionaries. Combined
+     * multi-dictionary words stack every selected dictionary's entry on one
+     * page (`mHomonymEntries` carries the whole set while the word's own
+     * `definitions`/`idioms` only hold the first entry), so their proposals
+     * flatten every entry, mirroring the page; plain words propose the
+     * loaded word's own definitions and idioms. */
     fun proposals(word: Word): List<CardProposal> {
         val entries = word.mHomonymEntries.takeIf {
             it.any { entry -> MultiDict.isCombinedRef(entry.ref) }
@@ -56,8 +59,11 @@ object Cards {
         if (entries != null) return combinedProposals(word, entries)
 
         val out = ArrayList<CardProposal>()
-        word.definitions.forEachIndexed { i, definition ->
-            out.add(CardProposal.Definition("d$i", definition.title ?: word.mTitle, definition))
+        var d = 0
+        for (definition in word.definitions) {
+            for (split in splitDefinition(definition)) {
+                out.add(CardProposal.Definition("d${d++}", split.title ?: word.mTitle, split))
+            }
         }
         word.idioms.forEachIndexed { i, idiom ->
             out.add(CardProposal.Idiom("i$i", word.mTitle, idiom))
@@ -70,7 +76,9 @@ object Cards {
         var d = 0
         for (entry in entries) {
             for (definition in entry.definitions) {
-                out.add(CardProposal.Definition("d${d++}", definition.title ?: entry.mTitle, definition))
+                for (split in splitDefinition(definition)) {
+                    out.add(CardProposal.Definition("d${d++}", split.title ?: entry.mTitle, split))
+                }
             }
         }
         var i = 0
@@ -80,6 +88,39 @@ object Cards {
             }
         }
         return out
+    }
+
+    /**
+     * Splits a Collins POS-group definition (empty top-level text, one gloss
+     * per sense) into one single-gloss definition per card. Each copy keeps
+     * the group's `pos`/markers and renders its own sense fragment, so its
+     * Back, examples and preview cover just that sense. Any other definition
+     * (including RAE secondary `.defP` glosses like "También prnl.") stays
+     * whole.
+     */
+    private fun splitDefinition(definition: Word.Definition): List<Word.Definition> {
+        if (definition.definition.isNotEmpty() || definition.glosses.size <= 1) {
+            return listOf(definition)
+        }
+        return definition.glosses.map { gloss ->
+            val element = gloss.element?.clone() ?: definition.element
+            val single = Word.Definition(definition.definition, element, definition.title)
+            single.pos = definition.pos
+            single.grammar = definition.grammar
+            single.gender = definition.gender
+            single.domain = definition.domain
+            single.geo = definition.geo
+            single.plev = definition.plev
+            single.register = definition.register
+            single.senseNumber = definition.senseNumber
+            single.synonyms.addAll(definition.synonyms)
+            single.antonyms.addAll(definition.antonyms)
+            single.idioms.addAll(definition.idioms)
+            single.phrases.addAll(definition.phrases)
+            single.examples.addAll(definition.examples)
+            single.glosses.add(gloss)
+            single
+        }
     }
 
     /**

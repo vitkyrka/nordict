@@ -125,7 +125,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
             mAudio = audio
             mDictImages = images
             mWord = word
-            mLeftCards = (word.definitions.size + word.idioms.size)
+            mLeftCards = Cards.proposals(word).size
         }
     }
 
