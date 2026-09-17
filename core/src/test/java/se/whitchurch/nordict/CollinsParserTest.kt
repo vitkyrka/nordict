@@ -300,6 +300,48 @@ class CollinsParserTest {
     }
 
     @Test
+    fun testParseFeble() {
+        val htmlFile = File("../testdata/colspan/feble.html")
+        val page = htmlFile.readText()
+        val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/feble")
+        val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
+
+        assertThat(words).hasSize(1)
+
+        // Only a Latin American (ES-419) clip exists for this word — with no
+        // Spain alternative, the single available audio is kept as a fallback.
+        val feble = words[0]
+        assertThat(feble.mTitle).isEqualTo("feble")
+        assertThat(feble.dictionary).isEqualTo("Collins Spanish-English")
+        assertThat(feble.audio).hasSize(1)
+        assertThat(feble.audio[0]).contains("ES-419")
+
+        assertGolden(words, "feble")
+    }
+
+    @Test
+    fun testParsePocima() {
+        val htmlFile = File("../testdata/colspan/pócima.html")
+        val page = htmlFile.readText()
+        val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/p%C3%B3cima")
+        val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
+
+        assertThat(words).hasSize(1)
+
+        // Two Spain clips: the lower-cased "es_es_pocima.mp3" spelling variant
+        // plus the ES-ES- upper-cased main one — both kept (the lowercase
+        // variant must not be dropped by a case-sensitive match).
+        val pocima = words[0]
+        assertThat(pocima.mTitle).isEqualTo("pócima")
+        assertThat(pocima.dictionary).isEqualTo("Collins Spanish-English")
+        assertThat(pocima.audio).hasSize(2)
+        assertThat(pocima.audio[0]).isEqualTo("https://www.collinsdictionary.com/sounds/hwd_sounds/es_es_pocima.mp3")
+        assertThat(pocima.audio[1]).isEqualTo("https://www.collinsdictionary.com/sounds/hwd_sounds/ES-ES-W0216377.mp3")
+
+        assertGolden(words, "pócima")
+    }
+
+    @Test
     fun testParseSearch() {
         val body = File("../testdata/colspan-search.json").readText()
 

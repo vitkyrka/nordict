@@ -131,13 +131,26 @@ class CollinsParser {
                 // Spanish pages carry both a Spain (ES-ES) and a Latin American
                 // (ES-419) clip — keep only the Spain one. French pages carry a
                 // single French clip (FR-… in the main dictionary, fr_<word>.mp3
-                // in Easy Learning).
-                val audioLocales = if (dictCode == "french-english") listOf("FR-", "/fr_") else listOf("ES-ES")
-                head.block.select("div.mini_h2 a.hwd_sound[data-src-mp3]").forEach { audio ->
-                    val url = audio.attr("data-src-mp3")
-                    if (audioLocales.any { url.contains(it) }) {
-                        headword.audio.add(url)
+                // in Easy Learning). If no Spain clip is found (e.g. "feble"
+                // which only has ES-419), fall back to whatever is available.
+                if (dictCode == "french-english") {
+                    val audioLocales = listOf("FR-", "/fr_")
+                    head.block.select("div.mini_h2 a.hwd_sound[data-src-mp3]").forEach { audio ->
+                        val url = audio.attr("data-src-mp3")
+                        if (audioLocales.any { url.contains(it) }) {
+                            headword.audio.add(url)
+                        }
                     }
+                } else {
+                    val all = head.block.select("div.mini_h2 a.hwd_sound[data-src-mp3]")
+                        .map { it.attr("data-src-mp3") }
+                    // Spain clips come as "ES-ES-W..." or the lower-cased
+                    // "es_es_pocima.mp3" underscore variant.
+                    val spain = all.filter { url ->
+                        val lowered = url.lowercase()
+                        lowered.contains("es-es") || lowered.contains("es_es")
+                    }
+                    headword.audio.addAll(if (spain.isNotEmpty()) spain else all)
                 }
 
                 if (head.singleHom != null) {

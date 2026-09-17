@@ -434,7 +434,13 @@ lower-cased with spaces as hyphens (`table basse` -> `table-basse`).
 Pronunciation audio is read from each block's `div.mini_h2` strip and filtered
 by the source language: COLSPAN keeps only the Spain clip (`ES-ES`, dropping
 the `ES-419` Latin American one), COLFREN keeps the single French clip
-(`FR-…` in the main dictionary, `fr_<word>.mp3` in Easy Learning).
+(`FR-…` in the main dictionary, `fr_<word>.mp3` in Easy Learning). The Spain
+match is case-insensitive and also catches the lower-cased `es_es_<word>.mp3`
+spelling-variant clips; a headword with no Spain clip at all falls back to
+whatever audio is present (e.g. "feble", which only has the ES-419 clip).
+Fixtures covering both edges: `testdata/colspan/feble.*` (single-clip
+fallback) and `testdata/colspan/pócima.*` (two Spain clips: `es_es_pocima.mp3`
++ `ES-ES-W....mp3`).
 
 Tests: `CollinsParserTest`/`CollfrenParserTest` (both `:core`, plain JUnit
 goldens), `CollinsIntegrationTest`/`ColfrenIntegrationTest` (MockWebServer).
