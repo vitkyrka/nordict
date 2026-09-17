@@ -1,9 +1,12 @@
 package se.whitchurch.nordict
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.test.core.app.ApplicationProvider
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import com.google.common.truth.Truth.assertThat
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -16,7 +19,11 @@ import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
+import org.robolectric.shadows.ShadowNetwork
+import org.robolectric.shadows.ShadowNetworkCapabilities
+import org.robolectric.shadows.ShadowNetworkInfo
 
 /**
  * Compose tests for [SearchScreen]'s results list.
@@ -37,12 +44,37 @@ class SearchScreenUiTest {
     private lateinit var server: MockWebServer
     private lateinit var ordboken: Ordboken
 
+    // [Ordboken.isOnline] reads the modern NetworkCapabilities API, which
+    // Robolectric leaves empty by default (no active network) — report an
+    // online network so the results screen fetches instead of showing the
+    // offline error. The NetworkInfo types here are deprecated in the SDK but
+    // are the only way to drive Robolectric's shadow connectivity manager
+    // (its getActiveNetwork() resolves the active info's type to a network).
+    @Suppress("DEPRECATION")
     @Before
     fun setUp() {
         app = ApplicationProvider.getApplicationContext()
-        app.getSharedPreferences("ordboken", android.content.Context.MODE_PRIVATE)
+        app.getSharedPreferences("ordboken", Context.MODE_PRIVATE)
             .edit().clear().commit()
         Ordboken.reset()
+
+        // [Ordboken.isOnline] reads the modern NetworkCapabilities API, which
+        // Robolectric leaves empty by default (no active network) — report an
+        // online network so the results screen fetches instead of showing the
+        // offline error.
+        val connMgr = app.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        // The shadow keys networks by net id but resolves the active network
+        // by the active info's type, so both must be TYPE_WIFI.
+        val network = ShadowNetwork.newInstance(ConnectivityManager.TYPE_WIFI)
+        val info = ShadowNetworkInfo.newInstance(
+            android.net.NetworkInfo.DetailedState.CONNECTED,
+            ConnectivityManager.TYPE_WIFI, 0, true, android.net.NetworkInfo.State.CONNECTED
+        )
+        val capabilities = ShadowNetworkCapabilities.newInstance()
+        shadowOf(capabilities).addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        shadowOf(connMgr).setActiveNetworkInfo(info)
+        shadowOf(connMgr).addNetwork(network, info)
+        shadowOf(connMgr).setNetworkCapabilities(network, capabilities)
 
         server = MockWebServer()
         server.start()

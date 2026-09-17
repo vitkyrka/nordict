@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Looper
 import androidx.compose.runtime.snapshots.Snapshot
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat

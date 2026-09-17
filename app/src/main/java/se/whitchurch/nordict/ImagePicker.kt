@@ -9,13 +9,18 @@ import android.webkit.*
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import org.json.JSONArray
@@ -55,6 +60,7 @@ class ImagePicker : AppCompatActivity() {
         }
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun ImagePickerScreen(
         initialWord: String,
@@ -65,48 +71,81 @@ class ImagePicker : AppCompatActivity() {
         val lang = ordboken.currentDictionary.lang
         val arg = dictImages.joinToString(",") { "\"$it\"" }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+        fun submitSearch() {
+            ImagePickerWebViewHolder.current?.loadUrl(
+                "https://www.google.$lang/search?tbm=isch&q=" + Uri.encode(query)
+            )
+        }
+
+        Scaffold(
+            topBar = {
+                TopAppBar(
+                    title = { Text("Choose image") },
+                    navigationIcon = {
+                        IconButton(onClick = { finish() }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
+                    },
+                    actions = {
+                        FilledTonalButton(onClick = onOk) {
+                            Icon(
+                                Icons.Default.Check,
+                                contentDescription = null,
+                                modifier = Modifier.size(ButtonDefaults.IconSize)
+                            )
+                            Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
+                            Text("Save")
+                        }
+                    }
+                )
+            }
+        ) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
             ) {
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    label = { Text("Search") },
-                    modifier = Modifier.weight(1f)
+                    label = { Text("Search images") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { submitSearch() }),
+                    trailingIcon = {
+                        Row {
+                            if (query.isNotEmpty()) {
+                                IconButton(onClick = { query = "" }) {
+                                    Icon(
+                                        Icons.Default.Clear,
+                                        contentDescription = "Clear search"
+                                    )
+                                }
+                            }
+                            IconButton(onClick = { submitSearch() }) {
+                                Icon(
+                                    Icons.Default.Search,
+                                    contentDescription = "Search images"
+                                )
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 )
-                Spacer(modifier = Modifier.width(8.dp))
-                Button(onClick = {
-                    ImagePickerWebViewHolder.current?.loadUrl(
-                        "https://www.google.$lang/search?tbm=isch&q=" + Uri.encode(query)
-                    )
-                }) {
-                    Icon(Icons.Default.Search, contentDescription = null)
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("Search")
-                }
-            }
 
-            Spacer(modifier = Modifier.height(16.dp))
-
-            ImagePickerWebView(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                lang = lang,
-                arg = arg,
-                initialWord = initialWord
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(onClick = onOk, modifier = Modifier.align(Alignment.End)) {
-                Text("OK")
+                ImagePickerWebView(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    lang = lang,
+                    arg = arg,
+                    initialWord = initialWord
+                )
             }
         }
     }

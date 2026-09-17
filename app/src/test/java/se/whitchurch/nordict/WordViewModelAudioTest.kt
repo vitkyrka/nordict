@@ -11,7 +11,7 @@ import org.robolectric.annotation.Config
 
 /**
  * Regression test for the audio replay bug: the word screen's [ExoPlayer]
- * used to append every playback URL to its playlist, so after the first word
+ * (androidx.media3) used to append every playback URL to its playlist, so after the first word
  * finished playing, tapping the play button again re-queued the same audio but
  * the player stayed at the ended item and never started it. [WordViewModel]
  * [WordViewModel.playAudio] now clears the playlist before re-queueing, so

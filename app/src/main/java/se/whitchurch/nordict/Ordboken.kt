@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
 import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.util.LruCache
 import android.util.Pair
@@ -29,6 +30,14 @@ class Ordboken private constructor(
     var lastWhere: Where? = null
         private set
     var lastWhat: String? = null
+        private set
+    // A combined multi-dictionary word is addressed by its sources probe list
+    // (plus the namespaced selected ref); the word's own uri is only the first
+    // source's page, so persisting the uri alone would restore/play it as a
+    // single-dictionary word. Empty = a normal single word.
+    var lastSources: String? = null
+        private set
+    var lastRef: String? = null
         private set
     var currentCss: String = ""
     lateinit     var currentDictionary: Dictionary
@@ -67,10 +76,7 @@ class Ordboken private constructor(
     private val mSearchResultCache: LruCache<String, List<SearchResult>> = LruCache(25)
 
     val isOnline: Boolean
-        get() {
-            val networkInfo = mConnMgr.activeNetworkInfo
-            return networkInfo != null && networkInfo.isConnected
-        }
+        get() = isNetworkOnline(mConnMgr)
 
     val availableLanguages: List<String>
         get() = languages.toList()
@@ -100,6 +106,8 @@ class Ordboken private constructor(
 
             ed.putString("lastWhere", lastWhere!!.toString())
             ed.putString("lastWhat", lastWhat)
+            ed.putString("lastSources", lastSources ?: "")
+            ed.putString("lastRef", lastRef ?: "")
             ed.putInt("currentIndex", currentIndex)
             ed.putString("lastLang", lastLang)
 
@@ -114,6 +122,8 @@ class Ordboken private constructor(
         mPrefs = context.getSharedPreferences("ordboken", Context.MODE_PRIVATE)
         lastWhere = Where.valueOf(mPrefs.getString("lastWhere", Where.MAIN.toString())!!)
         lastWhat = mPrefs.getString("lastWhat", "ordbok")
+        lastSources = mPrefs.getString("lastSources", "")?.takeIf { it.isNotBlank() }
+        lastRef = mPrefs.getString("lastRef", "")?.takeIf { it.isNotBlank() }
         mConnMgr = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
         dictionaries = testDictionaries ?: defaultDictionaries()
@@ -448,8 +458,7 @@ class Ordboken private constructor(
             return OkHttpClient.Builder()
                 .cache(cache)
                 .addInterceptor {
-                    val networkInfo = connMgr.activeNetworkInfo
-                    val isOnline = networkInfo != null && networkInfo.isConnected
+                    val isOnline = isNetworkOnline(connMgr)
                     var request = it.request()
 
                     if (isOnline) {
@@ -469,6 +478,12 @@ class Ordboken private constructor(
 
         fun reset() {
             sInstance = null
+        }
+
+        private fun isNetworkOnline(connMgr: ConnectivityManager): Boolean {
+            val network = connMgr.activeNetwork ?: return false
+            val caps = connMgr.getNetworkCapabilities(network) ?: return false
+            return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
         }
     }
 }

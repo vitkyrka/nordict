@@ -5,6 +5,7 @@ build/
 *.swp
 *.swo
 .cache
+.opencode
 *.class
 .settings
 .gradle

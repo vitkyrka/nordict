@@ -34,6 +34,20 @@ class OrdbokenDbHelper(context: Context) :
     }
 
     override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
+        if (oldVersion < 5) {
+            // Preserve history: combined words need the sources probe list.
+            // Old rows keep the default (single-dictionary open).
+            try {
+                db.execSQL(
+                    "ALTER TABLE " + HistoryEntry.TABLE_NAME + " ADD COLUMN " +
+                        HistoryEntry.COLUMN_NAME_SOURCES + " TEXT DEFAULT ''"
+                )
+                return
+            } catch (e: Exception) {
+                // Column already exists (or another schema issue): fall through
+                // to a clean recreate.
+            }
+        }
         db.execSQL(SQL_DELETE_HISTORY)
         onCreate(db)
     }
@@ -43,7 +57,7 @@ class OrdbokenDbHelper(context: Context) :
     }
 
     companion object {
-        val DATABASE_VERSION = 4
+        val DATABASE_VERSION = 5
         val DATBASE_NAME = "Ordboken.db"
         private val SQL_CREATE_HISTORY = "CREATE TABLE " + HistoryEntry.TABLE_NAME + " (" +
                 HistoryEntry._ID + " INTEGER PRIMARY KEY," +
@@ -51,6 +65,7 @@ class OrdbokenDbHelper(context: Context) :
                 HistoryEntry.COLUMN_NAME_TITLE + " TEXT," +
                 HistoryEntry.COLUMN_NAME_SUMMARY + " TEXT," +
                 HistoryEntry.COLUMN_NAME_URL + " TEXT," +
+                HistoryEntry.COLUMN_NAME_SOURCES + " TEXT DEFAULT ''," +
                 HistoryEntry.COLUMN_NAME_DATE + " INTEGER," +
                 "UNIQUE (" + HistoryEntry.COLUMN_NAME_URL +
                 ") ON CONFLICT REPLACE" +

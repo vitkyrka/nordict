@@ -1,16 +1,17 @@
 package se.whitchurch.nordict
 
+import android.app.Activity
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
-import android.media.AudioManager
+import android.media.AudioAttributes
 import android.media.MediaPlayer
-import android.os.AsyncTask
 import android.os.Bundle
 import android.util.Base64
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -32,7 +33,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.ichi2.anki.api.AddContentApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import okhttp3.Request
 import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
 import se.whitchurch.nordict.ui.theme.NordictTheme
@@ -51,6 +56,17 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
     private var deckName: String by mutableStateOf("")
     private var hiddenDefs by mutableStateOf(setOf<Word.Definition>())
     private var hiddenIdioms by mutableStateOf(setOf<Word.Idiom>())
+
+    private val cardImageLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                currentCardId?.let { cardId ->
+                    val existing = imagesMap[cardId].orEmpty().toMutableList()
+                    existing.addAll(ordboken.images)
+                    imagesMap[cardId] = existing
+                }
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -103,7 +119,14 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
             }
         }
 
-        WordAudioTask().execute(word)
+        lifecycleScope.launch {
+            val audio = withContext(Dispatchers.IO) { urlsToData(word.audio) }
+            val images = withContext(Dispatchers.IO) { urlsToData(word.images) }
+            mAudio = audio
+            mDictImages = images
+            mWord = word
+            mLeftCards = (word.definitions.size + word.idioms.size)
+        }
     }
 
     @Composable
@@ -281,7 +304,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                             it.putExtra("dictionaryImages", mDictImages)
                             currentCardId = proposal.id
                             ordboken.images = ArrayList()
-                            startActivityForResult(it, IMAGE_PICKER_REQUEST)
+                            cardImageLauncher.launch(it)
                         }
                     }) {
                         Icon(painterResource(R.drawable.ic_add_image), contentDescription = "Add image")
@@ -292,7 +315,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                             it.putExtra(Intent.EXTRA_TEXT, title)
                             currentCardId = proposal.id
                             ordboken.images = ArrayList()
-                            startActivityForResult(it, CAMERA_REQUEST)
+                            cardImageLauncher.launch(it)
                         }
                     }) {
                         Icon(painterResource(R.drawable.ic_add_camera), contentDescription = "Take photo")
@@ -505,24 +528,26 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
 
     private fun playAudio(url: String) {
         val mediaPlayer = MediaPlayer()
-        mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC)
+        mediaPlayer.setAudioAttributes(
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build()
+        )
 
         try {
             mediaPlayer.setDataSource(url)
         } catch (e: Exception) {
-            setProgressBarIndeterminateVisibility(false)
             android.widget.Toast.makeText(applicationContext, R.string.error_audio, android.widget.Toast.LENGTH_SHORT)
                 .show()
             return
         }
 
         mediaPlayer.setOnPreparedListener { mp ->
-            setProgressBarIndeterminateVisibility(false)
             mp.start()
         }
 
         mediaPlayer.setOnErrorListener { mp, what, extra ->
-            setProgressBarIndeterminateVisibility(false)
             android.widget.Toast.makeText(applicationContext, R.string.error_audio, android.widget.Toast.LENGTH_SHORT)
                 .show()
             false
@@ -556,39 +581,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         return data
     }
 
-    private inner class WordAudioTask :
-        AsyncTask<Word, Void, Triple<Word, ArrayList<String>, ArrayList<String>>>() {
-        override fun doInBackground(vararg params: Word): Triple<Word, ArrayList<String>, ArrayList<String>> {
-            val word = params[0]
-
-            return Triple(word, urlsToData(word.audio), urlsToData(word.images))
-        }
-
-        override fun onPostExecute(result: Triple<Word, ArrayList<String>, ArrayList<String>>) {
-            mAudio = result.second
-            mDictImages = result.third
-            mWord = result.first
-            mLeftCards = (mWord!!.definitions.size + mWord!!.idioms.size)
-        }
-    }
-
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        when (requestCode) {
-            IMAGE_PICKER_REQUEST, CAMERA_REQUEST -> {
-                currentCardId?.let { cardId ->
-                    val existing = imagesMap[cardId].orEmpty().toMutableList()
-                    existing.addAll(ordboken.images)
-                    imagesMap[cardId] = existing
-                }
-            }
-        }
-    }
-
     companion object {
-        private const val IMAGE_PICKER_REQUEST = 0
-        private const val CAMERA_REQUEST = 2
-
         // Test/debug seam: a fallback AnkiApi consumed (once) on the next
         // `onCreate` so Robolectric tests and the agent can drive card
         // creation against a fake instead of the AnkiDroid content provider.

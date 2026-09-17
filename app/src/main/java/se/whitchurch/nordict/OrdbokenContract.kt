@@ -13,6 +13,7 @@ class OrdbokenContract {
             val COLUMN_NAME_TITLE = "title"
             val COLUMN_NAME_SUMMARY = "summary"
             val COLUMN_NAME_URL = "url"
+            val COLUMN_NAME_SOURCES = "sources"
         }
     }
 }

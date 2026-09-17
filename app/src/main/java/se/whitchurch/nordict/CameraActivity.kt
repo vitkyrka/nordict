@@ -13,6 +13,8 @@ import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.*
+import androidx.camera.core.resolutionselector.ResolutionSelector
+import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.layout.*
@@ -28,8 +30,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.canhub.cropper.CropImageContract
-import com.canhub.cropper.CropImageContractOptions
 import com.canhub.cropper.CropImageOptions
 import com.canhub.cropper.CropImageView
 import java.io.File
@@ -42,10 +42,14 @@ class CameraActivity : AppCompatActivity() {
     private var imageCapture: ImageCapture? = null
     private lateinit var cameraExecutor: ExecutorService
 
+    // The cropper library (4.6.0) deprecated CropImageContract/ContractOptions
+    // without a drop-in replacement (the path forward is a hand-rolled crop
+    // activity around CropImageView), so this stays on the deprecated contract.
+    @Suppress("DEPRECATION")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        val cropImage = registerForActivityResult(CropImageContract()) { result ->
+        val cropImage = registerForActivityResult(com.canhub.cropper.CropImageContract()) { result ->
             if (result.isSuccessful) {
                 val croppedImageFilePath = result.getUriFilePath(this.applicationContext)
                 val base64 = croppedImageFilePath?.let {
@@ -86,7 +90,7 @@ class CameraActivity : AppCompatActivity() {
 
                                     override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                                         cropImage.launch(
-                                            CropImageContractOptions(
+                                            com.canhub.cropper.CropImageContractOptions(
                                                 uri = Uri.parse(file.toURI().toString()),
                                                 cropImageOptions = CropImageOptions(
                                                     guidelines = CropImageView.Guidelines.ON,
@@ -170,7 +174,16 @@ class CameraActivity : AppCompatActivity() {
                 }
 
             imageCapture = ImageCapture.Builder()
-                .setTargetResolution(Size(480, 640))
+                .setResolutionSelector(
+                    ResolutionSelector.Builder()
+                        .setResolutionStrategy(
+                            ResolutionStrategy(
+                                Size(480, 640),
+                                ResolutionStrategy.FALLBACK_RULE_CLOSEST_HIGHER_THEN_LOWER
+                            )
+                        )
+                        .build()
+                )
                 .build()
 
             val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA

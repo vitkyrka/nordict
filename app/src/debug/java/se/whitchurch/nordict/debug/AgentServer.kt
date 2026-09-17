@@ -58,6 +58,9 @@ class AgentServer(private val app: Application) {
         }
     }
 
+    // Gson can inject null for a missing `op` despite the non-null Kotlin type,
+    // so the null check below is runtime-relevant.
+    @Suppress("SENSELESS_COMPARISON")
     private fun handle(socket: Socket) {
         try {
             val reader = BufferedReader(InputStreamReader(socket.getInputStream()))

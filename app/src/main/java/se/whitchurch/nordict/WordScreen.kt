@@ -17,8 +17,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -30,7 +30,6 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -41,6 +40,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.SavedStateHandle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavBackStackEntry
@@ -49,8 +49,8 @@ import androidx.webkit.WebSettingsCompat
 import androidx.webkit.WebSettingsCompat.FORCE_DARK_OFF
 import androidx.webkit.WebSettingsCompat.FORCE_DARK_ON
 import androidx.webkit.WebViewFeature
-import com.google.android.exoplayer2.ExoPlayer
-import com.google.android.exoplayer2.MediaItem
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -238,6 +238,9 @@ class WordViewModel(
     }
 
     /** Persists the WebView scale when leaving a word. */
+    // WebView.getScale() is deprecated with no replacement carrying the page
+    // zoom level, which is what is persisted here.
+    @Suppress("DEPRECATION")
     fun onLeave() {
         val ed = ordboken.prefsEditor
 
@@ -297,6 +300,10 @@ class WordViewModel(
 
     // ---------- WebView ----------
 
+    // setAllowFileAccessFromFileURLs/setAllowUniversalAccessFromFileURLs are
+    // deprecated with no replacement; the word page loads from
+    // file:///android_asset/ with JavaScript enabled and needs them.
+    @Suppress("DEPRECATION")
     @SuppressLint("AddJavascriptInterface")
     fun createWebView(context: Context): WebView {
         // A prior WebView from a previous composition of this destination may
@@ -395,7 +402,7 @@ class WordViewModel(
         behavior.nestedScrollConnection.onPostScroll(
             consumed = Offset(0f, -delta.toFloat()),
             available = Offset.Zero,
-            source = NestedScrollSource.Drag,
+            source = NestedScrollSource.UserInput,
         )
     }
 
@@ -877,7 +884,7 @@ internal fun FloatingWordToolbar(
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.open_in_browser)) },
                         leadingIcon = {
-                            Icon(Icons.Filled.OpenInNew, contentDescription = null)
+                            Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null)
                         },
                         onClick = {
                             menuExpanded = false
