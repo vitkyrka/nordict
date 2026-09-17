@@ -4,6 +4,7 @@ import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.ViewModelProvider
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import se.whitchurch.nordict.AgentCommand
@@ -337,10 +338,7 @@ class AppDriver(private val app: android.app.Application) {
         val nav = activity.navController ?: return null
         val entry = nav.currentBackStackEntry ?: return null
         if (entry.destination.route?.startsWith("word?") != true) return null
-        return entry.viewModelStore["se.whitchurch.nordict.WordViewModel"] as? WordViewModel
-            ?: entry.viewModelStore[
-        "androidx.lifecycle.ViewModelProvider.DefaultKey:se.whitchurch.nordict.WordViewModel"
-        ] as? WordViewModel
+        return ViewModelProvider(entry)[WordViewModel::class.java]
     }
 
     /** Closes the card screen if it's still up, so main-activity routes run. */

@@ -29,7 +29,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
@@ -616,7 +615,6 @@ fun WordScreen(
     vm.onReplaceWord = onReplaceWord
 
     val word = vm.mWord
-    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
     // The floating word action bar uses the M3 exit-always scroll behavior: it
@@ -725,17 +723,17 @@ fun WordScreen(
                         if (s is WordUiStatus.Loading) {
                             LoadingIndicator(modifier = Modifier.padding(bottom = 16.dp))
                             Text(
-                                context.getString(R.string.loading),
+                                stringResource(R.string.loading),
                                 textAlign = TextAlign.Center
                             )
                         } else if (s is WordUiStatus.Error) {
                             Text(
-                                text = context.getString(s.textRes),
+                                text = stringResource(s.textRes),
                                 textAlign = TextAlign.Center,
                                 modifier = Modifier.padding(bottom = 16.dp)
                             )
                             Button(onClick = { vm.fetchWord() }) {
-                                Text(context.getString(R.string.tryagain))
+                                Text(stringResource(R.string.tryagain))
                             }
                         }
                     }

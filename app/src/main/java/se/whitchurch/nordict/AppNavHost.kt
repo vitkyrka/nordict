@@ -25,6 +25,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -191,7 +192,7 @@ fun NordictApp(
             searchBarState = searchBarState,
             onSearch = { runSearch(it) },
             modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text(context.getString(R.string.search_hint)) },
+            placeholder = { Text(stringResource(R.string.search_hint)) },
             leadingIcon = {
                 // The current language's flag takes over the role of the
                 // magnifying glass. currentIndex is the snapshot state every
@@ -201,7 +202,7 @@ fun NordictApp(
                 val currentLang = ordboken.currentLang
                 Image(
                     painter = painterResource(ordboken.langFlag(currentLang)),
-                    contentDescription = context.getString(R.string.menu_search),
+                    contentDescription = stringResource(R.string.menu_search),
                     modifier = Modifier.size(24.dp),
                     contentScale = ContentScale.Fit
                 )
@@ -210,7 +211,7 @@ fun NordictApp(
                 if (searchQuery.isNotEmpty()) {
                     Icon(
                         Icons.Filled.Clear,
-                        contentDescription = context.getString(R.string.search_clear),
+                        contentDescription = stringResource(R.string.search_clear),
                         modifier = Modifier.clickable {
                             textFieldState.setTextAndPlaceCursorAtEnd("")
                             // While the bar is collapsed the X doubles as a tap
@@ -380,14 +381,14 @@ fun NordictApp(
                             ) {
                                 Icon(
                                     Icons.Filled.NorthWest,
-                                    contentDescription = context.getString(R.string.search_fill_current_word),
+                                    contentDescription = stringResource(R.string.search_fill_current_word),
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     } else if (suggestions.isEmpty()) {
                         Text(
-                            text = context.getString(R.string.no_results),
+                            text = stringResource(R.string.no_results),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(16.dp)
                         )
