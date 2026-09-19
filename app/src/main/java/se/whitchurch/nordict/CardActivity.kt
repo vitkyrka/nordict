@@ -11,6 +11,7 @@ import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.os.Bundle
 import android.util.Base64
+import android.webkit.WebView
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -22,6 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -58,6 +61,8 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
     private var deckName: String by mutableStateOf("")
     private var hiddenDefs by mutableStateOf(setOf<Word.Definition>())
     private var hiddenIdioms by mutableStateOf(setOf<Word.Idiom>())
+    private var preview: Cards.CardPreview? by mutableStateOf(null)
+    private var previewTitle: String by mutableStateOf("")
 
     private val cardImageLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
@@ -201,7 +206,49 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                     }
                 }
             }
+
+            preview?.let { cardPreview ->
+                CardPreviewDialog(
+                    title = previewTitle,
+                    preview = cardPreview,
+                    onDismiss = { preview = null }
+                )
+            }
         }
+    }
+
+    /**
+     * The card preview dialog: renders the exact Front and Back the card
+     * would show in Anki (see [Cards.preview]) in a WebView, so card layout
+     * can be debugged without leaving the app.
+     */
+    @Composable
+    fun CardPreviewDialog(
+        title: String,
+        preview: Cards.CardPreview,
+        onDismiss: () -> Unit
+    ) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            confirmButton = {
+                TextButton(onClick = onDismiss) {
+                    Text("Close")
+                }
+            },
+            title = { Text(title) },
+            text = {
+                AndroidView(
+                    factory = { ctx ->
+                        WebView(ctx).apply {
+                            loadDataWithBaseURL(null, preview.html, "text/html", "UTF-8", null)
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(400.dp)
+                )
+            }
+        )
     }
 
     @Composable
@@ -344,6 +391,27 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
 
                     Spacer(modifier = Modifier.weight(1f))
 
+                    OutlinedButton(onClick = {
+                        val effectiveDefs =
+                            if (selectedDefinitions.isEmpty()) listOf(definition)
+                            else selectedDefinitions.toList()
+                        previewTitle = title
+                        preview = Cards.preview(
+                            Cards.definitionBack(word, effectiveDefs, ordboken.currentCss),
+                            Cards.examples(word, effectiveDefs, extraExamples),
+                            imagesMap[proposal.id].orEmpty(),
+                            audio.elementAtOrElse(audioIdx.intValue) { _ -> "" }
+                        )
+                    }) {
+                        Icon(
+                            Icons.Filled.Visibility,
+                            contentDescription = null,
+                            modifier = Modifier.size(ButtonDefaults.IconSize)
+                        )
+                        Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
+                        Text("Preview")
+                    }
+
                     Button(onClick = {
                         val effectiveDefs =
                             if (selectedDefinitions.isEmpty()) listOf(definition)
@@ -428,8 +496,25 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 4.dp),
-                    horizontalArrangement = Arrangement.End
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
                 ) {
+                    OutlinedButton(onClick = {
+                        previewTitle = proposal.title
+                        preview = Cards.preview(
+                            Cards.idiomBack(idiom),
+                            Cards.idiomExamples(idiom),
+                            emptyList(),
+                            ""
+                        )
+                    }) {
+                        Icon(
+                            Icons.Filled.Visibility,
+                            contentDescription = null,
+                            modifier = Modifier.size(ButtonDefaults.IconSize)
+                        )
+                        Spacer(modifier = Modifier.width(ButtonDefaults.IconSpacing))
+                        Text("Preview")
+                    }
                     Button(onClick = {
                         createCard(
                             Cards.idiomBack(idiom),
@@ -520,6 +605,31 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 audio
             )
             is CardProposal.Idiom -> createCard(
+                Cards.idiomBack(proposal.idiom),
+                Cards.idiomExamples(proposal.idiom),
+                emptyList(),
+                ""
+            )
+        }
+    }
+
+    /**
+     * Builds the front/back preview for proposal [index] (default the first
+     * definition) through the same pipeline the Preview button drives, without
+     * touching Anki. Used by the agent REPL and tests.
+     */
+    fun agentPreviewCard(index: Int?): Cards.CardPreview? {
+        val word = mWord ?: return null
+        val proposal = Cards.proposals(word).getOrNull(index ?: 0) ?: return null
+        val audio = mAudio.elementAtOrElse(0) { _ -> "" }
+        return when (proposal) {
+            is CardProposal.Definition -> Cards.preview(
+                Cards.definitionBack(word, listOf(proposal.definition), ordboken.currentCss),
+                Cards.examples(word, listOf(proposal.definition), emptyList()),
+                emptyList(),
+                audio
+            )
+            is CardProposal.Idiom -> Cards.preview(
                 Cards.idiomBack(proposal.idiom),
                 Cards.idiomExamples(proposal.idiom),
                 emptyList(),

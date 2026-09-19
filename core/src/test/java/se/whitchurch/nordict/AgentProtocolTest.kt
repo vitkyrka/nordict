@@ -80,6 +80,30 @@ class AgentProtocolTest {
     }
 
     @Test
+    fun previewCardCommandRoundTripsIndex() {
+        val cmd = AgentCommand(op = AgentOps.PREVIEW_CARD, index = 1)
+        assertThat(gson.toJson(cmd)).isEqualTo("{\"op\":\"previewCard\",\"index\":1}")
+        assertThat(gson.fromJson(gson.toJson(cmd), AgentCommand::class.java)).isEqualTo(cmd)
+    }
+
+    @Test
+    fun previewResultRoundTrips() {
+        val result = AgentResult(
+            ok = true,
+            op = AgentOps.PREVIEW_CARD,
+            message = "preview for proposal 0",
+            preview = CardPreviewData(
+                frontHtml = "<div class=\"preview-front\"><p>ex</p></div>",
+                backField = "<div style=\"text-align: left\"><b>back</b></div>"
+            )
+        )
+        val parsed = gson.fromJson(gson.toJson(result), AgentResult::class.java)
+        assertThat(parsed).isEqualTo(result)
+        assertThat(parsed.preview?.frontHtml).contains("ex")
+        assertThat(parsed.preview?.backField).contains("back")
+    }
+
+    @Test
     fun audioCommandRoundTripsUrl() {
         val cmd = AgentCommand(op = AgentOps.AUDIO, url = "https://example.com/a.mp3")
         assertThat(gson.toJson(cmd)).isEqualTo("{\"op\":\"audio\",\"url\":\"https://example.com/a.mp3\"}")

@@ -33,6 +33,7 @@ object AgentOps {
     const val BACK = "back"
     const val OPEN_CARDS = "openCards"
     const val CREATE_CARD = "createCard"
+    const val PREVIEW_CARD = "previewCard"
     const val AUDIO = "audio"
     const val SET_DICT = "setDict"
     const val SET_LANG = "setLang"
@@ -59,8 +60,9 @@ data class AgentCommand(
     // A multi-dictionary selection for `setDict` (ordered). When present it
     // wins over `tag`; a comma-separated `tag` ("DLE,EST") also works.
     val tags: List<String>? = null,
-    // The card proposal to create with `createCard` (a zero-based index into
-    // `Cards.proposals`: definitions first, then idioms, in page order).
+    // The card proposal to create/preview with `createCard`/`previewCard`
+    // (a zero-based index into `Cards.proposals`: definitions first, then
+    // idioms, in page order).
     val index: Int? = null
 ) {
     /** Returns the named argument or throws a clear protocol error. */
@@ -88,13 +90,26 @@ data class AgentResult(
     val message: String? = null,
     val state: AgentState? = null,
     val results: List<WordJson.SearchResultData>? = null,
-    val word: WordResult? = null
+    val word: WordResult? = null,
+    val preview: CardPreviewData? = null
 ) {
     companion object {
         fun error(op: String?, error: String): AgentResult =
             AgentResult(ok = false, op = op, error = error)
     }
 }
+
+/**
+ * The front/back preview of one card proposal, as rendered by the card
+ * screen's Preview button ([Cards.preview]): the Front fragment and the exact
+ * Anki `Back` note field, so card layout can be inspected without opening
+ * Anki. Carries no images/audio payloads (those are base64 data URLs on the
+ * card screen), only the rendered HTML.
+ */
+data class CardPreviewData(
+    val frontHtml: String,
+    val backField: String
+)
 
 /** A structured snapshot of what the agent is looking at. */
 data class AgentState(

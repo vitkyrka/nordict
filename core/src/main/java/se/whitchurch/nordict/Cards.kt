@@ -272,6 +272,57 @@ object Cards {
     }
 
     /**
+     * A renderable preview of the note Anki would show for a card: the Front
+     * fragment (what `CardModel.QUESTION_FORMAT` renders from the `Images` /
+     * `Sentences` fields), the exact `Back` note field from [fields], and a
+     * standalone page stacking both under Front/Back headings for debugging
+     * without opening Anki.
+     */
+    data class CardPreview(
+        val frontHtml: String,
+        val backField: String,
+        val html: String
+    )
+
+    /**
+     * The Front fragment for a card preview. Mirrors what the Anki front
+     * template renders (the `Images` and `Sentences` fields plus the `Audio`
+     * player), but deterministic: every sentence and image is shown, where
+     * Anki shows 1-2 random ones. Sentences are emitted as raw HTML exactly
+     * like the template's `document.write(s)` does.
+     */
+    fun previewFront(examples: List<String>, images: List<String>, audio: String): String {
+        val out = StringBuilder("<div class=\"preview-front\">")
+        for (image in images) {
+            out.append("<img src=\"").append(image).append("\"/>")
+        }
+        for (example in examples) {
+            out.append("<p>").append(example).append("</p>")
+        }
+        if (audio.isNotEmpty()) {
+            out.append("<audio controls src=\"").append(audio).append("\"/>")
+        }
+        out.append("</div>")
+        return out.toString()
+    }
+
+    /**
+     * Builds the preview for a card with note fields
+     * `fields(back, examples, images, audio)`: `backField` is the exact Anki
+     * `Back` field (the definition fragments wrapped left-aligned, CSS
+     * included), and `html` is a standalone page showing the front above the
+     * back.
+     */
+    fun preview(back: String, examples: List<String>, images: List<String>, audio: String): CardPreview {
+        val backField = fields(back, examples, images, audio)[3]
+        val front = previewFront(examples, images, audio)
+        val html = "<html><head><meta name=\"viewport\" content=\"width=device-width\"/>" +
+            "</head><body><h2>Front</h2>" + front +
+            "<hr/><h2>Back</h2>" + backField + "</body></html>"
+        return CardPreview(front, backField, html)
+    }
+
+    /**
      * Plain text for the card preview: strips HTML (Collins gloss definitions
      * and examples are rich HTML) while leaving plain text untouched.
      */

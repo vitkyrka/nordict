@@ -342,6 +342,52 @@ class CardsTest {
         assertThat(text).doesNotContain("<")
     }
 
+    // ---- card preview page ----
+
+    @Test
+    fun previewFront_rendersEverySentenceImageAndAudioPlayer() {
+        val front = Cards.previewFront(
+            examples = listOf("ex one", "<b>ex two</b>"),
+            images = listOf("data:image/png;base64,AAA"),
+            audio = "a.mp3"
+        )
+
+        // Sentences render as raw HTML paragraphs (like Anki's document.write),
+        // images as <img> and audio with a player control.
+        assertThat(front).contains("<p>ex one</p>")
+        assertThat(front).contains("<p><b>ex two</b></p>")
+        assertThat(front).contains("<img src=\"data:image/png;base64,AAA\"/>")
+        assertThat(front).contains("<audio controls src=\"a.mp3\"/>")
+    }
+
+    @Test
+    fun previewFront_omitsAudioPlayerWhenSilent() {
+        val front = Cards.previewFront(listOf("ex"), emptyList(), "")
+
+        assertThat(front).contains("<p>ex</p>")
+        assertThat(front).doesNotContain("<audio")
+    }
+
+    @Test
+    fun preview_stacksFrontAboveTheExactBackField() {
+        val back = "<b>back</b>"
+        val preview = Cards.preview(back, listOf("ex"), emptyList(), "")
+
+        // The back is the exact Anki Back note field (left-aligned wrapper),
+        // so what the preview shows is what Anki would show.
+        assertThat(preview.backField).isEqualTo(Cards.fields(back, listOf("ex"), emptyList(), "")[3])
+        assertThat(preview.backField).contains(back)
+        assertThat(preview.frontHtml).contains("<p>ex</p>")
+
+        val frontHeading = preview.html.indexOf("<h2>Front</h2>")
+        val backHeading = preview.html.indexOf("<h2>Back</h2>")
+        assertThat(frontHeading).isAtLeast(0)
+        assertThat(backHeading).isGreaterThan(frontHeading)
+        assertThat(preview.html).contains(preview.frontHtml)
+        assertThat(preview.html).contains(preview.backField)
+        assertThat(Jsoup.parse(preview.html).text()).contains("ex")
+    }
+
     // ---- fields ----
 
     @Test

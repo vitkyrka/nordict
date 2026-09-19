@@ -565,6 +565,41 @@ class AppDriverTest {
     }
 
     @Test
+    fun previewCardReturnsFrontAndBackWithoutTouchingAnki() {
+        val fake = RecordingAnkiApi()
+        CardActivity.debugAnkiApi = fake
+        seedAndOpenWord()
+        launchCardActivity()
+
+        val preview = drive(AgentCommand(op = AgentOps.PREVIEW_CARD))
+        assertThat(preview.ok).isTrue()
+        assertThat(preview.preview).isNotNull()
+        assertThat(preview.preview!!.frontHtml).isNotEmpty()
+        assertThat(preview.preview!!.backField).contains("<div style=\"text-align: left\">")
+
+        // Previewing never inserts a note.
+        assertThat(fake.addedNotes).isEmpty()
+
+        // An explicit index previews that proposal: the first idiom card
+        // renders the <strong> idiom header, not a definition fragment.
+        val word = Ordboken.getInstance(app!!).currentWord!!
+        val proposals = se.whitchurch.nordict.Cards.proposals(word)
+        val firstIdiom = proposals.indexOfFirst { it is se.whitchurch.nordict.CardProposal.Idiom }
+        assertThat(firstIdiom).isGreaterThan(0)
+        val idiom = drive(AgentCommand(op = AgentOps.PREVIEW_CARD, index = firstIdiom))
+        assertThat(idiom.ok).isTrue()
+        assertThat(idiom.preview!!.backField).contains("<strong>")
+    }
+
+    @Test
+    fun previewCardWithoutCardActivityErrors() {
+        seedAndOpenWord()
+        val result = drive(AgentCommand(op = AgentOps.PREVIEW_CARD))
+        assertThat(result.ok).isFalse()
+        assertThat(result.error).contains("no card screen up")
+    }
+
+    @Test
     fun backClosesTheCardScreen() {
         seedAndOpenWord()
         launchCardActivity()

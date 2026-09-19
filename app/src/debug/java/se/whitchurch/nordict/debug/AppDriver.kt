@@ -59,6 +59,7 @@ class AppDriver(private val app: android.app.Application) {
                 AgentOps.BACK -> opBack(command)
                 AgentOps.OPEN_CARDS -> opOpenCards(command)
                 AgentOps.CREATE_CARD -> opCreateCard(command)
+                AgentOps.PREVIEW_CARD -> opPreviewCard(command)
                 AgentOps.AUDIO -> opAudio(command)
                 AgentOps.SET_DICT -> opSetDict(command)
                 AgentOps.SET_LANG -> opSetLang(command)
@@ -291,6 +292,42 @@ class AppDriver(private val app: android.app.Application) {
             AgentResult.error(
                 AgentOps.CREATE_CARD,
                 "card creation failed (no proposal, word not loaded yet, or AnkiDroid unreachable)"
+            )
+        }
+    }
+
+    /**
+     * Builds the front/back preview for proposal [index] on the open card
+     * screen, through the same pipeline the Preview button drives, without
+     * touching Anki — so card layout can be inspected without leaving the app.
+     */
+    private fun opPreviewCard(command: AgentCommand): AgentResult {
+        val activity = tracker.current
+        if (activity?.javaClass?.simpleName != "CardActivity") {
+            return AgentResult.error(
+                AgentOps.PREVIEW_CARD,
+                "no card screen up — call openCards first (resumed activity is '${activity?.javaClass?.simpleName}')"
+            )
+        }
+        val card = activity as CardActivity
+        // The word/audio load task populates mWord asynchronously on open.
+        await({ card.isCardReady() }, 10_000)
+        val preview = onMain { card.agentPreviewCard(command.index) }
+        return if (preview != null) {
+            AgentResult(
+                ok = true,
+                op = AgentOps.PREVIEW_CARD,
+                message = "preview for proposal ${command.index ?: 0}",
+                state = snapshot(),
+                preview = se.whitchurch.nordict.CardPreviewData(
+                    frontHtml = preview.frontHtml,
+                    backField = preview.backField
+                )
+            )
+        } else {
+            AgentResult.error(
+                AgentOps.PREVIEW_CARD,
+                "preview failed (no proposal or word not loaded yet)"
             )
         }
     }
