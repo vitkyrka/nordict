@@ -285,8 +285,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
             Column(modifier = Modifier.padding(10.dp)) {
                 Text(
                     text = "$title: ${Cards.definitionText(definition)}",
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    fontWeight = FontWeight.Bold
                 )
                 val examplesText = definition.glosses.flatMap { it.examples }
                     .ifEmpty { definition.examples } + extraExamples
