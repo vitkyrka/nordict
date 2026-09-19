@@ -247,6 +247,15 @@ class CollinsParser {
         private fun parseSense(sense: Element): Word.Gloss {
             val gloss = Word.Gloss()
 
+            // The sense's own number (span.sensenum, e.g. "1."): the source's
+            // numbering for this sense, carried as the gloss's senseNumber so
+            // the renderer prints it instead of an auto-generated <ol> index.
+            // Nested sub-sense markers (a./b./c.) stay inline in the rich HTML.
+            sense.children().firstOrNull { it.hasClass("sensenum") }?.let {
+                gloss.senseNumber = it.text().replace("\u00a0", " ").trim().trimEnd('.').trim()
+                it.remove()
+            }
+
             // Examples are direct child .cit.type-example cells of the sense;
             // their inner HTML includes the source phrase, any English
             // translation(s), and inline register/geo markers.
@@ -268,8 +277,9 @@ class CollinsParser {
                 re.remove()
             }
 
-            // Definition HTML = the sense's remaining children: sensenum,
-            // markers, nested sub-senses and translations.
+            // Definition HTML = the sense's remaining children: markers,
+            // nested sub-senses and translations (examples, idioms/phrases and
+            // the sense's own sensenum were pruned above).
             val definition = StringBuilder()
             sense.children().forEach { child ->
                 definition.append(child.outerHtml())

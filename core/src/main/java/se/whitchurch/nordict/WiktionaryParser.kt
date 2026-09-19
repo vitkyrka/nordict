@@ -165,10 +165,12 @@ class WiktionaryParser {
                 // Audio
                 headword.audio.addAll(pronunciationAudio)
 
-                // Parse definitions from the <ol> list
+                // Parse definitions from the <ol> list. The <ol> position is the
+                // original's displayed numbering (1, 2, 3, …), carried as the
+                // definition's senseNumber so the renderer needs no <ol>.
                 val ol = defSection.selectFirst("ol") ?: continue
-                for (li in ol.children()) {
-                    parseDefinition(headword, li, pos, genderWord)
+                ol.children().forEachIndexed { index, li ->
+                    parseDefinition(headword, li, pos, genderWord, (index + 1).toString())
                 }
 
                 words.add(headword)
@@ -189,8 +191,8 @@ class WiktionaryParser {
                 headword.etymology = etymologyText
                 headword.audio.addAll(pronunciationAudio)
 
-                for (li in ol.children()) {
-                    parseDefinition(headword, li, "", "")
+                for ((index, li) in ol.children().withIndex()) {
+                    parseDefinition(headword, li, "", "", (index + 1).toString())
                 }
                 words.add(headword)
             }
@@ -270,8 +272,8 @@ class WiktionaryParser {
                     }
                 }
 
-                lemma.selectFirst("ol")?.children()?.forEach { li ->
-                    parseDefinition(headword, li, pos, "")
+                lemma.selectFirst("ol")?.children()?.forEachIndexed { index, li ->
+                    parseDefinition(headword, li, pos, "", (index + 1).toString())
                 }
 
                 words.add(headword)
@@ -291,7 +293,8 @@ class WiktionaryParser {
             headword: Word,
             li: Element,
             pos: String,
-            genderWord: String
+            genderWord: String,
+            senseNumber: String = ""
         ) {
             val clone = li.clone()
             // Examples are collected separately below.
@@ -318,6 +321,7 @@ class WiktionaryParser {
             definition.pos = pos
             definition.grammar = pos
             definition.gender = genderOf(genderWord)
+            definition.senseNumber = senseNumber
 
             if (term != null) {
                 definition.domain = term.text().trim()

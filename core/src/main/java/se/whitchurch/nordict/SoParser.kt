@@ -119,8 +119,10 @@ class SoParser {
             }
             word.pronunciation = pronunciation.joinToString(" / ")
 
-            arr(source, "huvudbetydelser")?.forEach { bite ->
-                val definition = parseBite(bite, ordklass)
+            arr(source, "huvudbetydelser")?.forEachIndexed { index, bite ->
+                // The site numbers senses by position (1, 2, 3, …), so the
+                // array index is the original numbering.
+                val definition = parseBite(bite, ordklass, (index + 1).toString())
                 if (definition != null) word.definitions.add(definition)
 
                 arr(bite, "idiom")?.forEach { idiomObj ->
@@ -133,7 +135,7 @@ class SoParser {
         }
 
         /** One primary sense plus its nested sub-senses. */
-        private fun parseBite(bite: JsonElement?, ordklass: String): Word.Definition? {
+        private fun parseBite(bite: JsonElement?, ordklass: String, senseNumber: String): Word.Definition? {
             val glosses = ArrayList<Word.Gloss>()
 
             val formkommentar = str(obj(bite, "formkommentar"), "text")
@@ -156,6 +158,7 @@ class SoParser {
             val definition = Word.Definition(primary.definition, definitionElement(glosses))
             definition.pos = ordklass
             definition.grammar = ordklass
+            definition.senseNumber = senseNumber
             definition.register = str(bite, "bruklighetskommentar") ?: ""
             definition.glosses.addAll(glosses)
             definition.examples.addAll(primary.examples)

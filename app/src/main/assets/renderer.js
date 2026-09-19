@@ -85,7 +85,7 @@ const compareSenses = (a, b) => {
 };
 
 const renderDefinitionBlock = (def) => `
-    <li>
+    <div class="definition-row">
         ${def.senseNumber ? `<span class="sense-number">${def.senseNumber}</span> ` : ''}
         ${def.pos ? `<span class="pos">${def.pos}</span> ` : ''}
         ${def.register ? `<span class="register">${def.register}</span> ` : ''}
@@ -105,7 +105,7 @@ const renderDefinitionBlock = (def) => `
         ` : ''}
         ${renderCollinsIdioms(def.idioms)}
         ${renderCollinsPhrases(def.phrases)}
-    </li>
+    </div>
 `;
 
 const renderIdiomMeta = (idiom) => `
@@ -117,11 +117,11 @@ const renderIdiomMeta = (idiom) => `
 `;
 
 const renderIdiomBlock = (idiom) => `
-    <li>
+    <div class="definition-row idiom-row">
         ${renderIdiomMeta(idiom)}
         <b class="idiom-name">${idiom.idiom}</b>:
         ${renderGlosses(idiom.glosses)}
-    </li>
+    </div>
 `;
 
 // Standalone locutions (DLE/EST-style): one section per idiom under its own
@@ -152,15 +152,8 @@ const template = (word) => {
         ? [...defs, ...idioms].sort(compareSenses)
         : defs;
 
-    // Collins bilingual entries number each sense themselves with a
-    // `.sensenum` marker inside the gloss HTML and carry no `senseNumber`, so
-    // their <ol> must not be auto-numbered. A combined multi-dictionary page
-    // labels every entry with its dictionary tag too (e.g. "DLE"/"EST") for
-    // the sub-heading, which is a label, not a bilingual flag: entries without
-    // inline sense markers keep the <ol>'s numbering.
-    const hasSensenum = (senses) => senses.some(s =>
-        (s.glosses || []).some(g => (g.definition || '').indexOf('sensenum') !== -1));
-
+    // All numbering comes from the originals via `senseNumber` (definition-
+    // or gloss-level); the list itself is never auto-numbered.
     return `
     <article>
         <header>
@@ -177,9 +170,9 @@ const template = (word) => {
             ${word.etymology ? `<div class="etymology">${word.etymology}</div>` : ''}
         </header>
         ${senses.length > 0 ? `
-            <ol class="definitions${hasSensenum(senses) ? ' bilingual' : ''}${senses.some(s => s.senseNumber) ? ' sense-numbered' : ''}">
+            <div class="definitions">
                 ${senses.map(s => s.idiom ? renderIdiomBlock(s) : renderDefinitionBlock(s)).join('')}
-            </ol>
+            </div>
         ` : ''}
         ${!numberedIdioms && idioms.length > 0 ? `
             ${idioms.map(renderIdiomSection).join('')}

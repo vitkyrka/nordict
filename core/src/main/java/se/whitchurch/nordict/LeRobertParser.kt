@@ -130,13 +130,23 @@ class LeRobertParser {
          * Recursively walks the `d_ptma` tree and collects flat definitions and
          * idioms. Each `d_dvn`, `d_dvl`, or bare `d_dfn` at any depth becomes a
          * definition; `d_dvt` blocks marked "locution" become idioms.
+         *
+         * Sense numbering mirrors the site's CSS counters (`d_dvr::before` is
+         * an upper-roman counter reset per POS group, `d_dvn::before` an arabic
+         * counter reset per `d_dvr`, `d_dvl::before` a "⬥" lozenge): the
+         * group lead takes the roman numeral, nested senses take
+         * "ROMAN.arabic", lozenge senses take "⬥", and `d_dvt` senses stay
+         * unnumbered — exactly as displayed on the original page.
          */
+        private data class Numbering(val roman: Int = 0, val arabic: Int = 0)
+
         private fun collectSenses(
             element: Element,
             cat: String,
             defs: ArrayList<Word.Definition>,
             idioms: ArrayList<Word.Idiom>,
-            inheritDomain: String = ""
+            inheritDomain: String = "",
+            num: Numbering = Numbering()
         ) {
             var domain = inheritDomain
 
@@ -146,14 +156,20 @@ class LeRobertParser {
                         val topic = child.selectFirst("span.d_dtr")?.text()
                             ?.removeSurrounding("(", ")")?.trim() ?: ""
                         if (topic.isNotEmpty()) domain = topic
-                        collectSenses(child, cat, defs, idioms, domain)
+                        collectSenses(
+                            child, cat, defs, idioms, domain,
+                            num.copy(roman = num.roman + 1, arabic = 0)
+                        )
                     }
 
                     child.hasClass("d_dvn") || child.hasClass("d_dvl") -> {
                         // d_dvn/d_dvl are nested containers that mirror d_ptma:
                         // they hold d_dfn, d_xpl, d_mta, d_dvt, and even deeper
-                        // d_dvl nesting — recurse like d_dvr.
-                        collectSenses(child, cat, defs, idioms, domain)
+                        // d_dvl nesting — recurse like d_dvr. Each d_dvn
+                        // advances the arabic counter; d_dvl is unnumbered.
+                        val next = if (child.hasClass("d_dvl")) num
+                        else num.copy(arabic = num.arabic + 1)
+                        collectSenses(child, cat, defs, idioms, domain, next)
                     }
 
                     child.hasClass("d_dvt") -> {
@@ -174,7 +190,7 @@ class LeRobertParser {
                     }
 
                     child.`is`("span.d_dfn") -> {
-                        defs.add(parseDfnSense(child, cat, domain))
+                        defs.add(parseDfnSense(child, cat, domain, senseNumberFor(element, num)))
                     }
 
                     child.`is`("span.d_xpl") && defs.isNotEmpty() -> {
@@ -187,10 +203,39 @@ class LeRobertParser {
             }
         }
 
+        // The original page's number for a `d_dfn` that is a direct child of
+        // [element], given the counters in [num].
+        private fun senseNumberFor(element: Element, num: Numbering): String = when {
+            element.hasClass("d_dvl") -> "⬥"
+            element.hasClass("d_dvn") ->
+                if (num.roman > 0) "${toRoman(num.roman)}.${num.arabic}" else "${num.arabic}"
+            element.hasClass("d_dvr") -> toRoman(num.roman)
+            else -> ""
+        }
+
+        private fun toRoman(n: Int): String {
+            if (n <= 0) return ""
+            val table = listOf(
+                1000 to "M", 900 to "CM", 500 to "D", 400 to "CD",
+                100 to "C", 90 to "XC", 50 to "L", 40 to "XL",
+                10 to "X", 9 to "IX", 5 to "V", 4 to "IV", 1 to "I"
+            )
+            val sb = StringBuilder()
+            var rest = n
+            for ((value, numeral) in table) {
+                while (rest >= value) {
+                    sb.append(numeral)
+                    rest -= value
+                }
+            }
+            return sb.toString()
+        }
+
         private fun parseDfnSense(
             dfn: Element,
             cat: String,
-            domain: String
+            domain: String,
+            senseNumber: String = ""
         ): Word.Definition {
             val dfnText = dfn.text()
             val definition = Word.Definition(dfnText, dfn.clone())
@@ -198,6 +243,7 @@ class LeRobertParser {
             definition.pos = cat
             definition.grammar = cat
             definition.gender = genderOf(cat)
+            definition.senseNumber = senseNumber
 
             val gloss = Word.Gloss()
             gloss.definition = dfnText

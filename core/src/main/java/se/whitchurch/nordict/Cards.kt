@@ -112,7 +112,7 @@ object Cards {
             single.geo = definition.geo
             single.plev = definition.plev
             single.register = definition.register
-            single.senseNumber = definition.senseNumber
+            single.senseNumber = definition.senseNumber.ifEmpty { gloss.senseNumber }
             single.synonyms.addAll(definition.synonyms)
             single.antonyms.addAll(definition.antonyms)
             single.idioms.addAll(definition.idioms)
@@ -196,6 +196,13 @@ object Cards {
         val raw = definition.definition.ifEmpty {
             definition.glosses.firstOrNull()?.definition.orEmpty()
         }
-        return plainText(raw)
+        val text = plainText(raw)
+        if (text.isNotEmpty()) return text
+        // A sense whose HTML held only its number (e.g. a bare Collins
+        // sensenum, now extracted to senseNumber) previews as that number so
+        // cards stay distinguishable instead of collapsing to one blank line.
+        return definition.senseNumber.ifEmpty {
+            definition.glosses.firstOrNull()?.senseNumber.orEmpty()
+        }
     }
 }
