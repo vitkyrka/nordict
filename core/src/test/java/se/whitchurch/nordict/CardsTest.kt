@@ -48,6 +48,20 @@ class CardsTest {
     // ---- proposals ----
 
     @Test
+    fun proposals_idsAreUniqueStringsForLazyKeys() {
+        // CardActivity keys its LazyColumn by CardProposal.id. The key feeds
+        // Compose's saveable-state provider, so it must be Bundle-storable (a
+        // String — never a Word.Gloss/Definition/Idiom, which crashes on
+        // device) and distinct, or per-card remember state is reused by
+        // position and created entries inherit the wrong Merge selection.
+        for (word in listOf(parseDleOtro(), parseEstOtro(), parseCollinsMorir())) {
+            val ids = Cards.proposals(word).map { it.id }
+            assertThat(ids).isNotEmpty()
+            assertThat(ids).containsNoDuplicates()
+        }
+    }
+
+    @Test
     fun proposals_oneCardPerDefinitionAndIdiom() {
         val word = parseDleOtro()
         val proposals = Cards.proposals(word)

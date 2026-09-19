@@ -188,12 +188,15 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(10.dp)
             ) {
-                // Key by the stable proposal identity (see Cards.proposalHideKey),
-                // not by position: without a key the per-card `remember` state
+                // Key by the stable proposal id (see CardProposal.id), not by
+                // position: without a key the per-card `remember` state
                 // (the Merge switch, extra examples, audio index) is reused by
                 // position, so after created entries are removed the entry
                 // sliding into their slot inherits their Merge selection.
-                items(proposalCards, key = { Cards.proposalHideKey(it) }) { proposal ->
+                // The key must be Bundle-storable (String): the hide-key
+                // objects (Word.Gloss/Definition/Idiom) crash LazyColumn's
+                // saveable-state provider on device.
+                items(proposalCards, key = { it.id }) { proposal ->
                     when (proposal) {
                         is CardProposal.Definition -> DefinitionCard(
                             word = word,
