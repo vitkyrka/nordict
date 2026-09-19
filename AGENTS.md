@@ -815,7 +815,7 @@ CLI: `wfr table` / `wfr table --search` (or `--dict wfr --file …` offline).
 
 ## Instructions
 
-When asked to implement something, in the todo steps always include these:
+When asked to implement something, always do these steps as part of the process:
 
 - Extend agent interface if applicable for easier agentic test
 - Add automated tests (core and/or UI)
