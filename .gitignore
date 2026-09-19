@@ -9,6 +9,7 @@ build/
 *.class
 .settings
 .gradle
+.kotlin
 testdata/
 node_modules/
 .idea/
