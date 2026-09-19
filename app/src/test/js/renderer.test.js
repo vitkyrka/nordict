@@ -1125,3 +1125,29 @@ test('renders Le Robert roman/arabic/lozenge sense numbers', () => {
     expect($('.definitions .definition-row > .sense-number').map((_, el) => $(el).text()).get())
         .toEqual(['I', 'I.1', 'I.2', '⬥']);
 });
+
+test('renders RAE entry-number superscripts in headword and synonyms', () => {
+    const word = {
+        mTitle: 'tapa<sup>1</sup>',
+        definitions: [
+            {
+                synonyms: [{ text: 'cara<sup>1</sup>', href: 'https://dle.rae.es/?id=7NOG7x2', plev: '' }],
+                antonyms: ['vivir<sup>1</sup>'],
+                glosses: [
+                    { definition: 'Pieza que cierra.', grammar: 'nombre femenino', gender: '', examples: [] }
+                ]
+            }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    // Headword keeps its superscript entry number (tapa¹, not flat tapa1).
+    expect($('h1 sup').text()).toBe('1');
+    expect($('h1').text()).toBe('tapa1');
+    // Synonym link and antonym text keep theirs too.
+    expect($('.synonyms a.synonym sup').text()).toBe('1');
+    expect($('.synonyms a.synonym').text()).toBe('cara1');
+    expect($('.antonyms .antonym sup').text()).toBe('1');
+});

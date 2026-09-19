@@ -217,9 +217,41 @@ class DleParserTest {
         val def1 = word.definitions[0]
         assertThat(def1.grammar).isEqualTo("adjetivo")
         assertThat(def1.glosses[0].definition).contains("Dicho de una persona o de una cosa")
-        assertThat(def1.synonyms.map { it.text }).containsExactly("diferente", "distinto1")
+        assertThat(def1.synonyms.map { it.text }).containsExactly("diferente", "distinto<sup>1</sup>")
         assertThat(def1.antonyms).containsExactly("mismo")
 
         assertGolden(words, "../testdata/dle/otro.json")
+    }
+
+    @Test
+    fun testHeadwordAndSynonymSupPreserved() {
+        // RAE entry numbers (e.g. tapa1/tapa2, cara1) carry the homograph
+        // number in a <sup>; it must survive as <sup> HTML so the renderer
+        // shows it superscripted instead of a flat "1" suffix.
+        val page = """
+            <!DOCTYPE html><html><head></head><body>
+            <div id="resultados">
+            <article>
+                <header><h1>tapa<sup>1</sup></h1></header>
+                <ol class="c-definitions"><li class="j"><div class="c-definitions__item"><div><span class="n_acep">1. </span><abbr class="d" title="nombre femenino">f.</abbr> Pieza que cierra.</div><div class="c-definitions__item-footer"><div class="c-word-list"><div class="c-word-list__label">Sin.:</div><ul class="c-word-list__items"><li><span><span class="sin" data-id="X">cara<sup>1</sup></span></span></li></ul></div></div></div></li></ol>
+            </article>
+            <article>
+                <header><h1>tapa<sup>2</sup></h1></header>
+                <ol class="c-definitions"><li class="j"><div class="c-definitions__item"><div><span class="n_acep">1. </span><abbr class="d" title="nombre femenino">f.</abbr> Ración de comida.</div></div></div></li></ol>
+            </article>
+            </div>
+            </body></html>
+        """.trimIndent()
+        val uri = httpUrl("https://dle.rae.es/tapa")
+        val words = DleParser.parse(page, uri, "DLE")
+
+        assertThat(words).hasSize(2)
+        assertThat(words[0].mTitle).isEqualTo("tapa<sup>1</sup>")
+        assertThat(words[1].mTitle).isEqualTo("tapa<sup>2</sup>")
+        // Slug/summary/search key stay plain for lookup and display fallback.
+        assertThat(words[0].mSlug).isEqualTo("tapa1")
+        assertThat(words[0].rawHeadword).isEqualTo("tapa1")
+        assertThat(words[0].definitions[0].synonyms.map { it.text })
+            .containsExactly("cara<sup>1</sup>")
     }
 }

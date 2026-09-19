@@ -46,13 +46,15 @@ class EstParser {
                 first = false
 
                 val taglemma = lemma.selectFirst("header span.entrada") ?: return@forEach
-                val word = taglemma.text().trim('"')
-                val summary = StringBuilder(word)
+                val plain = taglemma.text().trim('"').trim()
+                val rich = richSupText(taglemma).trim().trim('"').trim()
+                val word = rich.ifEmpty { plain }
+                val summary = StringBuilder(plain)
 
                 val headword = Word(
-                    tag, word, word, summary.toString(), newUri
+                    tag, word, plain, summary.toString(), newUri
                 )
-                headword.rawHeadword = Word.raeSearchKey(word)
+                headword.rawHeadword = Word.raeSearchKey(plain)
 
                 // Capture conjugation and participle info from div.par
                 val parDiv = lemma.selectFirst("div.paracep div.par")
@@ -76,7 +78,7 @@ class EstParser {
                     if (meaning.parents().any { it.hasClass("locs") || it.hasClass("sols") }) return@forEach
 
                     val definition = parseDefinition(meaning, finalBaseUrl)
-                    applyHeadwords(definition.glosses, word)
+                    applyHeadwords(definition.glosses, plain)
                     headword.definitions.add(definition)
                     meaning.remove()
                 }
@@ -109,7 +111,7 @@ class EstParser {
                             }
                         }
                     }
-                    applyHeadwords(idiom.glosses, word)
+                    applyHeadwords(idiom.glosses, plain)
                     headword.idioms.add(idiom)
                 }
 
@@ -121,20 +123,23 @@ class EstParser {
                 lemma.select(".sols .fc").forEach { fc ->
                     ref += 1
 
-                    val subTitle = fc.selectFirst(".headword-fc")?.text()?.trim() ?: ""
-                    if (subTitle.isEmpty()) return@forEach
+                    val subEl = fc.selectFirst(".headword-fc")
+                    val subPlain = subEl?.text()?.trim() ?: ""
+                    if (subPlain.isEmpty()) return@forEach
+                    val subRich = subEl?.let { richSupText(it).trim() }?.ifEmpty { subPlain } ?: subPlain
+                    val subTitle = subRich
 
                     val subUri = uri.newBuilder()
                         .addQueryParameter("__ref", ref.toString()).build()
                     val sub = Word(
-                        tag, subTitle, subTitle, subTitle, subUri
+                        tag, subTitle, subPlain, subPlain, subUri
                     )
-                    sub.rawHeadword = subTitle
+                    sub.rawHeadword = subPlain
                     sub.xrefs.add(ref.toString())
 
                     fc.select("div.acep").forEach { meaning ->
                         val definition = parseDefinition(meaning, finalBaseUrl)
-                        applyHeadwords(definition.glosses, subTitle)
+                        applyHeadwords(definition.glosses, subPlain)
                         sub.definitions.add(definition)
                     }
 
@@ -166,9 +171,27 @@ class EstParser {
             meaning.select(".refS a.synon").forEach { synEl ->
                 val href = synEl.attr("href")
                 val url = if (href.startsWith("http")) href else finalBaseUrl + href
-                definition.synonyms.add(Word.Synonym(synEl.text(), url))
+                definition.synonyms.add(Word.Synonym(richSupText(synEl), url))
             }
             return definition
+        }
+
+        // Serialize an element's text keeping RAE entry-number <sup> markers
+        // (e.g. tapa<sup>1</sup>) as <sup> HTML so the renderer shows them
+        // superscripted; all other markup is flattened to text.
+        private fun richSupText(el: Element): String =
+            el.childNodes().joinToString("") { richSupNode(it) }.trim()
+
+        private fun richSupNode(node: org.jsoup.nodes.Node): String {
+            return when (node) {
+                is org.jsoup.nodes.TextNode -> node.text()
+                is Element -> if (node.tagName() == "sup") {
+                    "<sup>${node.text()}</sup>"
+                } else {
+                    node.childNodes().joinToString("") { richSupNode(it) }
+                }
+                else -> ""
+            }
         }
 
         private fun fillTarget(definition: Word.Definition, acep: Acep) {

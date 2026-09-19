@@ -49,13 +49,15 @@ class DleParser {
                 first = false
 
                 val taglemma = lemma.selectFirst("header h1") ?: return@forEach
-                val word = taglemma.text().trim('"')
-                val summary = StringBuilder(word)
+                val plain = taglemma.text().trim('"').trim()
+                val rich = richSupText(taglemma).trim().trim('"').trim()
+                val word = rich.ifEmpty { plain }
+                val summary = StringBuilder(plain)
 
                 val headword = Word(
-                    tag, word, word, summary.toString(), newUri
+                    tag, word, plain, summary.toString(), newUri
                 )
-                headword.rawHeadword = Word.raeSearchKey(word)
+                headword.rawHeadword = Word.raeSearchKey(plain)
 
                 // Etymology: div.n2.c-text-intro (e.g. "Del lat. cacāre.")
                 val etymEl = lemma.selectFirst("div.n2.c-text-intro")
@@ -174,7 +176,7 @@ class DleParser {
                 val target = wordList.select(".c-word-list__items .sin")
                 for (synEl in target) {
                     if (isAntonym) {
-                        definition.antonyms.add(synEl.text())
+                        definition.antonyms.add(richSupText(synEl))
                     } else {
                         definition.synonyms.add(parseSynonym(synEl, baseUrl))
                     }
@@ -191,7 +193,26 @@ class DleParser {
             val plev = wrapper?.selectFirst("abbr.sin_alert")?.attr("title") ?: ""
             val dataId = synEl.attr("data-id")
             val href = if (dataId.isNotEmpty()) "${baseUrl}?id=$dataId" else ""
-            return Word.Synonym(synEl.text(), href, plev)
+            return Word.Synonym(richSupText(synEl), href, plev)
+        }
+
+        // Serialize an element's text keeping RAE entry-number <sup> markers
+        // (e.g. cara<sup>1</sup>, tapa<sup>2</sup>) as <sup> HTML so the
+        // renderer shows them superscripted; all other markup is flattened to
+        // text. The renderer injects synonym/headword strings as HTML.
+        private fun richSupText(el: Element): String =
+            el.childNodes().joinToString("") { richSupNode(it) }.trim()
+
+        private fun richSupNode(node: org.jsoup.nodes.Node): String {
+            return when (node) {
+                is org.jsoup.nodes.TextNode -> node.text()
+                is Element -> if (node.tagName() == "sup") {
+                    "<sup>${node.text()}</sup>"
+                } else {
+                    node.childNodes().joinToString("") { richSupNode(it) }
+                }
+                else -> ""
+            }
         }
 
         // Parse one h3 idiom group (all li senses under the header) into a

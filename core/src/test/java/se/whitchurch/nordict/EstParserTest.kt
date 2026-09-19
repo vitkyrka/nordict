@@ -414,4 +414,37 @@ class EstParserTest {
 
         assertThat(results).isEmpty()
     }
+
+    @Test
+    fun testHeadwordAndSynonymSupPreserved() {
+        // RAE entry numbers (e.g. tapa1/tapa2) carry the homograph number in
+        // a <sup>; it must survive as <sup> HTML so the renderer shows it
+        // superscripted instead of a flat "1" suffix.
+        val page = """
+            <!DOCTYPE html><html><head></head><body>
+            <div id="resultados">
+            <article>
+                <header><span class="entrada">tapa<sup>1</sup></span></header>
+                <div class="acep"><abbr class="gram" title="nombre femenino">f.</abbr>
+                    <span class="def">Pieza que cierra.</span><div class="refS"><a class="synon" href="cubierta">cubierta<sup>2</sup></a></div></div>
+            </article>
+            <article>
+                <header><span class="entrada">tapa<sup>2</sup></span></header>
+                <div class="acep"><abbr class="gram" title="nombre femenino">f.</abbr>
+                    <span class="def">Ración de comida.</span></div>
+            </article>
+            </div>
+            </body></html>
+        """.trimIndent()
+        val uri = httpUrl("https://www.rae.es/diccionario-estudiante/tapa")
+        val words = EstParser.parse(page, uri, "EST")
+
+        assertThat(words).hasSize(2)
+        assertThat(words[0].mTitle).isEqualTo("tapa<sup>1</sup>")
+        assertThat(words[1].mTitle).isEqualTo("tapa<sup>2</sup>")
+        assertThat(words[0].mSlug).isEqualTo("tapa1")
+        assertThat(words[0].rawHeadword).isEqualTo("tapa1")
+        assertThat(words[0].definitions[0].synonyms.map { it.text })
+            .containsExactly("cubierta<sup>2</sup>")
+    }
 }
