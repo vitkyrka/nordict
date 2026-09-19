@@ -96,4 +96,61 @@ class ExactMatchTest {
         assertThat(match).isNotNull()
         assertThat(match!!.mTitle).isEqualTo("cagar")
     }
+
+    @Test
+    fun singularCandidatesStripPluralEndings() {
+        // Spanish -s plural, -es plural, -ces -> -z, French -x plural.
+        assertThat(ExactMatch.singularCandidates("casas")).containsExactly("casa")
+        assertThat(ExactMatch.singularCandidates("flores")).containsExactly("flor", "flore").inOrder()
+        assertThat(ExactMatch.singularCandidates("luces")).containsExactly("luz", "luc", "luce").inOrder()
+        assertThat(ExactMatch.singularCandidates("tableaux")).containsExactly("tableau")
+        // Short article plural still maps ("los" -> "lo"); blank and
+        // non-plurals yield nothing.
+        assertThat(ExactMatch.singularCandidates("los")).containsExactly("lo")
+        assertThat(ExactMatch.singularCandidates("as")).isEmpty()
+        assertThat(ExactMatch.singularCandidates("casa")).isEmpty()
+        assertThat(ExactMatch.singularCandidates("  ")).isEmpty()
+    }
+
+    @Test
+    fun fallbackMatchesSingularInSameResults() {
+        // A plural search that already suggests its singular resolves without
+        // a second network round-trip.
+        val results = listOf(
+            result("casa", "https://dict.example/casa"),
+            result("casamiento", "https://dict.example/casamiento")
+        )
+        val match = ExactMatch.resolveWithFallback("casas", results)
+        assertThat(match).isNotNull()
+        assertThat(match!!.mTitle).isEqualTo("casa")
+    }
+
+    @Test
+    fun fallbackPrefersExactOverSingular() {
+        val results = listOf(
+            result("casas", "https://dict.example/casas"),
+            result("casa", "https://dict.example/casa")
+        )
+        val match = ExactMatch.resolveWithFallback("casas", results)
+        assertThat(match!!.mTitle).isEqualTo("casas")
+    }
+
+    @Test
+    fun fallbackWithSearchQueriesSingular() {
+        // The plural search has no singular; the singular re-search does.
+        val pluralResults = listOf(result("casamiento", "https://dict.example/casamiento"))
+        val singularResults = listOf(result("casa", "https://dict.example/casa"))
+        val match = ExactMatch.resolveWithSearch("casas", pluralResults) { q ->
+            assertThat(q).isEqualTo("casa")
+            singularResults
+        }
+        assertThat(match).isNotNull()
+        assertThat(match!!.mTitle).isEqualTo("casa")
+    }
+
+    @Test
+    fun fallbackWithSearchStillNullWithoutSingular() {
+        val match = ExactMatch.resolveWithSearch("casas", emptyList()) { emptyList() }
+        assertThat(match).isNull()
+    }
 }

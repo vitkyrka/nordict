@@ -430,22 +430,30 @@ class WordViewModel(
         viewModelScope.launch {
             val trimmed = query.trim()
             var combined: List<CombSource>? = null
+            var combinedTitle = trimmed
             var exact: SearchResult? = null
             withContext(Dispatchers.IO) {
                 if (ordboken.activeDicts.isNotEmpty()) {
-                    val sources = MultiDict.resolveExact(ordboken.activeDicts, trimmed)
+                    val (matched, sources) =
+                        MultiDict.resolveExactWithQuery(ordboken.activeDicts, trimmed)
                     combined = sources.takeIf { it.isNotEmpty() }
-                    if (combined == null) exact = SearchResult(trimmed)
+                    if (combined != null) combinedTitle = matched
+                    else exact = SearchResult(trimmed)
                 } else {
-                    val results = ordboken.currentDictionary.search(trimmed)
-                    exact = ExactMatch.resolve(trimmed, results) ?: SearchResult(trimmed)
+                    val dict = ordboken.currentDictionary
+                    val results = dict.search(trimmed)
+                    // A word.js link can be an inflected form (e.g. Spanish
+                    // plural "casas"); fall back to the singular ("casa") when
+                    // the raw query has no exact match.
+                    exact = ExactMatch.resolveWithSearch(trimmed, results) { dict.search(it) }
+                        ?: SearchResult(trimmed)
                 }
             }
             when {
                 combined != null ->
                     onOpenSources?.invoke(
                         SearchResult(
-                            mTitle = trimmed,
+                            mTitle = combinedTitle,
                             uri = combined!!.first().uri,
                             dicts = combined!!.map { it.tag },
                             sources = combined!!

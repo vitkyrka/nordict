@@ -130,7 +130,9 @@ class HeadlessAgentDriver(
         val results = searchResults(query)
         lastQuery = query
 
-        val exact = ExactMatch.resolve(query, results)
+        // Same singular fallback as the word view's `/search/` handler, so an
+        // agent can `open` an inflected form (e.g. Spanish "casas" -> "casa").
+        val exact = ExactMatch.resolveWithSearch(query, results) { searchResults(it) }
         if (exact == null) {
             val suggestions = results.map { it.mTitle }.distinct()
             return AgentResult.error(
@@ -140,9 +142,12 @@ class HeadlessAgentDriver(
             )
         }
         // Single-dictionary results carry no sources; a combined selection's
-        // merged result lists every matching dictionary's page.
+        // merged result lists every matching dictionary's page. The headword
+        // follows the matched (possibly singular-fallback) title, not the raw
+        // query, so a plural `open` loads the singular page under its own name.
         val sources = exact.sources.ifEmpty { listOf(CombSource(active.tag, exact.uri)) }
-        return openSources(sources, query, AgentOps.OPEN)
+        lastQuery = exact.mTitle
+        return openSources(sources, exact.mTitle, AgentOps.OPEN)
     }
 
     private fun openSources(sources: List<CombSource>, query: String?, op: String): AgentResult {

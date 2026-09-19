@@ -280,6 +280,29 @@ class MultiDictTest {
     }
 
     @Test
+    fun resolveExactFallsBackToSingular() {
+        // A word.js plural link ("casas") resolves to the singular page when
+        // only the singular has an exact match.
+        val singular = SearchResult("casa", "", server.url("/frente"))
+        val lookup = object : WordLookup {
+            override val tag = "DLE"
+            override fun search(query: String): List<SearchResult> =
+                if (query.equals("casa", ignoreCase = true)) listOf(singular)
+                else emptyList()
+            override fun get(uri: okhttp3.HttpUrl): Word? = null
+        }
+        val sources = MultiDict.resolveExact(listOf(lookup), "casas")
+        assertThat(sources.map { it.tag }).containsExactly("DLE")
+
+        val (matched, withQuery) = MultiDict.resolveExactWithQuery(listOf(lookup), "casas")
+        assertThat(matched).isEqualTo("casa")
+        assertThat(withQuery.map { it.tag }).containsExactly("DLE")
+
+        // No singular anywhere: still empty.
+        assertThat(MultiDict.resolveExact(listOf(lookup), "xyzzy")).isEmpty()
+    }
+
+    @Test
     fun externalUrisOpensEverySelectedDictionary() {
         val sources = listOf(
             CombSource("DLE", server.url("/frente")),

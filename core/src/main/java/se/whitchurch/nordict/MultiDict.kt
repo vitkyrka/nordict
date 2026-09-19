@@ -152,15 +152,38 @@ object MultiDict {
     /**
      * The ordered set of dictionaries that have a unique exact match for
      * [headword] (the word.js `/search/` link opener). Dictionaries without the
-     * word are skipped; the result keeps the selection's order.
+     * word are skipped; the result keeps the selection's order. When no
+     * dictionary has the headword, each [ExactMatch.singularCandidates] form
+     * (e.g. "casas" -> "casa") is searched in turn and the first form with any
+     * exact match wins.
      */
-    fun resolveExact(lookups: List<WordLookup>, headword: String): List<CombSource> {
+    fun resolveExact(lookups: List<WordLookup>, headword: String): List<CombSource> =
+        resolveExactWithQuery(lookups, headword).second
+
+    /**
+     * [resolveExact] plus the matched query: the raw headword when it matched,
+     * else the singular fallback form that did (e.g. "casa" for "casas"), else
+     * the trimmed headword with an empty source list. Lets `/search/` openers
+     * title the combined page under the singular that actually matched.
+     */
+    fun resolveExactWithQuery(
+        lookups: List<WordLookup>,
+        headword: String
+    ): Pair<String, List<CombSource>> {
         val trimmed = headword.trim()
-        if (trimmed.isEmpty()) return emptyList()
+        if (trimmed.isEmpty()) return "" to emptyList()
+        resolveOne(lookups, trimmed).takeIf { it.isNotEmpty() }?.let { return trimmed to it }
+        for (candidate in ExactMatch.singularCandidates(trimmed)) {
+            resolveOne(lookups, candidate).takeIf { it.isNotEmpty() }?.let { return candidate to it }
+        }
+        return trimmed to emptyList()
+    }
+
+    private fun resolveOne(lookups: List<WordLookup>, query: String): List<CombSource> {
         val futures = lookups.map { lookup ->
             pool.submit<Pair<String, SearchResult?>> {
                 try {
-                    lookup.tag to ExactMatch.resolve(trimmed, lookup.search(trimmed))
+                    lookup.tag to ExactMatch.resolve(query, lookup.search(query))
                 } catch (e: Exception) {
                     log.severe("combined exact search failed for ${lookup.tag}: ${e.message}")
                     lookup.tag to null

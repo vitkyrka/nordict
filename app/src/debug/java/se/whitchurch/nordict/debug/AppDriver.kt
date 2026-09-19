@@ -110,7 +110,9 @@ class AppDriver(private val app: android.app.Application) {
         if (command.uri != null) return opOpenUri(command)
         val query = command.require("query", command.query).trim()
         val results = ordboken().search(query, 0)
-        val exact = ExactMatch.resolve(query, results)
+        // Same singular fallback as the word view's `/search/` handler, so an
+        // agent can `open` an inflected form (e.g. Spanish "casas" -> "casa").
+        val exact = ExactMatch.resolveWithSearch(query, results) { ordboken().search(it, 0) }
         if (exact == null) {
             val suggestions = results.map { it.mTitle }.distinct()
             return AgentResult.error(
