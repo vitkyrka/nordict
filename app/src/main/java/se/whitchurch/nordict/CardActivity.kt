@@ -341,11 +341,8 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 }
 
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = {
                         Intent(this@CardActivity, ImagePicker::class.java).also {
@@ -388,9 +385,15 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                     }) {
                         Icon(painterResource(R.drawable.ic_clear), contentDescription = "Clear")
                     }
+                }
 
-                    Spacer(modifier = Modifier.weight(1f))
-
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
+                ) {
                     OutlinedButton(onClick = {
                         val effectiveDefs =
                             if (selectedDefinitions.isEmpty()) listOf(definition)
