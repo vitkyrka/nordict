@@ -168,4 +168,41 @@ class AnkiClientTest {
         assertThat(note.fields[1]).isEqualTo("[]")
         assertThat(note.fields[2]).isEmpty()
     }
+
+    @Test
+    fun createCard_shrinksOversizedImagesThroughDownscaler() {
+        val api = FakeAnkiApi()
+        val client = AnkiClient(api)
+        val big = "data:image/png;base64," + "A".repeat(Cards.MAX_NOTE_FIELDS_BYTES)
+        var calls = 0
+
+        val id = client.createCard("Nordict - DLE", "back", listOf("ex"), listOf(big), "a.mp3") {
+            calls++
+            "data:image/jpeg;base64,SMALL"
+        }
+
+        assertThat(id).isEqualTo(100L)
+        assertThat(calls).isGreaterThan(0)
+        val note = api.notes.single()
+        assertThat(Cards.fieldsSizeBytes(note.fields.toTypedArray())).isAtMost(Cards.MAX_NOTE_FIELDS_BYTES)
+        assertThat(note.fields[0]).contains("SMALL")
+        assertThat(note.fields[0]).doesNotContain("AAAA")
+    }
+
+    @Test
+    fun createCard_withoutDownscaler_dropsUnfittableImagesInsteadOfFailing() {
+        val api = FakeAnkiApi()
+        val client = AnkiClient(api)
+        val big = "data:image/png;base64," + "A".repeat(Cards.MAX_NOTE_FIELDS_BYTES)
+
+        // No downscaler: the image cannot shrink, so it is dropped rather
+        // than failing the whole card (the AnkiDroid insert would reject the
+        // oversized Binder payload with TransactionTooLargeException).
+        val id = client.createCard("Nordict - DLE", "back", listOf("ex"), listOf(big), "a.mp3")
+
+        assertThat(id).isEqualTo(100L)
+        val note = api.notes.single()
+        assertThat(note.fields[0]).isEqualTo("[]")
+        assertThat(note.fields[1]).isEqualTo("[\"ex\"]")
+    }
 }

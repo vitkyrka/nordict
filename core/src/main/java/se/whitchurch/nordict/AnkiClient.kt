@@ -12,15 +12,29 @@ package se.whitchurch.nordict
  */
 class AnkiClient(private val api: AnkiApi) {
 
-    /** Adds one note to [deck], returning its new note id, or null on failure. */
+    /**
+     * Adds one note to [deck], returning its new note id, or null on failure.
+     *
+     * Images that would push the note over [Cards.MAX_NOTE_FIELDS_BYTES]
+     * (the ~1MB Binder transaction buffer shared by the AnkiDroid insert —
+     * oversized cards fail with `TransactionTooLargeException` and `addNote`
+     * returns null) are first shrunk through [downscaleImage], which maps a
+     * data URL to a smaller one (or null when it cannot shrink it); images
+     * that cannot shrink enough are dropped as a last resort. The default
+     * shrinks nothing, so unfittable images are dropped instead of failing
+     * the whole card — the Android app passes a Bitmap downscaler.
+     */
     fun createCard(
         deck: String,
         back: String,
         examples: List<String>,
         images: List<String>,
-        audio: String
+        audio: String,
+        downscaleImage: (String) -> String? = { null }
     ): Long? {
-        return createFromFields(deck, Cards.fields(back, examples, images, audio))
+        return createFromFields(
+            deck, Cards.fitFields(back, examples, images, audio, downscale = downscaleImage)
+        )
     }
 
     /**

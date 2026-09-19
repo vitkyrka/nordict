@@ -359,4 +359,86 @@ class CardsTest {
         assertThat(fields[2]).isEqualTo("a.mp3")
         assertThat(fields[3]).isEqualTo("<div style=\"text-align: left\"><b>back</b></div>")
     }
+
+    // ---- image fitting (Binder ~1MB budget) ----
+
+    private fun imagesOf(fields: Array<String>): List<String> =
+        com.google.gson.Gson().fromJson(fields[0], Array<String>::class.java).toList()
+
+    @Test
+    fun fieldsSizeBytes_countsUtf8Bytes() {
+        assertThat(Cards.fieldsSizeBytes(arrayOf("a", "é"))).isEqualTo(3)
+    }
+
+    @Test
+    fun fitFields_underBudget_returnsFieldsUnchangedAndNeverDownscales() {
+        var calls = 0
+        val images = listOf("data:image/png;base64,AAA")
+        val fields = Cards.fitFields("back", listOf("ex"), images, "a.mp3") {
+            calls++
+            null
+        }
+
+        assertThat(fields).isEqualTo(Cards.fields("back", listOf("ex"), images, "a.mp3"))
+        assertThat(calls).isEqualTo(0)
+    }
+
+    @Test
+    fun fitFields_overBudget_downscalesLargestImageUntilItFits() {
+        val big = "data:image/png;base64," + "A".repeat(2000)
+        val small = "data:image/png;base64," + "B".repeat(100)
+        var calls = 0
+        val fields = Cards.fitFields("b", emptyList(), listOf(big, small), "", maxTotalBytes = 1000) {
+            calls++
+            if (it.length > 60) it.take(60) else null
+        }
+
+        assertThat(calls).isGreaterThan(0)
+        assertThat(Cards.fieldsSizeBytes(fields)).isAtMost(1000)
+        // Both images survive (shrunk, not dropped); the untouched small one
+        // is kept verbatim.
+        val kept = imagesOf(fields)
+        assertThat(kept).hasSize(2)
+        assertThat(kept).contains(small)
+        assertThat(kept.single { it.startsWith("data:image/png;base64,A") }.length)
+            .isLessThan(big.length)
+    }
+
+    @Test
+    fun fitFields_overBudgetWithHalvingDownscaler_keepsEveryImage() {
+        val images = listOf(
+            "data:image/png;base64," + "A".repeat(50_000),
+            "data:image/png;base64," + "B".repeat(50_000)
+        )
+        val fields = Cards.fitFields("b", emptyList(), images, "", maxTotalBytes = 10_000) {
+            if (it.length > 30) it.take(it.length / 2) else null
+        }
+
+        assertThat(Cards.fieldsSizeBytes(fields)).isAtMost(10_000)
+        assertThat(imagesOf(fields)).hasSize(2)
+    }
+
+    @Test
+    fun fitFields_unshrinkableImages_areDroppedLargestFirstAsLastResort() {
+        val big = "data:image/png;base64," + "A".repeat(2000)
+        val small = "data:image/png;base64," + "B".repeat(100)
+        val fields = Cards.fitFields("b", emptyList(), listOf(big, small), "", maxTotalBytes = 500) {
+            null
+        }
+
+        // Nothing can shrink, so the largest image is dropped and the small
+        // one (which fits) is kept.
+        assertThat(imagesOf(fields)).containsExactly(small)
+    }
+
+    @Test
+    fun fitFields_noImagesOverBudget_returnsBestEffort() {
+        val fields = Cards.fitFields("huge back".repeat(100), emptyList(), emptyList(), "", maxTotalBytes = 10) {
+            null
+        }
+
+        assertThat(fields).isEqualTo(
+            Cards.fields("huge back".repeat(100), emptyList(), emptyList(), "")
+        )
+    }
 }

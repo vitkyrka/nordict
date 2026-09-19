@@ -182,6 +182,96 @@ object Cards {
     }
 
     /**
+     * Maximum total size (UTF-8 bytes) of the four note fields built by
+     * [fields].
+     *
+     * AnkiDroid itself enforces no per-field size cap (its content provider
+     * just inserts whatever `FLDS` it receives), so an oversized card fails
+     * one layer down: the `ContentValues` cross process boundaries over
+     * Binder, whose transaction buffer is ~1MB shared between all ongoing
+     * transactions (`TransactionTooLargeException`, the insert fails and
+     * `addNote` returns null). AnkiDroid's own code follows the same rule —
+     * `ClipboardUtil` caps pasted text well below half the buffer for exactly
+     * this reason — so the note fields stay under half the buffer here too.
+     * Images are the only field worth shrinking (base64 data URLs from the
+     * camera/picker are PNGs and easily exceed the whole budget alone), which
+     * is what [fitFields] does.
+     */
+    const val MAX_NOTE_FIELDS_BYTES = 500_000
+
+    /** The total UTF-8 byte size of already-built note [fields]. */
+    fun fieldsSizeBytes(fields: Array<String>): Int =
+        fields.sumOf { it.toByteArray(Charsets.UTF_8).size }
+
+    /**
+     * Builds the note fields like [fields], shrinking the `images` data URLs
+     * until the total fits in [maxTotalBytes] (default
+     * [MAX_NOTE_FIELDS_BYTES]).
+     *
+     * Each pass downscales the currently largest image through [downscale]
+     * (which returns a smaller data URL, or null when the image cannot be
+     * made smaller — e.g. it is not a decodable data URL). Images that cannot
+     * shrink are kept as long as the rest fits; only when everything
+     * shrinkable is exhausted and the fields are still over budget are the
+     * largest leftovers dropped, one by one — a card without one image still
+     * beats a card that fails to insert entirely. When there is nothing left
+     * to shrink or drop, the fields are returned best-effort (oversized).
+     */
+    fun fitFields(
+        back: String,
+        examples: List<String>,
+        images: List<String>,
+        audio: String,
+        maxTotalBytes: Int = MAX_NOTE_FIELDS_BYTES,
+        downscale: (String) -> String?
+    ): Array<String> {
+        val settled = ArrayList<String>()
+        val shrinkable = images.toMutableList()
+        var fields = fields(back, examples, images, audio)
+        // Belt and braces: every pass either strictly shrinks the payload or
+        // settles/drops an image, so this bound is never reached in practice.
+        var passes = (images.size + 1) * 4 + 4
+        while (fieldsSizeBytes(fields) > maxTotalBytes && passes-- > 0) {
+            val largest = shrinkable.indices.maxByOrNull { shrinkable[it].length }
+            if (largest == null) {
+                // Nothing shrinkable left: drop the largest settled-or-current
+                // image still in the payload, or give up when none remain.
+                val current = currentImages(fields)
+                val drop = current.indices.maxByOrNull { current[it].length }
+                if (drop == null) break
+                val remaining = current.toMutableList().also { it.removeAt(drop) }
+                fields = fields(back, examples, remaining, audio)
+                continue
+            }
+            val smaller = downscale(shrinkable[largest])
+            if (smaller != null && smaller.length < shrinkable[largest].length) {
+                shrinkable[largest] = smaller
+                fields = fields(back, examples, settled + shrinkable, audio)
+            } else {
+                // Cannot shrink this one further: keep it for now and try the
+                // rest; it becomes droppable once nothing shrinkable remains.
+                settled.add(shrinkable.removeAt(largest))
+                fields = fields(back, examples, settled + shrinkable, audio)
+            }
+        }
+        return fields
+    }
+
+    /**
+     * Reads the image data URLs back out of built note [fields] (the `Images`
+     * JSON array), or an empty list when the field does not decode. Used by
+     * [fitFields] to drop images once nothing can shrink further.
+     */
+    private fun currentImages(fields: Array<String>): List<String> {
+        if (fields.isEmpty()) return emptyList()
+        return try {
+            gson.fromJson(fields[0], Array<String>::class.java)?.toList().orEmpty()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
      * Plain text for the card preview: strips HTML (Collins gloss definitions
      * and examples are rich HTML) while leaving plain text untouched.
      */

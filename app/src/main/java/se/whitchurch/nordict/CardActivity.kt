@@ -5,6 +5,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioAttributes
 import android.media.MediaPlayer
@@ -40,6 +41,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import se.whitchurch.nordict.ui.theme.NordictTheme
+import java.io.ByteArrayOutputStream
+import kotlin.math.max
 
 class CardActivity : androidx.appcompat.app.AppCompatActivity() {
     private lateinit var ordboken: Ordboken
@@ -466,7 +469,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         audio: String
     ): Long? {
         val deck = deckName
-        val id = anki.createCard(deck, text, examples, images, audio)
+        val id = anki.createCard(deck, text, examples, images, audio, ::downscaleImageDataUrl)
 
         android.widget.Toast.makeText(
             this, if (id == null) "Fail" else "Card added to $deck",
@@ -586,5 +589,55 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         // creation against a fake instead of the AnkiDroid content provider.
         @Volatile
         var debugAnkiApi: AnkiApi? = null
+    }
+}
+
+/**
+ * Downscale floor for [downscaleImageDataUrl]: images at or below this size
+ * on their longest side are returned as-is (null), since shrinking further
+ * would only hurt legibility for negligible byte savings.
+ */
+internal const val MIN_IMAGE_DIMENSION = 512
+
+/**
+ * One shrink step for the card image fitter ([Cards.fitFields], wired in
+ * through `CardActivity.createCard`): decodes a `data:image/...;base64,...`
+ * URL, halves its longest side (down to [MIN_IMAGE_DIMENSION] px) and
+ * re-encodes it as JPEG (the picker's canvas PNGs and the camera crop's PNG
+ * output are what blow the Binder budget in the first place).
+ *
+ * Returns null for non-image data URLs, undecodable payloads, or images
+ * already at the floor — the fitter then keeps or drops them.
+ */
+internal fun downscaleImageDataUrl(dataUrl: String): String? {
+    val comma = dataUrl.indexOf(',')
+    if (!dataUrl.startsWith("data:image/") || comma < 0) return null
+    val bytes = try {
+        Base64.decode(dataUrl.substring(comma + 1), Base64.DEFAULT)
+    } catch (e: IllegalArgumentException) {
+        return null
+    }
+    val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+    try {
+        val longest = max(bitmap.width, bitmap.height)
+        if (longest <= MIN_IMAGE_DIMENSION || longest <= 0) return null
+        val targetLongest = max(longest / 2, MIN_IMAGE_DIMENSION)
+        val scale = targetLongest.toFloat() / longest
+        val scaled = Bitmap.createScaledBitmap(
+            bitmap,
+            (bitmap.width * scale).toInt().coerceAtLeast(1),
+            (bitmap.height * scale).toInt().coerceAtLeast(1),
+            true
+        )
+        try {
+            val out = ByteArrayOutputStream()
+            if (!scaled.compress(Bitmap.CompressFormat.JPEG, 80, out)) return null
+            return "data:image/jpeg;base64," +
+                Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
+        } finally {
+            if (!scaled.isRecycled) scaled.recycle()
+        }
+    } finally {
+        if (!bitmap.isRecycled) bitmap.recycle()
     }
 }
