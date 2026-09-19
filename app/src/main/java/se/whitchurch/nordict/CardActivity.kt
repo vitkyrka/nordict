@@ -59,8 +59,12 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
     private var saveDeckName = true
     private var mLeftCards = 0
     private var deckName: String by mutableStateOf("")
-    private var hiddenDefs by mutableStateOf(setOf<Word.Definition>())
-    private var hiddenIdioms by mutableStateOf(setOf<Word.Idiom>())
+    // Hide-keys (see Cards.hideKey) of the proposals whose cards were created
+    // successfully. Keyed on the stable underlying model objects, not the
+    // proposal wrappers: proposals() mints fresh Definition copies for split
+    // (Collins) definitions on every call, so object identity would never
+    // match across recompositions and created entries would stay visible.
+    private var hiddenCards by mutableStateOf(setOf<Any>())
     private var preview: Cards.CardPreview? by mutableStateOf(null)
     private var previewTitle: String by mutableStateOf("")
 
@@ -177,12 +181,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 return
             }
 
-            val proposalCards = Cards.proposals(word).filterNot { p ->
-                when (p) {
-                    is CardProposal.Definition -> p.definition in hiddenDefs
-                    is CardProposal.Idiom -> p.idiom in hiddenIdioms
-                }
-            }
+            val proposalCards = Cards.visibleProposals(word, hiddenCards)
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -194,14 +193,16 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                             word = word,
                             proposal = proposal,
                             audio = audio,
-                            onCreate = { hideDefinitions ->
-                                hiddenDefs = hiddenDefs + hideDefinitions
-                                selectedDefinitions.removeAll(hideDefinitions.toSet())
+                            onCreate = { created ->
+                                hiddenCards = hiddenCards +
+                                    created.map { Cards.hideKey(it) } +
+                                    Cards.hideKey(proposal.definition)
+                                selectedDefinitions.removeAll(created.toSet())
                             }
                         )
                         is CardProposal.Idiom -> IdiomCard(
                             proposal = proposal,
-                            onCreate = { hiddenIdioms = hiddenIdioms + proposal.idiom }
+                            onCreate = { hiddenCards = hiddenCards + Cards.hideKey(proposal.idiom) }
                         )
                     }
                 }
@@ -421,13 +422,13 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                             else selectedDefinitions.toList()
                         val imagesForCard = imagesMap[proposal.id].orEmpty()
                         val cardExamples = Cards.examples(word, effectiveDefs, extraExamples)
-                        createCard(
+                        val noteId = createCard(
                             Cards.definitionBack(word, effectiveDefs, ordboken.currentCss),
                             cardExamples,
                             imagesForCard,
                             audio.elementAtOrElse(audioIdx.intValue) { _ -> "" }
                         )
-                        onCreate(effectiveDefs)
+                        if (noteId != null) onCreate(effectiveDefs)
                     }) {
                         Icon(
                             painterResource(R.drawable.ic_done),
@@ -519,13 +520,13 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                         Text("Preview")
                     }
                     Button(onClick = {
-                        createCard(
+                        val noteId = createCard(
                             Cards.idiomBack(idiom),
                             Cards.idiomExamples(idiom),
                             ArrayList(),
                             ""
                         )
-                        onCreate()
+                        if (noteId != null) onCreate()
                     }) {
                         Icon(
                             painterResource(R.drawable.ic_done),
@@ -592,15 +593,27 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
     fun isCardReady(): Boolean = mWord != null
 
     /**
-     * Creates the card for proposal [index] (default the first definition)
-     * through the same pipeline the Create button drives, and returns the new
-     * Anki note id (null on failure). Used by the agent REPL and tests.
+     * The card screen's currently visible (not yet created) proposals, in page
+     * order. Used by the agent driver to verify that a created card's entry
+     * left the card view.
+     */
+    fun visibleProposals(): List<CardProposal> {
+        val word = mWord ?: return emptyList()
+        return Cards.visibleProposals(word, hiddenCards)
+    }
+
+    /**
+     * Creates the card for visible proposal [index] (default the first
+     * remaining entry) through the same pipeline the Create button drives, and
+     * returns the new Anki note id (null on failure). On success the entry is
+     * hidden from the card view, exactly like the Create button. Used by the
+     * agent REPL and tests.
      */
     fun agentCreateCard(index: Int?): Long? {
         val word = mWord ?: return null
-        val proposal = Cards.proposals(word).getOrNull(index ?: 0) ?: return null
+        val proposal = visibleProposals().getOrNull(index ?: 0) ?: return null
         val audio = mAudio.elementAtOrElse(0) { _ -> "" }
-        return when (proposal) {
+        val noteId = when (proposal) {
             is CardProposal.Definition -> createCard(
                 Cards.definitionBack(word, listOf(proposal.definition), ordboken.currentCss),
                 Cards.examples(word, listOf(proposal.definition), emptyList()),
@@ -614,6 +627,10 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 ""
             )
         }
+        if (noteId != null) {
+            hiddenCards = hiddenCards + Cards.proposalHideKey(proposal)
+        }
+        return noteId
     }
 
     /**

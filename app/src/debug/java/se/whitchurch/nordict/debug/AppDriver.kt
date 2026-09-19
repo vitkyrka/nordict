@@ -282,10 +282,11 @@ class AppDriver(private val app: android.app.Application) {
         await({ card.isCardReady() }, 10_000)
         val id = onMain { card.agentCreateCard(command.index) }
         return if (id != null) {
+            val remaining = onMain { card.visibleProposals().size }
             AgentResult(
                 ok = true,
                 op = AgentOps.CREATE_CARD,
-                message = "card created (note id $id)",
+                message = "card created (note id $id, $remaining cards left)",
                 state = snapshot()
             )
         } else {

@@ -91,6 +91,38 @@ object Cards {
     }
 
     /**
+     * Stable identity for hiding a created definition card.
+     *
+     * `proposals()` mints a fresh [Word.Definition] copy on every call for a
+     * split (Collins POS-group) definition, so the copies can never be matched
+     * by object identity across recompositions. The single gloss a split copy
+     * carries *is* shared (the original gloss instance is moved onto the
+     * copy), as are the definition instances of unsplit definitions — keying
+     * on `glosses.singleOrNull() ?: definition` therefore identifies the same
+     * card on every call. An unsplit single-gloss definition keys on its gloss
+     * for the same reason; glosses are never shared between definitions.
+     */
+    fun hideKey(definition: Word.Definition): Any =
+        definition.glosses.singleOrNull() ?: definition
+
+    /** Stable identity for hiding a created idiom card (idioms are never copied). */
+    fun hideKey(idiom: Word.Idiom): Any = idiom
+
+    /** The [hideKey] of a card proposal. */
+    fun proposalHideKey(proposal: CardProposal): Any = when (proposal) {
+        is CardProposal.Definition -> hideKey(proposal.definition)
+        is CardProposal.Idiom -> hideKey(proposal.idiom)
+    }
+
+    /**
+     * The proposals of [word] minus the hidden ones: the entries the card
+     * screen still offers. [hidden] holds [hideKey]/[proposalHideKey] keys
+     * recorded when their cards were created.
+     */
+    fun visibleProposals(word: Word, hidden: Set<Any>): List<CardProposal> =
+        proposals(word).filterNot { proposalHideKey(it) in hidden }
+
+    /**
      * Splits a Collins POS-group definition (empty top-level text, one gloss
      * per sense) into one single-gloss definition per card. Each copy keeps
      * the group's `pos`/markers and renders its own sense fragment, so its

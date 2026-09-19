@@ -171,6 +171,58 @@ class CardsTest {
         assertThat(estProposalIndex).isGreaterThan(0)
     }
 
+    // ---- hide-keys (card-view removal) ----
+
+    @Test
+    fun hideKey_splitDefinitions_matchAcrossProposalCalls() {
+        val page = File("../testdata/colspan/frente.html").readText()
+        val masc = CollinsParser.parse(
+            page,
+            httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/frente"),
+            "COLSPAN", "spanish-english"
+        ).single {
+            it.dictionary == "Collins Spanish-English" &&
+                it.definitions.singleOrNull()?.pos == "masculine noun"
+        }
+
+        // Every proposals() call mints fresh Definition copies for a split
+        // POS-group definition, so hiding by object identity could never match
+        // across recompositions and the created entry stayed visible.
+        val first = Cards.proposals(masc).filterIsInstance<CardProposal.Definition>()
+        val second = Cards.proposals(masc).filterIsInstance<CardProposal.Definition>()
+        assertThat(first.map { it.definition }).isNotEqualTo(second.map { it.definition })
+        assertThat(first.map { Cards.proposalHideKey(it) })
+            .containsExactlyElementsIn(second.map { Cards.proposalHideKey(it) })
+
+        // Hiding the first entry's key removes exactly that entry (and only
+        // it) from a freshly computed proposal list.
+        val hidden = setOf(Cards.proposalHideKey(first[0]))
+        val visible = Cards.visibleProposals(masc, hidden)
+        assertThat(visible).hasSize(first.size - 1)
+        assertThat(visible.map { Cards.proposalHideKey(it) }).doesNotContain(Cards.proposalHideKey(first[0]))
+        assertThat(visible.map { Cards.proposalHideKey(it) })
+            .containsExactlyElementsIn(first.drop(1).map { Cards.proposalHideKey(it) })
+    }
+
+    @Test
+    fun hideKey_unsplitDefinitionsAndIdioms_areStableAcrossCalls() {
+        val word = parseDleOtro()
+        val all = Cards.proposals(word)
+
+        // Unsplit definitions keep their model objects across calls (a
+        // single-gloss definition keys on its gloss, anything else on itself),
+        // so keys match on every call; idioms are never copied.
+        val again = Cards.proposals(word)
+        assertThat(again.map { Cards.proposalHideKey(it) })
+            .containsExactlyElementsIn(all.map { Cards.proposalHideKey(it) })
+
+        val hidden = setOf(Cards.proposalHideKey(all[0]), Cards.proposalHideKey(all.last()))
+        val visible = Cards.visibleProposals(word, hidden)
+        assertThat(visible).hasSize(all.size - 2)
+        assertThat(visible.map { Cards.proposalHideKey(it) })
+            .containsExactlyElementsIn(all.drop(1).dropLast(1).map { Cards.proposalHideKey(it) })
+    }
+
     // ---- definition Back ----
 
     @Test

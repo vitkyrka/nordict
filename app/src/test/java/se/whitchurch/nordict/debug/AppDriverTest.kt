@@ -7,6 +7,7 @@ import androidx.compose.ui.test.junit4.v2.createEmptyComposeRule
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
@@ -24,6 +25,9 @@ import se.whitchurch.nordict.AgentOps
 import se.whitchurch.nordict.AgentResult
 import se.whitchurch.nordict.AnkiApi
 import se.whitchurch.nordict.CardActivity
+import se.whitchurch.nordict.CardProposal
+import se.whitchurch.nordict.Cards
+import se.whitchurch.nordict.CollinsParser
 import se.whitchurch.nordict.DleDictionary
 import se.whitchurch.nordict.EstDictionary
 import se.whitchurch.nordict.GdlcDictionary
@@ -448,7 +452,7 @@ class AppDriverTest {
     // Fake AnkiApi
     // ---------------------------------------------------------------------------
 
-    private class RecordingAnkiApi : AnkiApi {
+    private open class RecordingAnkiApi : AnkiApi {
         val createdDecks = mutableListOf<String>()
         val createdModels = mutableListOf<String>()
         var addedNotes = mutableListOf<Long>()
@@ -473,6 +477,10 @@ class AppDriverTest {
             addedFields.add(fields)
             return id
         }
+    }
+
+    private class FailingAnkiApi : RecordingAnkiApi() {
+        override fun addNote(modelId: Long, deckId: Long, fields: Array<String>, tags: Set<String>?): Long? = null
     }
 
     private fun seedAndOpenWord(
@@ -554,6 +562,63 @@ class AppDriverTest {
         val created = drive(AgentCommand(op = AgentOps.CREATE_CARD, index = 2))
         assertThat(created.ok).isTrue()
         assertThat(created.message).contains("note id 42")
+    }
+
+    @Test
+    fun createCardRemovesTheFirstEntryFromTheCardView() {
+        // Collins POS-group definitions split into one card per gloss, and
+        // every proposals() call mints fresh Definition copies — hiding by
+        // object identity left the created first entry visible.
+        val page = File("../testdata/colspan/frente.html").readText()
+        val masc = CollinsParser.parse(
+            page,
+            "https://www.collinsdictionary.com/dictionary/spanish-english/frente".toHttpUrl(),
+            "COLSPAN", "spanish-english"
+        ).single {
+            it.dictionary == "Collins Spanish-English" &&
+                it.definitions.singleOrNull()?.pos == "masculine noun"
+        }
+        CardActivity.debugAnkiApi = RecordingAnkiApi()
+        Ordboken.getInstance(app!!).currentWord = masc
+        launchCardActivity()
+        awaitCondition { (trackedActivity() as? CardActivity)?.isCardReady() == true }
+
+        val card = trackedActivity() as CardActivity
+        val before = card.visibleProposals().filterIsInstance<CardProposal.Definition>()
+        assertThat(before).hasSize(6)
+        val firstText = Cards.definitionText(before[0].definition)
+
+        val created = drive(AgentCommand(op = AgentOps.CREATE_CARD))
+        assertThat(created.ok).isTrue()
+        assertThat(created.message).contains("note id 42")
+        assertThat(created.message).contains("5 cards left")
+
+        val after = card.visibleProposals().filterIsInstance<CardProposal.Definition>()
+        assertThat(after).hasSize(5)
+        assertThat(after.map { Cards.definitionText(it.definition) }).doesNotContain(firstText)
+
+        // Creating the (new) first entry removes that one too.
+        val second = drive(AgentCommand(op = AgentOps.CREATE_CARD))
+        assertThat(second.ok).isTrue()
+        assertThat(second.message).contains("4 cards left")
+        assertThat(card.visibleProposals()).hasSize(4)
+    }
+
+    @Test
+    fun failedCardCreationKeepsTheEntryInTheCardView() {
+        CardActivity.debugAnkiApi = FailingAnkiApi()
+        seedAndOpenWord()
+        launchCardActivity()
+        awaitCondition { (trackedActivity() as? CardActivity)?.isCardReady() == true }
+
+        val card = trackedActivity() as CardActivity
+        val total = card.visibleProposals().size
+        assertThat(total).isGreaterThan(0)
+
+        val failed = drive(AgentCommand(op = AgentOps.CREATE_CARD))
+        assertThat(failed.ok).isFalse()
+
+        assertThat(card.visibleProposals()).hasSize(total)
     }
 
     @Test

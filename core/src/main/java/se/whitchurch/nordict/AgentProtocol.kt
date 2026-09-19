@@ -61,8 +61,9 @@ data class AgentCommand(
     // wins over `tag`; a comma-separated `tag` ("DLE,EST") also works.
     val tags: List<String>? = null,
     // The card proposal to create/preview with `createCard`/`previewCard`
-    // (a zero-based index into `Cards.proposals`: definitions first, then
-    // idioms, in page order).
+    // (a zero-based index into the card screen's remaining proposals:
+    // definitions first, then idioms, in page order — `createCard` hides each
+    // created entry, so later indices address what is still visible).
     val index: Int? = null
 ) {
     /** Returns the named argument or throws a clear protocol error. */
