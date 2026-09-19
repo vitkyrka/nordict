@@ -149,6 +149,12 @@ class LeRobertParser {
             num: Numbering = Numbering()
         ) {
             var domain = inheritDomain
+            // Counters mirror the site's CSS: each `d_dvr` sibling advances
+            // the roman counter and resets arabic; each `d_dvn` sibling
+            // advances arabic. They must accumulate across siblings, so they
+            // live in locals — not in the passed-in `num`.
+            var roman = num.roman
+            var arabic = num.arabic
 
             for (child in element.children()) {
                 when {
@@ -156,9 +162,11 @@ class LeRobertParser {
                         val topic = child.selectFirst("span.d_dtr")?.text()
                             ?.removeSurrounding("(", ")")?.trim() ?: ""
                         if (topic.isNotEmpty()) domain = topic
+                        roman += 1
+                        arabic = 0
                         collectSenses(
                             child, cat, defs, idioms, domain,
-                            num.copy(roman = num.roman + 1, arabic = 0)
+                            num.copy(roman = roman, arabic = 0)
                         )
                     }
 
@@ -167,8 +175,11 @@ class LeRobertParser {
                         // they hold d_dfn, d_xpl, d_mta, d_dvt, and even deeper
                         // d_dvl nesting — recurse like d_dvr. Each d_dvn
                         // advances the arabic counter; d_dvl is unnumbered.
-                        val next = if (child.hasClass("d_dvl")) num
-                        else num.copy(arabic = num.arabic + 1)
+                        val next = if (child.hasClass("d_dvl")) num.copy(roman = roman, arabic = arabic)
+                        else {
+                            arabic += 1
+                            num.copy(roman = roman, arabic = arabic)
+                        }
                         collectSenses(child, cat, defs, idioms, domain, next)
                     }
 

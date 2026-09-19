@@ -44,6 +44,15 @@ class LeRobertParserTest {
         // Domain marker "(Surface plane)" should appear on one definition.
         assertThat(word.definitions.any { it.domain == "Surface plane" }).isTrue()
 
+        // Sense numbering mirrors the site's CSS counters: the group lead
+        // takes the roman numeral, nested senses take "ROMAN.arabic"
+        // (restarting per group), lozenge senses take "⬥".
+        val numbers = word.definitions.map { it.senseNumber }
+        assertThat(numbers.first()).isEqualTo("I")
+        assertThat(numbers).containsAtLeast("I.1", "I.2", "II.1", "⬥")
+        // Arabic counters restart per roman group: I.1 appears once per group.
+        assertThat(numbers.filter { it == "I.1" }).hasSize(1)
+
         // Idioms: "locution"-marked expressions.
         assertThat(word.idioms).isNotEmpty()
         val tableRonde = word.idioms.find { it.idiom.contains("Se mettre à table") }
