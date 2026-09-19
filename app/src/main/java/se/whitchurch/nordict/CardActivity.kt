@@ -187,7 +187,12 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(10.dp)
             ) {
-                items(proposalCards) { proposal ->
+                // Key by the stable proposal identity (see Cards.proposalHideKey),
+                // not by position: without a key the per-card `remember` state
+                // (the Merge checkbox, extra examples, audio index) is reused by
+                // position, so after created entries are removed the entry
+                // sliding into their slot inherits their Merge selection.
+                items(proposalCards, key = { Cards.proposalHideKey(it) }) { proposal ->
                     when (proposal) {
                         is CardProposal.Definition -> DefinitionCard(
                             word = word,
