@@ -274,10 +274,17 @@ fun NordictApp(
 
     Box(modifier = Modifier.fillMaxSize()) {
     Column(modifier = Modifier.fillMaxSize()) {
-        // Global search header.
+        // Global search header. M3 Search specs: 56dp container (the
+        // SearchBar default height — do not override), 16dp horizontal
+        // screen margins, an 8dp top gap on top of the status-bar inset so
+        // the bar never touches the screen edge.
         SearchBar(
             state = searchBarState,
-            inputField = inputField
+            inputField = inputField,
+            modifier = Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
         Box(modifier = Modifier.weight(1f)) {
@@ -357,12 +364,20 @@ fun NordictApp(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .statusBarsPadding()
                     .imePadding()
             ) {
                 // Single focusable copy of the field lives in the sheet while
                 // it is open, so the caret/selection is visible in the window
                 // that owns it (the collapsed bar's copy is behind the sheet).
-                Box(modifier = Modifier.focusRequester(sheetFieldFocus)) {
+                // Same M3 margins as the collapsed header (16dp horizontal,
+                // 8dp vertical) so the field doesn't jump or touch the edge.
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .focusRequester(sheetFieldFocus)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
                     inputField()
                 }
                 // The dictionary nav (language switcher + dict chips) lives on
