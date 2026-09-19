@@ -50,8 +50,7 @@ class DictionaryNavUiTest {
     @Before
     fun setUp() {
         app = ApplicationProvider.getApplicationContext<android.app.Application>()
-        app.getSharedPreferences("ordboken", android.content.Context.MODE_PRIVATE)
-            .edit().clear().commit()
+        NordictPrefs.clearBlocking(app)
         Ordboken.reset()
         ordboken = Ordboken.getInstance(
             app, client, arrayOf(dle(), est(), GdlcDictionary(client), SoDictionary(client))
@@ -83,8 +82,7 @@ class DictionaryNavUiTest {
         composeRule.onNode(hasClickAction() and (hasText(tag) or hasAnyDescendant(hasText(tag))))
 
     private fun prefsDicts(lang: String): String =
-        app.getSharedPreferences("ordboken", android.content.Context.MODE_PRIVATE)
-            .getString("dicts_$lang", "")!!
+        NordictPrefs.snapshotBlocking(app)[NordictPrefs.dictsKey(lang)] ?: ""
 
     @Test
     fun combiningLanguageRendersChipsForAllCombiningDicts() {
@@ -251,8 +249,7 @@ class DictionaryNavUiTest {
         // reseeding a single-language Ordboken: it must have no swap target,
         // leaving just the language-menu button.
         Ordboken.reset()
-        app.getSharedPreferences("ordboken", android.content.Context.MODE_PRIVATE)
-            .edit().clear().commit()
+        NordictPrefs.clearBlocking(app)
         ordboken = Ordboken.getInstance(app, client, arrayOf(dle(), est()))
         setTopBar()
         composeRule.onNodeWithContentDescription("Byt till ca").assertDoesNotExist()

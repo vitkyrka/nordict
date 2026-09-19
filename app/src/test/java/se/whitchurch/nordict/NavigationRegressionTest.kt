@@ -1,7 +1,6 @@
 package se.whitchurch.nordict
 
 import android.app.Application
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Handler
@@ -100,7 +99,7 @@ class NavigationRegressionTest {
 
     private fun setUpFixtures() {
         app = ApplicationProvider.getApplicationContext<Application>()
-        app!!.getSharedPreferences("ordboken", Context.MODE_PRIVATE).edit().clear().commit()
+        NordictPrefs.clearBlocking(app!!)
         // History tables persist across tests in Robolectric's native
         // SQLite; a fresh file avoids double-CREATE crashes on the first open.
         app!!.deleteDatabase("Ordboken.db")
@@ -932,14 +931,14 @@ class NavigationRegressionTest {
         // Backgrounding the app must persist the zoom…
         composeRule.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
         awaitCondition(message = "zoom persisted on pause") {
-            ordboken().mPrefs.getInt("scale", 0) == 150
+            ordboken().scale == 150
         }
 
         // …and closing the app (destroying the task) must not clobber it: the
         // disposed WordScreen must not re-save a default scale from a WebView
         // that has already been destroyed.
         composeRule.activityRule.scenario.moveToState(Lifecycle.State.DESTROYED)
-        assertThat(ordboken().mPrefs.getInt("scale", 0)).isEqualTo(150)
+        assertThat(ordboken().scale).isEqualTo(150)
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -995,7 +994,7 @@ class NavigationRegressionTest {
         // WordActivity finished on back and saved in its onPause).
         onMain { composeRule.activity.navController?.popBackStack() }
         awaitCondition(message = "zoom persisted on back") {
-            ordboken().mPrefs.getInt("scale", 0) == 160
+            ordboken().scale == 160
         }
         assertThat(composeRule.activity.navController?.currentDestination?.route)
             .startsWith("search")
@@ -1012,16 +1011,16 @@ class NavigationRegressionTest {
 
         // "Reset zoom" clears the saved scale immediately…
         onMain { vm.resetZoom() }
-        assertThat(ordboken().mPrefs.getInt("scale", -1)).isEqualTo(0)
+        assertThat(ordboken().scale).isEqualTo(0)
 
         // …and the next pause must not re-save the still-zoomed page's value,
         // or the next open would apply the zoom the user just reset.
         composeRule.activityRule.scenario.moveToState(Lifecycle.State.STARTED)
         awaitCondition(message = "reset zoom survives pause") {
-            ordboken().mPrefs.getInt("scale", -1) == 0
+            ordboken().scale == 0
         }
         composeRule.activityRule.scenario.moveToState(Lifecycle.State.DESTROYED)
-        assertThat(ordboken().mPrefs.getInt("scale", -1)).isEqualTo(0)
+        assertThat(ordboken().scale).isEqualTo(0)
     }
 
     // ---------- Scroll-position persistence (a covered word destination is

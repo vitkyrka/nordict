@@ -1,6 +1,6 @@
 package se.whitchurch.nordict
 
-import android.content.Context
+import androidx.datastore.preferences.core.edit
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import okhttp3.OkHttpClient
@@ -43,7 +43,7 @@ class OrdbokenSelectionTest {
     @Before
     fun setUp() {
         app = ApplicationProvider.getApplicationContext<android.app.Application>()
-        app.getSharedPreferences("ordboken", Context.MODE_PRIVATE).edit().clear().commit()
+        NordictPrefs.clearBlocking(app)
         Ordboken.reset()
     }
 
@@ -53,8 +53,7 @@ class OrdbokenSelectionTest {
     }
 
     private fun prefsKey(lang: String): String =
-        app.getSharedPreferences("ordboken", Context.MODE_PRIVATE)
-            .getString("dicts_$lang", "")!!
+        NordictPrefs.snapshotBlocking(app)[NordictPrefs.dictsKey(lang)] ?: ""
 
     @Test
     fun toggleAppendsAndPersistsMultiSelection() {
@@ -158,27 +157,32 @@ class OrdbokenSelectionTest {
     fun restoreDropsInvalidOrForeignTags() {
         // Seeded prefs with a foreign-language tag in the es selection: SO is
         // Swedish, so the pair cannot combine and falls back to single-dict.
-        app.getSharedPreferences("ordboken", Context.MODE_PRIVATE)
-            .edit().putString("dicts_es", "DLE,SO").commit()
+        runBlockingSeedDicts("es", "DLE,SO")
         val invalid = ordboken()
         assertThat(invalid.activeDicts).isEmpty()
         assertThat(invalid.currentDictionary.tag).isEqualTo("DLE")
 
         // Unknown tags are dropped too.
         Ordboken.reset()
-        app.getSharedPreferences("ordboken", Context.MODE_PRIVATE)
-            .edit().putString("dicts_es", "DLE,NOPE").commit()
+        runBlockingSeedDicts("es", "DLE,NOPE")
         val unknown = ordboken()
         assertThat(unknown.activeDicts).isEmpty()
         assertThat(unknown.currentDictionary.tag).isEqualTo("DLE")
 
         // A cross-language mix keeps only the current language's members.
         Ordboken.reset()
-        app.getSharedPreferences("ordboken", Context.MODE_PRIVATE)
-            .edit().putString("dicts_es", "DLE,GDLC").commit()
+        runBlockingSeedDicts("es", "DLE,GDLC")
         val mixed = ordboken()
         assertThat(mixed.activeDicts).isEmpty()
         assertThat(mixed.currentDictionary.tag).isEqualTo("DLE")
+    }
+
+    private fun runBlockingSeedDicts(lang: String, value: String) {
+        kotlinx.coroutines.runBlocking {
+            app.nordictDataStore.edit {
+                it[NordictPrefs.dictsKey(lang)] = value
+            }
+        }
     }
 
     @Test
@@ -210,7 +214,7 @@ class OrdbokenSelectionTest {
         assertThat(ord.toggleDictionary("SDO")).isTrue()
         assertThat(ord.activeDicts.map { it.tag }).containsExactly("SO", "SDO").inOrder()
         assertThat(prefsKey("se")).isEqualTo("SO,SDO")
-        ord.prefsEditor.commit() // the real app persists the state on pause
+        ord.persistBlocking() // the real app persists the state on pause
 
         // Restarts restore the Swedish combination.
         val restored = restart()
@@ -277,7 +281,7 @@ class OrdbokenSelectionTest {
     fun lastLangSurvivesRestart() {
         val ord = ordboken()
         ord.swapLang() // es -> ca; lastLang becomes es
-        ord.prefsEditor.commit() // the real app persists the state on pause
+        ord.persistBlocking() // the real app persists the state on pause
 
         val restored = restart()
         assertThat(restored.currentDictionary.lang).isEqualTo("ca")

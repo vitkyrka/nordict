@@ -52,10 +52,10 @@ class MainActivity : AppCompatActivity() {
         mOrdboken = ordboken
 
         // Initial route from the persisted last view. A fresh install has no
-        // "lastWhere" and lands on the search screen (empty query = history).
+        // persisted state and lands on the search screen (empty query = history).
         var initialRoute: String? = null
         var initialQuery = ""
-        if (ordboken.mPrefs.contains("lastWhere")) {
+        if (ordboken.hasPersistedState) {
             when (ordboken.lastWhere) {
                 Where.WORD -> ordboken.lastWhat?.let {
                     initialRoute = wordRoute(
@@ -142,12 +142,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        mOrdboken?.onResume(this)
+        mOrdboken?.onResume()
         mOrdboken?.onDictChanged = null
     }
 
     override fun onPause() {
         super.onPause()
-        mOrdboken?.prefsEditor?.commit()
+        mOrdboken?.persistBlocking()
     }
 }

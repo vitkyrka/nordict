@@ -189,7 +189,7 @@ class WordViewModel(
     }
 
     init {
-        autoPlay = ordboken.mPrefs.getBoolean("autoPlay", false)
+        autoPlay = ordboken.autoPlay
         fetchWord()
     }
 
@@ -242,18 +242,14 @@ class WordViewModel(
     // zoom level, which is what is persisted here.
     @Suppress("DEPRECATION")
     fun onLeave() {
-        val ed = ordboken.prefsEditor
-
         // If the WebView was never made visible, getScale() returns the default
         // scale instead of the initialScale.
         if (mResetZoomNextPause) {
             mResetZoomNextPause = false
         } else if (webViewVisible) {
             val scale = ((webView?.scale ?: 1f) * 100).toInt()
-            ed.putInt("scale", scale)
+            ordboken.setScale(scale)
         }
-
-        ed.commit()
     }
 
     /** Records the word's current scroll offset so a back-navigation can put
@@ -336,7 +332,7 @@ class WordViewModel(
                 else -> WebSettingsCompat.setForceDark(webView.settings, FORCE_DARK_OFF)
             }
         }
-        webView.setInitialScale(ordboken.mPrefs.getInt("scale", 0))
+        webView.setInitialScale(ordboken.scale)
 
         webView.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
@@ -608,7 +604,7 @@ class WordViewModel(
 
     fun resetZoom() {
         mResetZoomNextPause = true
-        ordboken.mPrefs.edit().putInt("scale", 0).apply()
+        ordboken.setScale(0)
     }
 
     fun share() {
@@ -803,8 +799,7 @@ fun WordScreen(
                 },
                 onToggleAutoPlay = {
                     vm.autoPlay = !vm.autoPlay
-                    ordboken.mPrefs.edit()
-                        .putBoolean("autoPlay", vm.autoPlay).apply()
+                    ordboken.setAutoPlay(vm.autoPlay)
                 },
                 onResetZoom = { vm.resetZoom() },
                 onAddCard = { vm.share() }

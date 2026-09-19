@@ -54,8 +54,7 @@ class SearchScreenUiTest {
     @Before
     fun setUp() {
         app = ApplicationProvider.getApplicationContext()
-        app.getSharedPreferences("ordboken", Context.MODE_PRIVATE)
-            .edit().clear().commit()
+        NordictPrefs.clearBlocking(app)
         Ordboken.reset()
 
         // [Ordboken.isOnline] reads the modern NetworkCapabilities API, which

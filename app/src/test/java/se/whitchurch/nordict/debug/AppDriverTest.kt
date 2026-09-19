@@ -1,6 +1,5 @@
 package se.whitchurch.nordict.debug
 
-import android.content.Context
 import android.net.Uri
 import android.os.Looper
 import androidx.compose.runtime.snapshots.Snapshot
@@ -80,7 +79,7 @@ class AppDriverTest {
         }
 
         app = ApplicationProvider.getApplicationContext<android.app.Application>()
-        app!!.getSharedPreferences("ordboken", Context.MODE_PRIVATE).edit().clear().commit()
+        se.whitchurch.nordict.NordictPrefs.clearBlocking(app!!)
         Ordboken.reset()
 
         server = MockWebServer()

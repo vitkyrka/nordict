@@ -205,7 +205,7 @@ fun NordictApp(
                     }
                     else -> ordboken.setLastView(Ordboken.Where.MAIN, "")
                 }
-                ordboken.prefsEditor.commit()
+                ordboken.persistBlocking()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)

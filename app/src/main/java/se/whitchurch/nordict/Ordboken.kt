@@ -1,17 +1,17 @@
 package se.whitchurch.nordict
 
-import android.annotation.SuppressLint
 import android.content.Context
-import android.content.SharedPreferences
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.util.LruCache
 import android.util.Pair
-import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.datastore.preferences.core.edit
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import okhttp3.Cache
 import okhttp3.CacheControl
 import okhttp3.HttpUrl
@@ -24,7 +24,17 @@ class Ordboken private constructor(
     testDictionaries: Array<Dictionary>? = null
 ) {
     private val mConnMgr: ConnectivityManager
-    val mPrefs: SharedPreferences
+    private val appContext: Context = context.applicationContext
+    private val dataStore get() = appContext.nordictDataStore
+    /** True once a last-view snapshot has been persisted (fresh-install check). */
+    var hasPersistedState: Boolean = false
+        private set
+    /** Persisted pronunciation-autoplay flag (was a SharedPreferences key). */
+    var autoPlay: Boolean = false
+        private set
+    /** Persisted WebView zoom scale in percent (was a SharedPreferences key). */
+    var scale: Int = 0
+        private set
     var images = ArrayList<String>()
     var currentWord: Word? = null
     var lastWhere: Where? = null
@@ -98,32 +108,45 @@ class Ordboken private constructor(
     fun combiningDictsForLang(lang: String): List<Dictionary> =
         dictionaries.filter { it.lang == lang }
 
-    // Caller does the commit
-    val prefsEditor: SharedPreferences.Editor
-        @SuppressLint("CommitPrefEdits")
-        get() {
-            val ed = mPrefs.edit()
-
-            ed.putString("lastWhere", lastWhere!!.toString())
-            ed.putString("lastWhat", lastWhat)
-            ed.putString("lastSources", lastSources ?: "")
-            ed.putString("lastRef", lastRef ?: "")
-            ed.putInt("currentIndex", currentIndex)
-            ed.putString("lastLang", lastLang)
-
-            return ed
+    /** Writes the in-memory last-view + selection snapshot to DataStore. */
+    suspend fun persistState() {
+        dataStore.edit { prefs ->
+            lastWhere?.let { prefs[NordictPrefs.LAST_WHERE] = it.toString() }
+            prefs[NordictPrefs.LAST_WHAT] = lastWhat ?: ""
+            prefs[NordictPrefs.LAST_SOURCES] = lastSources ?: ""
+            prefs[NordictPrefs.LAST_REF] = lastRef ?: ""
+            prefs[NordictPrefs.CURRENT_INDEX] = currentIndex
+            lastLang?.let { prefs[NordictPrefs.LAST_LANG] = it }
         }
+        hasPersistedState = true
+    }
+
+    /** Blocking [persistState] for onPause paths and tests. */
+    fun persistBlocking() = runBlocking { persistState() }
+
+    fun setAutoPlay(value: Boolean) {
+        autoPlay = value
+        runBlocking { dataStore.edit { it[NordictPrefs.AUTO_PLAY] = value } }
+    }
+
+    fun setScale(value: Int) {
+        scale = value
+        runBlocking { dataStore.edit { it[NordictPrefs.SCALE] = value } }
+    }
 
     enum class Where {
         MAIN, WORD
     }
 
     init {
-        mPrefs = context.getSharedPreferences("ordboken", Context.MODE_PRIVATE)
-        lastWhere = Where.valueOf(mPrefs.getString("lastWhere", Where.MAIN.toString())!!)
-        lastWhat = mPrefs.getString("lastWhat", "ordbok")
-        lastSources = mPrefs.getString("lastSources", "")?.takeIf { it.isNotBlank() }
-        lastRef = mPrefs.getString("lastRef", "")?.takeIf { it.isNotBlank() }
+        val snapshot = runBlocking { dataStore.data.first() }
+        hasPersistedState = snapshot.contains(NordictPrefs.LAST_WHERE)
+        lastWhere = snapshot[NordictPrefs.LAST_WHERE]?.let { Where.valueOf(it) } ?: Where.MAIN
+        lastWhat = snapshot[NordictPrefs.LAST_WHAT] ?: "ordbok"
+        lastSources = snapshot[NordictPrefs.LAST_SOURCES]?.takeIf { it.isNotBlank() }
+        lastRef = snapshot[NordictPrefs.LAST_REF]?.takeIf { it.isNotBlank() }
+        autoPlay = snapshot[NordictPrefs.AUTO_PLAY] ?: false
+        scale = snapshot[NordictPrefs.SCALE] ?: 0
         mConnMgr = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
         dictionaries = testDictionaries ?: defaultDictionaries()
@@ -141,19 +164,20 @@ class Ordboken private constructor(
         languages = languageList.toTypedArray()
         languageFlags = languageFlagMap
 
-        currentIndex = mPrefs.getInt("currentIndex", 0)
+        currentIndex = snapshot[NordictPrefs.CURRENT_INDEX] ?: 0
+        if (currentIndex !in dictionaries.indices) currentIndex = 0
         currentDictionary = dictionaries[currentIndex]
         currentFlag = flags[currentIndex]
 
         // A fresh install has no last language yet: seed it to the first
         // registered language other than the current one (usually dk against
         // the default se start) so the swap button is usable right away.
-        lastLang = mPrefs.getString("lastLang", null)
+        lastLang = snapshot[NordictPrefs.LAST_LANG]
         if (lastLang == null) {
             val seed = languages.firstOrNull { it != currentDictionary.lang }
             if (seed != null) {
                 lastLang = seed
-                mPrefs.edit().putString("lastLang", seed).apply()
+                runBlocking { dataStore.edit { it[NordictPrefs.LAST_LANG] = seed } }
             }
         }
 
@@ -224,11 +248,12 @@ class Ordboken private constructor(
         return MultiDict.fetch(lookups, sources, ref = ref)
     }
 
-    fun onResume(activity: AppCompatActivity) {
+    fun onResume() {
         // Restore any dictionary selection persisted while this screen was
         // paused; the Compose nav rows read the live Ordboken state, so no
         // view mutation is needed here.
-        currentIndex = mPrefs.getInt("currentIndex", 0)
+        val snapshot = runBlocking { dataStore.data.first() }
+        currentIndex = snapshot[NordictPrefs.CURRENT_INDEX] ?: currentIndex
         if (currentIndex !in dictionaries.indices) {
             currentIndex = 0
         }
@@ -291,7 +316,7 @@ class Ordboken private constructor(
         // button can bounce back to it (a no-op switch keeps lastLang).
         if (previous != lang) {
             lastLang = previous
-            mPrefs.edit().putString("lastLang", previous).apply()
+            runBlocking { dataStore.edit { it[NordictPrefs.LAST_LANG] = previous } }
         }
         onDictChanged?.invoke()
         return true
@@ -402,15 +427,16 @@ class Ordboken private constructor(
     private fun dictByTag(tag: String): Dictionary? =
         dictionaries.firstOrNull { it.tag.equals(tag, ignoreCase = true) }
 
-    private fun storedDictIndex(lang: String): Int = mPrefs.getInt("dictIndex_$lang", -1)
+    private fun storedDictIndex(lang: String): Int =
+        runBlocking { dataStore.data.first()[NordictPrefs.dictIndexKey(lang)] } ?: -1
 
     private fun saveDictIndex(lang: String, index: Int) {
-        mPrefs.edit().putInt("dictIndex_$lang", index).apply()
+        runBlocking { dataStore.edit { it[NordictPrefs.dictIndexKey(lang)] = index } }
     }
 
     /** Reads [lang]'s persisted enabled+ordered combining tags. */
     private fun loadDicts(lang: String): List<String> {
-        val raw = mPrefs.getString("dicts_$lang", "") ?: ""
+        val raw = runBlocking { dataStore.data.first()[NordictPrefs.dictsKey(lang)] } ?: ""
         if (raw.isBlank()) return emptyList()
         return raw.split(",").map { it.trim() }.filter { tag ->
             val dict = dictByTag(tag)
@@ -419,7 +445,7 @@ class Ordboken private constructor(
     }
 
     private fun saveDicts(lang: String, tags: List<String>) {
-        mPrefs.edit().putString("dicts_$lang", tags.joinToString(",")).apply()
+        runBlocking { dataStore.edit { it[NordictPrefs.dictsKey(lang)] = tags.joinToString(",") } }
     }
 
     fun setLastView(where: Where, what: String, sources: String? = null, ref: String? = null) {
