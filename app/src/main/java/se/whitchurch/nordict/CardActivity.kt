@@ -15,6 +15,7 @@ import android.webkit.WebView
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -189,7 +190,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
             ) {
                 // Key by the stable proposal identity (see Cards.proposalHideKey),
                 // not by position: without a key the per-card `remember` state
-                // (the Merge checkbox, extra examples, audio index) is reused by
+                // (the Merge switch, extra examples, audio index) is reused by
                 // position, so after created entries are removed the entry
                 // sliding into their slot inherits their Merge selection.
                 items(proposalCards, key = { Cards.proposalHideKey(it) }) { proposal ->
@@ -322,20 +323,24 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                     modifier = Modifier.padding(top = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Checkbox(
-                        checked = merged.value,
-                        onCheckedChange = { checked ->
-                            merged.value = checked
-                            if (checked) {
-                                if (!selectedDefinitions.contains(definition)) {
-                                    selectedDefinitions.add(definition)
-                                }
-                            } else {
-                                selectedDefinitions.remove(definition)
+                    val toggleMerge: (Boolean) -> Unit = { checked ->
+                        merged.value = checked
+                        if (checked) {
+                            if (!selectedDefinitions.contains(definition)) {
+                                selectedDefinitions.add(definition)
                             }
+                        } else {
+                            selectedDefinitions.remove(definition)
                         }
+                    }
+                    Switch(
+                        checked = merged.value,
+                        onCheckedChange = toggleMerge
                     )
-                    Text("Merge")
+                    Text(
+                        "Merge",
+                        modifier = Modifier.clickable { toggleMerge(!merged.value) }
+                    )
 
                     if (audio.size > 1) {
                         AudioIndexPicker(
