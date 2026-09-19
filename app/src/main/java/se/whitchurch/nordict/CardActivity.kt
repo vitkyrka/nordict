@@ -322,30 +322,22 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                     }
                 }
 
-                Row(
-                    modifier = Modifier.padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    val toggleMerge: (Boolean) -> Unit = { checked ->
-                        merged.value = checked
-                        if (checked) {
-                            if (!selectedDefinitions.contains(definition)) {
-                                selectedDefinitions.add(definition)
-                            }
-                        } else {
-                            selectedDefinitions.remove(definition)
+                val toggleMerge: (Boolean) -> Unit = { checked ->
+                    merged.value = checked
+                    if (checked) {
+                        if (!selectedDefinitions.contains(definition)) {
+                            selectedDefinitions.add(definition)
                         }
+                    } else {
+                        selectedDefinitions.remove(definition)
                     }
-                    Switch(
-                        checked = merged.value,
-                        onCheckedChange = toggleMerge
-                    )
-                    Text(
-                        "Merge",
-                        modifier = Modifier.clickable { toggleMerge(!merged.value) }
-                    )
+                }
 
-                    if (audio.size > 1) {
+                if (audio.size > 1) {
+                    Row(
+                        modifier = Modifier.padding(top = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         AudioIndexPicker(
                             audio = audio,
                             audioIdx = audioIdx
@@ -407,6 +399,21 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
                 ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Switch(
+                            checked = merged.value,
+                            onCheckedChange = toggleMerge
+                        )
+                        Text(
+                            "Merge",
+                            modifier = Modifier
+                                .padding(start = 8.dp)
+                                .clickable { toggleMerge(!merged.value) }
+                        )
+                    }
                     OutlinedButton(onClick = {
                         val effectiveDefs =
                             if (selectedDefinitions.isEmpty()) listOf(definition)
