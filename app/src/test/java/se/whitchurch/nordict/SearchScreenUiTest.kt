@@ -136,18 +136,15 @@ class SearchScreenUiTest {
 
     @Test
     fun emptyQueryShowsHistoryInsteadOfNoResults() {
-        val dbHelper = se.whitchurch.nordict.OrdbokenDbHelper(app)
-        dbHelper.writableDatabase.use { db ->
-            db.delete("history", null, null)
-            val values = android.content.ContentValues().apply {
-                put("title", "histword")
-                put("dict", "SO")
-                put("url", "https://example.com/histword")
-                put("summary", "a past lookup")
-                put("sources", "")
-                put("date", System.currentTimeMillis())
-            }
-            db.insert("history", null, values)
+        kotlinx.coroutines.runBlocking {
+            saveHistoryEntry(
+                app,
+                dict = "SO",
+                title = "histword",
+                summary = "a past lookup",
+                url = "https://example.com/histword",
+                sources = ""
+            )
         }
 
         setSearch("")

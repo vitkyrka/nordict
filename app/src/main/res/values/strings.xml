@@ -23,8 +23,6 @@
     <string name="menu_more">Fler alternativ</string>
     <string name="swap_to">Byt till %1$s</string>
     <string name="change_language">Byt språk</string>
-    <string name="delete">Ta bort</string>
-    <string name="delete_all">Ta bort alla</string>
     <string name="title_activity_card">CardActivity</string>
     <string name="action_settings">Settings</string>
 

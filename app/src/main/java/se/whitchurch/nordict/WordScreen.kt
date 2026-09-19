@@ -1,7 +1,6 @@
 package se.whitchurch.nordict
 
 import android.annotation.SuppressLint
-import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
@@ -55,10 +54,8 @@ import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
 import java.io.StringReader
 import java.net.URLDecoder
-import java.util.Date
 import kotlin.math.roundToInt
 
 
@@ -72,7 +69,7 @@ sealed interface WordUiStatus {
  * Loads and renders one word destination. The ViewModel is scoped to the word
  * NavBackStackEntry, so each pushed word keeps its own state exactly like the
  * old stacked WordActivities. Owns the WebView lifecycle, the audio player and
- * the SQLite history writes; navigation side effects flow out through the
+ * the DataStore history writes; navigation side effects flow out through the
  * [onOpenUri]/[onOpenExternal]/[onFillSearch] callbacks wired by [WordScreen].
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -560,30 +557,18 @@ class WordViewModel(
         val word = mWord ?: return
         // A combined page's own uri/dict is only its first source's: persist
         // the full sources probe list so history reopens the merged page,
-        // not the single dictionary. Single words keep an empty sources cell
-        // (old rows/openers behave as before).
+        // not the single dictionary. Single words keep an empty sources cell.
         val sourcesJson = MultiDict.sourcesToJson(sources)
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                val dbHelper = OrdbokenDbHelper(getApplication())
-                val db = dbHelper.writableDatabase
-                val values = ContentValues()
-                values.put(HistoryEntry.COLUMN_NAME_TITLE, word.mTitle)
-                values.put(HistoryEntry.COLUMN_NAME_DICT, word.dict)
-                values.put(HistoryEntry.COLUMN_NAME_SUMMARY, word.summary)
-                values.put(HistoryEntry.COLUMN_NAME_URL, word.uri.toString())
-                values.put(HistoryEntry.COLUMN_NAME_SOURCES, sourcesJson)
-                values.put(HistoryEntry.COLUMN_NAME_DATE, Date().time)
-                try {
-                    db.insert(HistoryEntry.TABLE_NAME, "null", values)
-                } catch (e: Exception) {
-                    // A pre-migration database without the sources column:
-                    // retry without it rather than dropping the history write.
-                    values.remove(HistoryEntry.COLUMN_NAME_SOURCES)
-                    db.insert(HistoryEntry.TABLE_NAME, "null", values)
-                } finally {
-                    db.close()
-                }
+                saveHistoryEntry(
+                    getApplication(),
+                    dict = word.dict,
+                    title = word.mTitle,
+                    summary = word.summary,
+                    url = word.uri.toString(),
+                    sources = sourcesJson
+                )
             }
         }
     }

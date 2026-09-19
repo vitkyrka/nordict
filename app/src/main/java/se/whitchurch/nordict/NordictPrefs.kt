@@ -23,6 +23,8 @@ object NordictPrefs {
     val LAST_LANG = stringPreferencesKey("lastLang")
     val AUTO_PLAY = booleanPreferencesKey("autoPlay")
     val SCALE = intPreferencesKey("scale")
+    /** JSON array of recent lookups (newest first, capped at [HISTORY_MAX]). */
+    val HISTORY = stringPreferencesKey("history")
 
     fun dictIndexKey(lang: String) = intPreferencesKey("dictIndex_$lang")
     fun dictsKey(lang: String) = stringPreferencesKey("dicts_$lang")

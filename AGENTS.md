@@ -96,7 +96,7 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
   `WordViewModel.captureScroll`/`restoreWebViewScroll` snapshot the WebView's
   scroll offset across configuration changes and the collapse state.
   Owns the WebView, an `ExoPlayer`, and the
-  oracle history SQLite writes; navigation side effects flow out through
+  oracle history DataStore writes; navigation side effects flow out through
   `onOpenUri`/`onOpenExternal`/`onFillSearch` callbacks.
 - **`<Name>Parser.kt`** — companion-object parsers that take a raw HTML page,
   `okhttp3.HttpUrl`, and dict `tag`, and return `List<Word>`. They use Jsoup.

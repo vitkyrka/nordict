@@ -1,15 +1,11 @@
 package se.whitchurch.nordict
 
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,15 +15,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
+import androidx.datastore.preferences.core.edit
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import org.json.JSONArray
+import org.json.JSONObject
+
+/** Maximum number of recent lookups kept in history. */
+const val HISTORY_MAX = 10
 
 /**
- * History list components backed by the SQLite table. There is no longer a
- * separate home/history destination: the search screen shows this list when
- * its query is empty, and the expanded search sheet shows it in the
- * suggestions area when the search box is empty.
+ * History list components backed by Jetpack DataStore (a newest-first JSON
+ * array under [NordictPrefs.HISTORY], capped at [HISTORY_MAX]). There is no
+ * longer a separate home/history destination: the search screen shows this
+ * list when its query is empty, and the expanded search sheet shows it in
+ * the suggestions area when the search box is empty. Entries cannot be
+ * deleted or cleared.
  */
 @Composable
 fun HistoryList(
@@ -35,19 +38,28 @@ fun HistoryList(
     ordboken: Ordboken,
     onOpenWord: (title: String, url: String, sources: String) -> Unit
 ) {
-    CommonListScreen(
-        context = context,
-        ordboken = ordboken,
-        table = HistoryEntry.TABLE_NAME,
-        titleCol = HistoryEntry.COLUMN_NAME_TITLE,
-        summaryCol = HistoryEntry.COLUMN_NAME_SUMMARY,
-        dictCol = HistoryEntry.COLUMN_NAME_DICT,
-        urlCol = HistoryEntry.COLUMN_NAME_URL,
-        sourcesCol = HistoryEntry.COLUMN_NAME_SOURCES,
-        sortOrder = HistoryEntry.COLUMN_NAME_DATE + " DESC",
-        limit = 100,
-        onOpenWord = onOpenWord
-    )
+    val rows by produceState(initialValue = emptyList<WordRow>()) {
+        value = loadHistoryRows(context)
+    }
+
+    if (rows.isEmpty()) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(context.getString(R.string.empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    } else {
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            items(rows, key = { it.id }) { row ->
+                WordRowItem(
+                    row = row,
+                    ordboken = ordboken,
+                    onOpen = { onOpenWord(row.title, row.url, row.sources) }
+                )
+            }
+        }
+    }
 }
 
 data class WordRow(
@@ -60,91 +72,16 @@ data class WordRow(
     val sources: String = ""
 )
 
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-fun CommonListScreen(
-    context: Context,
-    ordboken: Ordboken,
-    table: String,
-    titleCol: String,
-    summaryCol: String,
-    dictCol: String,
-    urlCol: String,
-    sourcesCol: String? = null,
-    sortOrder: String,
-    limit: Int? = null,
-    onOpenWord: (title: String, url: String, sources: String) -> Unit
-) {
-    var reloadToken by remember { mutableStateOf(0) }
-    val rows by produceState(initialValue = emptyList<WordRow>(), key1 = reloadToken) {
-        value = loadRows(context, table, titleCol, summaryCol, dictCol, urlCol, sourcesCol, sortOrder, limit)
-    }
-
-    Column(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 2.dp),
-            horizontalArrangement = Arrangement.End
-        ) {
-            TextButton(onClick = {
-                deleteRow(context, table, null)
-                reloadToken++
-            }) {
-                Icon(
-                    Icons.Filled.Delete,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(modifier = Modifier.width(4.dp))
-                Text(context.getString(R.string.delete_all))
-            }
-        }
-
-        if (rows.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(context.getString(R.string.empty), color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        } else {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(rows, key = { it.id }) { row ->
-                    WordRowItem(
-                        context = context,
-                        row = row,
-                        ordboken = ordboken,
-                        onOpen = { onOpenWord(row.title, row.url, row.sources) },
-                        onDelete = {
-                            deleteRow(context, table, row.url)
-                            reloadToken++
-                        }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WordRowItem(
-    context: Context,
     row: WordRow,
     ordboken: Ordboken,
-    onOpen: () -> Unit,
-    onDelete: () -> Unit
+    onOpen: () -> Unit
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
-
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .combinedClickable(
-                onClick = onOpen,
-                onLongClick = { menuOpen = true }
-            )
+            .clickable(onClick = onOpen)
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -173,15 +110,6 @@ fun WordRowItem(
                 )
             }
         }
-        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-            DropdownMenuItem(
-                text = { Text(context.getString(R.string.delete)) },
-                onClick = {
-                    menuOpen = false
-                    onDelete()
-                }
-            )
-        }
     }
 }
 
@@ -199,8 +127,7 @@ fun HistorySuggestionList(
     onOpenWord: (title: String, url: String, sources: String) -> Unit,
     excludeUrl: String? = null
 ): Boolean {
-    var reloadToken by remember { mutableStateOf(0) }
-    val rows by produceState(initialValue = emptyList<WordRow>(), key1 = reloadToken) {
+    val rows by produceState(initialValue = emptyList<WordRow>()) {
         value = loadHistoryRows(context)
     }
 
@@ -210,99 +137,83 @@ fun HistorySuggestionList(
     Column(modifier = Modifier.fillMaxWidth()) {
         visible.forEach { row ->
             WordRowItem(
-                context = context,
                 row = row,
                 ordboken = ordboken,
-                onOpen = { onOpenWord(row.title, row.url, row.sources) },
-                onDelete = {
-                    deleteHistoryRow(context, row.url)
-                    reloadToken++
-                }
+                onOpen = { onOpenWord(row.title, row.url, row.sources) }
             )
         }
     }
     return true
 }
 
-/** The history table's rows, newest first (shared by the list + suggestions). */
-suspend fun loadHistoryRows(context: Context, limit: Int = 100): List<WordRow> =
-    loadRows(
-        context,
-        HistoryEntry.TABLE_NAME,
-        HistoryEntry.COLUMN_NAME_TITLE,
-        HistoryEntry.COLUMN_NAME_SUMMARY,
-        HistoryEntry.COLUMN_NAME_DICT,
-        HistoryEntry.COLUMN_NAME_URL,
-        HistoryEntry.COLUMN_NAME_SOURCES,
-        HistoryEntry.COLUMN_NAME_DATE + " DESC",
-        limit
-    )
+/** The history entries, newest first (shared by the list + suggestions). */
+suspend fun loadHistoryRows(context: Context, limit: Int = HISTORY_MAX): List<WordRow> =
+    context.nordictDataStore.data
+        .map { prefs -> decodeHistory(prefs[NordictPrefs.HISTORY].orEmpty()) }
+        .first()
+        .take(limit.coerceAtLeast(0))
 
-fun deleteHistoryRow(context: Context, url: String?) =
-    deleteRow(context, HistoryEntry.TABLE_NAME, url)
-
-private suspend fun loadRows(
+/**
+ * Records a lookup in history: an existing entry for [url] moves to the
+ * front, and the list is capped at [HISTORY_MAX].
+ */
+suspend fun saveHistoryEntry(
     context: Context,
-    table: String,
-    titleCol: String,
-    summaryCol: String,
-    dictCol: String,
-    urlCol: String,
-    sourcesCol: String?,
-    sortOrder: String,
-    limit: Int?
-): List<WordRow> = withContext(Dispatchers.IO) {
-    val dbHelper = OrdbokenDbHelper(context)
-    val db = dbHelper.readableDatabase
-    try {
-        val cols = mutableListOf(HistoryEntry._ID, dictCol, titleCol, summaryCol, urlCol)
-        if (sourcesCol != null) cols.add(sourcesCol)
-        val cursor = try {
-            db.query(
-                table,
-                cols.toTypedArray(),
-                null, null, null, null,
-                sortOrder,
-                limit?.toString()
+    dict: String,
+    title: String,
+    summary: String,
+    url: String,
+    sources: String = ""
+) {
+    context.nordictDataStore.edit { prefs ->
+        val rows = decodeHistory(prefs[NordictPrefs.HISTORY].orEmpty())
+            .filterNot { it.url == url }
+            .toMutableList()
+        rows.add(
+            0,
+            WordRow(
+                id = url.hashCode().toLong(),
+                dict = dict,
+                title = title,
+                summary = summary,
+                url = url,
+                sources = sources
             )
-        } catch (e: Exception) {
-            // A pre-migration database without the sources column.
-            db.query(
-                table,
-                arrayOf(HistoryEntry._ID, dictCol, titleCol, summaryCol, urlCol),
-                null, null, null, null,
-                sortOrder,
-                limit?.toString()
-            )
-        }
-        val rows = mutableListOf<WordRow>()
-        val sourcesIdx = runCatching { cursor.getColumnIndexOrThrow(sourcesCol) }.getOrNull()
-        while (cursor.moveToNext()) {
-            rows.add(
-                WordRow(
-                    id = cursor.getLong(cursor.getColumnIndexOrThrow(HistoryEntry._ID)),
-                    dict = cursor.getString(cursor.getColumnIndexOrThrow(dictCol)),
-                    title = cursor.getString(cursor.getColumnIndexOrThrow(titleCol)),
-                    summary = cursor.getString(cursor.getColumnIndexOrThrow(summaryCol)),
-                    url = cursor.getString(cursor.getColumnIndexOrThrow(urlCol)),
-                    sources = sourcesIdx?.takeIf { it >= 0 }?.let { cursor.getString(it) } ?: ""
-                )
-            )
-        }
-        cursor.close()
-        rows
-    } finally {
-        db.close()
+        )
+        prefs[NordictPrefs.HISTORY] = encodeHistory(rows.take(HISTORY_MAX))
     }
 }
 
-private fun deleteRow(context: Context, table: String, url: String?) {
-    val dbHelper = OrdbokenDbHelper(context)
-    val db: SQLiteDatabase = dbHelper.writableDatabase
-    if (url == null) {
-        db.delete(table, null, null)
-    } else {
-        db.delete(table, HistoryEntry.COLUMN_NAME_URL + "=?", arrayOf(url))
-    }
-    db.close()
+private fun decodeHistory(raw: String): List<WordRow> {
+    if (raw.isBlank()) return emptyList()
+    return runCatching {
+        val array = JSONArray(raw)
+        List(array.length()) { i ->
+            val obj = array.getJSONObject(i)
+            val url = obj.optString("url")
+            WordRow(
+                id = url.hashCode().toLong(),
+                dict = obj.optString("dict"),
+                title = obj.optString("title"),
+                summary = obj.optString("summary"),
+                url = url,
+                sources = obj.optString("sources")
+            )
+        }
+    }.getOrDefault(emptyList())
 }
+
+private fun encodeHistory(rows: List<WordRow>): String =
+    JSONArray().apply {
+        rows.forEach { row ->
+            put(
+                JSONObject().apply {
+                    put("dict", row.dict)
+                    put("title", row.title)
+                    put("summary", row.summary)
+                    put("url", row.url)
+                    put("sources", row.sources)
+                }
+            )
+        }
+    }.toString()

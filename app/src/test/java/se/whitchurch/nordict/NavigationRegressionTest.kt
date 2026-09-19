@@ -100,9 +100,6 @@ class NavigationRegressionTest {
     private fun setUpFixtures() {
         app = ApplicationProvider.getApplicationContext<Application>()
         NordictPrefs.clearBlocking(app!!)
-        // History tables persist across tests in Robolectric's native
-        // SQLite; a fresh file avoids double-CREATE crashes on the first open.
-        app!!.deleteDatabase("Ordboken.db")
         Ordboken.reset()
 
         dle = MockWebServer()
@@ -124,14 +121,8 @@ class NavigationRegressionTest {
                 GdlcDictionary(client)
             )
         )
-        // Create the history tables exactly once, before the activity
-        // launch; the compose test rule's dispatchers make reads/writes overlap
-        // otherwise and a write sneaks in before the first open finishes.
-        // Start with an empty history: the seed rows would otherwise fill the
-        // suggestions area and break the empty-sheet assumptions below.
-        OrdbokenDbHelper(app!!).writableDatabase.use { db ->
-            db.delete("history", null, null)
-        }
+        // The history starts empty (DataStore is cleared above), so the
+        // suggestions area stays empty until a word is opened.
     }
 
     private fun tearDownFixtures() {
@@ -326,22 +317,11 @@ class NavigationRegressionTest {
         // History must store the sources probe list alongside the first uri.
         var storedSources = emptyList<CombSource>()
         awaitCondition(message = "history stores the combined sources") {
-            val db = OrdbokenDbHelper(app!!).readableDatabase
-            try {
-                db.query(
-                    "history", arrayOf("url", "sources"),
-                    "url=?", arrayOf(firstUri),
-                    null, null, null
-                ).use { cursor ->
-                    if (!cursor.moveToFirst()) return@awaitCondition false
-                    storedSources = MultiDict.sourcesFromJson(
-                        cursor.getString(cursor.getColumnIndexOrThrow("sources"))
-                    )
-                    storedSources.map { it.tag } == listOf("DLE", "EST")
-                }
-            } finally {
-                db.close()
-            }
+            val rows = kotlinx.coroutines.runBlocking { loadHistoryRows(app!!) }
+            val row = rows.firstOrNull { it.url == firstUri }
+                ?: return@awaitCondition false
+            storedSources = MultiDict.sourcesFromJson(row.sources)
+            storedSources.map { it.tag } == listOf("DLE", "EST")
         }
 
         // Opening that history entry (the history screen's sources-aware path)
@@ -762,18 +742,15 @@ class NavigationRegressionTest {
         awaitNav()
 
         // Seed one history row directly (no word needs loading).
-        val dbHelper = OrdbokenDbHelper(app!!)
-        dbHelper.writableDatabase.use { db ->
-            db.delete("history", null, null)
-            val values = android.content.ContentValues().apply {
-                put("title", "sugghist")
-                put("dict", "DLE")
-                put("url", "https://example.com/sugghist")
-                put("summary", "")
-                put("sources", "")
-                put("date", System.currentTimeMillis())
-            }
-            db.insert("history", null, values)
+        kotlinx.coroutines.runBlocking {
+            saveHistoryEntry(
+                app!!,
+                dict = "DLE",
+                title = "sugghist",
+                summary = "",
+                url = "https://example.com/sugghist",
+                sources = ""
+            )
         }
 
         // Expanding the search bar with an empty query shows history rows in

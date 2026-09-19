@@ -39,7 +39,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import okhttp3.Request
-import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
 import se.whitchurch.nordict.ui.theme.NordictTheme
 
 class CardActivity : androidx.appcompat.app.AppCompatActivity() {
