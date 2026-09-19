@@ -21,9 +21,10 @@ import se.whitchurch.nordict.ui.theme.NordictTheme
 
 /**
  * The unified single-activity home: hosts the navigation graph ([NordictApp])
- * with the global search bar, dictionary nav, history, search
- * results and the word view. Restores the last view on start (word or search
- * query); a fresh install opens the Home (history) screen.
+ * with the global search bar, dictionary nav, search
+ * results (an empty query shows history) and the word view. Restores the
+ * last view on start (word or search query); a fresh install opens the
+ * search screen with its history list.
  */
 class MainActivity : AppCompatActivity() {
     private var mOrdboken: Ordboken? = null
@@ -51,7 +52,7 @@ class MainActivity : AppCompatActivity() {
         mOrdboken = ordboken
 
         // Initial route from the persisted last view. A fresh install has no
-        // "lastWhere" and lands on Home (history + search bar).
+        // "lastWhere" and lands on the search screen (empty query = history).
         var initialRoute: String? = null
         var initialQuery = ""
         if (ordboken.mPrefs.contains("lastWhere")) {

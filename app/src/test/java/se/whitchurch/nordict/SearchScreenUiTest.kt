@@ -112,7 +112,8 @@ class SearchScreenUiTest {
                     context = app,
                     ordboken = ordboken,
                     query = query,
-                    onOpenWord = {}
+                    onOpenWord = {},
+                    onOpenHistory = { _, _, _ -> }
                 )
             }
         }
@@ -132,6 +133,33 @@ class SearchScreenUiTest {
         assertThat(composeRule.onAllNodesWithText("husar").fetchSemanticsNodes()).hasSize(1)
         assertThat(composeRule.onAllNodesWithText("husarregemente (husar)").fetchSemanticsNodes())
             .hasSize(1)
+    }
+
+    @Test
+    fun emptyQueryShowsHistoryInsteadOfNoResults() {
+        val dbHelper = se.whitchurch.nordict.OrdbokenDbHelper(app)
+        dbHelper.writableDatabase.use { db ->
+            db.delete("history", null, null)
+            val values = android.content.ContentValues().apply {
+                put("title", "histword")
+                put("dict", "SO")
+                put("url", "https://example.com/histword")
+                put("summary", "a past lookup")
+                put("sources", "")
+                put("date", System.currentTimeMillis())
+            }
+            db.insert("history", null, values)
+        }
+
+        setSearch("")
+
+        composeRule.waitUntil(timeoutMillis = 10_000) {
+            composeRule.onAllNodesWithText("histword")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        assertThat(
+            composeRule.onAllNodesWithText("a past lookup").fetchSemanticsNodes()
+        ).isNotEmpty()
     }
 
     companion object {

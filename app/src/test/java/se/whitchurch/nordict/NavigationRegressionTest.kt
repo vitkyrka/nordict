@@ -128,7 +128,11 @@ class NavigationRegressionTest {
         // Create the history tables exactly once, before the activity
         // launch; the compose test rule's dispatchers make reads/writes overlap
         // otherwise and a write sneaks in before the first open finishes.
-        OrdbokenDbHelper(app!!).readableDatabase.close()
+        // Start with an empty history: the seed rows would otherwise fill the
+        // suggestions area and break the empty-sheet assumptions below.
+        OrdbokenDbHelper(app!!).writableDatabase.use { db ->
+            db.delete("history", null, null)
+        }
     }
 
     private fun tearDownFixtures() {
@@ -375,11 +379,11 @@ class NavigationRegressionTest {
         }
 
         // Back from the switched word lands on the previous destination
-        // (home): the DLE word was replaced, not left underneath for back to
+        // (search): the DLE word was replaced, not left underneath for back to
         // resurrect.
         onMain { composeRule.activity.navController?.popBackStack() }
         awaitCondition(message = "back exits to the previous destination") {
-            composeRule.activity.navController?.currentDestination?.route == "home"
+            composeRule.activity.navController?.currentDestination?.route?.startsWith("search") == true
         }
         assertThat(ordboken().currentWord?.dict).isEqualTo("EST")
     }
@@ -593,12 +597,12 @@ class NavigationRegressionTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithText(app!!.getString(R.string.no_results)).assertExists()
 
-        // Back collapses the overlay without popping the home destination.
+        // Back collapses the overlay without popping the search destination.
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
         composeRule.waitForIdle()
         composeRule.onNodeWithText(app!!.getString(R.string.no_results)).assertDoesNotExist()
         assertThat(composeRule.activity.navController?.currentDestination?.route)
-            .isEqualTo("home")
+            .startsWith("search")
     }
 
     @Test
@@ -755,6 +759,42 @@ class NavigationRegressionTest {
     }
 
     @Test
+    fun emptySearchBoxShowsHistoryInTheSuggestionsArea() {
+        awaitNav()
+
+        // Seed one history row directly (no word needs loading).
+        val dbHelper = OrdbokenDbHelper(app!!)
+        dbHelper.writableDatabase.use { db ->
+            db.delete("history", null, null)
+            val values = android.content.ContentValues().apply {
+                put("title", "sugghist")
+                put("dict", "DLE")
+                put("url", "https://example.com/sugghist")
+                put("summary", "")
+                put("sources", "")
+                put("date", System.currentTimeMillis())
+            }
+            db.insert("history", null, values)
+        }
+
+        // Expanding the search bar with an empty query shows history rows in
+        // the suggestions area (there is no separate history screen anymore).
+        composeRule.onNode(hasSetTextAction())
+            .performTouchInput {
+                down(center)
+                up()
+            }
+        awaitCondition(message = "history row appears in the suggestions") {
+            try {
+                composeRule.onNodeWithText("sugghist").assertExists()
+                true
+            } catch (t: Throwable) {
+                false
+            }
+        }
+    }
+
+    @Test
     fun clearButtonOnTheCollapsedBarOpensTheSearchOverlay() {
         awaitNav()
 
@@ -842,7 +882,7 @@ class NavigationRegressionTest {
 
         // Collapsed: the dictionary nav (language switcher + dict chips) moved
         // off the main screens — only the search bar remains, so the nav
-        // controls are absent from the home screen.
+        // controls are absent from the search screen.
         composeRule.onNodeWithText("DLE").assertDoesNotExist()
         composeRule.onNodeWithContentDescription(app!!.getString(R.string.change_language))
             .assertDoesNotExist()
@@ -958,7 +998,7 @@ class NavigationRegressionTest {
             ordboken().mPrefs.getInt("scale", 0) == 160
         }
         assertThat(composeRule.activity.navController?.currentDestination?.route)
-            .isEqualTo("home")
+            .startsWith("search")
     }
 
     @Test

@@ -24,12 +24,13 @@ import kotlinx.coroutines.withContext
 import se.whitchurch.nordict.OrdbokenContract.HistoryEntry
 
 /**
- * The home destination: the history list backed by the SQLite table.
- * Ported from the legacy HistoryActivity, minus the app's search bar (now the
- * global header) and the storage permission request (moved to MainActivity).
+ * History list components backed by the SQLite table. There is no longer a
+ * separate home/history destination: the search screen shows this list when
+ * its query is empty, and the expanded search sheet shows it in the
+ * suggestions area when the search box is empty.
  */
 @Composable
-fun HomeScreen(
+fun HistoryList(
     context: Context,
     ordboken: Ordboken,
     onOpenWord: (title: String, url: String, sources: String) -> Unit
@@ -183,6 +184,62 @@ fun WordRowItem(
         }
     }
 }
+
+/**
+ * History rows for the expanded search sheet's suggestions area (a plain
+ * Column, since the sheet already scrolls — a LazyColumn cannot nest in it).
+ * [excludeUrl] hides the current word's own row (it already has its
+ * artificial suggestion above the history). Returns true when at least one
+ * row was shown.
+ */
+@Composable
+fun HistorySuggestionList(
+    context: Context,
+    ordboken: Ordboken,
+    onOpenWord: (title: String, url: String, sources: String) -> Unit,
+    excludeUrl: String? = null
+): Boolean {
+    var reloadToken by remember { mutableStateOf(0) }
+    val rows by produceState(initialValue = emptyList<WordRow>(), key1 = reloadToken) {
+        value = loadHistoryRows(context)
+    }
+
+    val visible = if (excludeUrl.isNullOrEmpty()) rows else rows.filter { it.url != excludeUrl }
+    if (visible.isEmpty()) return false
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        visible.forEach { row ->
+            WordRowItem(
+                context = context,
+                row = row,
+                ordboken = ordboken,
+                onOpen = { onOpenWord(row.title, row.url, row.sources) },
+                onDelete = {
+                    deleteHistoryRow(context, row.url)
+                    reloadToken++
+                }
+            )
+        }
+    }
+    return true
+}
+
+/** The history table's rows, newest first (shared by the list + suggestions). */
+suspend fun loadHistoryRows(context: Context, limit: Int = 100): List<WordRow> =
+    loadRows(
+        context,
+        HistoryEntry.TABLE_NAME,
+        HistoryEntry.COLUMN_NAME_TITLE,
+        HistoryEntry.COLUMN_NAME_SUMMARY,
+        HistoryEntry.COLUMN_NAME_DICT,
+        HistoryEntry.COLUMN_NAME_URL,
+        HistoryEntry.COLUMN_NAME_SOURCES,
+        HistoryEntry.COLUMN_NAME_DATE + " DESC",
+        limit
+    )
+
+fun deleteHistoryRow(context: Context, url: String?) =
+    deleteRow(context, HistoryEntry.TABLE_NAME, url)
 
 private suspend fun loadRows(
     context: Context,

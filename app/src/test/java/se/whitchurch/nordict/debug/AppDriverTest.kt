@@ -107,7 +107,7 @@ class AppDriverTest {
 
     /**
      * Launches [MainActivity]. A fresh-test prefs file has no saved "lastWhere",
-     * so the app lands on the Home (history) destination with no network calls.
+     * so the app lands on the search destination (empty query = history) with no network calls.
      */
     private fun launchMain() {
         scenario = ActivityScenario.launch(MainActivity::class.java)
@@ -440,9 +440,9 @@ class AppDriverTest {
         assertThat(back.ok).isTrue()
         assertThat(back.message).contains("closed the word view")
 
-        // Popping the word destination lands back on Home.
+        // Popping the word destination lands back on search.
         val state = drive(AgentCommand(op = AgentOps.STATE))
-        assertThat(state.state?.activity).isEqualTo("home")
+        assertThat(state.state?.activity).isEqualTo("search")
     }
 
     // ---------------------------------------------------------------------------

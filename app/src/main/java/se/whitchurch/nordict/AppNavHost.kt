@@ -43,7 +43,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-const val HOME_ROUTE = "home"
 const val SEARCH_ROUTE = "search"
 const val WORD_ROUTE = "word"
 
@@ -65,9 +64,10 @@ fun searchRoute(query: String): String =
 /**
  * The single-activity app shell: one globally visible MD3 [SearchBar] (with
  * debounced live suggestions from [Ordboken.search]) and a
- * Navigation-Compose [NavHost] with three destinations — home (history),
- * search results, and the word view. The [DictionaryNav] (language switcher +
- * dictionary chips) lives on the expanded search sheet, above the suggestions.
+ * Navigation-Compose [NavHost] with two destinations — search results (an
+ * empty query shows the history list), and the word view. The
+ * [DictionaryNav] (language switcher + dictionary chips) lives on the
+ * expanded search sheet, above the suggestions.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -159,8 +159,9 @@ fun NordictApp(
     // background so the next start resumes where the user left off: the word
     // view saves the word it is showing (a combined page saves its sources
     // probe list + selected ref, since its own uri is only the first
-    // source's page), the search screen saves its query, and home clears the
-    // restore point. This mirrors the legacy contract where each activity
+    // source's page), the search screen saves its query, and an empty query
+    // clears the restore point (the search screen then shows history).
+    // This mirrors the legacy contract where each activity
     // saved its own screen in its onPause.
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner, ordboken) {
@@ -282,15 +283,8 @@ fun NordictApp(
         Box(modifier = Modifier.weight(1f)) {
             NavHost(
                 navController = navController,
-                startDestination = HOME_ROUTE
+                startDestination = SEARCH_ROUTE
             ) {
-                composable(HOME_ROUTE) {
-                    HomeScreen(
-                        context = context,
-                        ordboken = ordboken,
-                        onOpenWord = { title, url, sources -> openHistory(title, url, sources) }
-                    )
-                }
                 composable(
                     route = "$SEARCH_ROUTE?query={query}",
                     arguments = listOf(
@@ -302,7 +296,8 @@ fun NordictApp(
                         context = context,
                         ordboken = ordboken,
                         query = query,
-                        onOpenWord = { result -> openWord(result.uri.toAndroidUri(), result.mTitle) }
+                        onOpenWord = { result -> openWord(result.uri.toAndroidUri(), result.mTitle) },
+                        onOpenHistory = { title, url, sources -> openHistory(title, url, sources) }
                     )
                 }
                 composable(
@@ -385,47 +380,64 @@ fun NordictApp(
                         .verticalScroll(rememberScrollState())
                 ) {
                     val currentWord = ordboken.currentWord
-                    if (searchQuery.isBlank() && currentWord != null) {
-                        // Artificial first suggestion with an empty search bar: the
-                        // current word. The trailing north-west arrow fills the word
-                        // into the search field for easy manual editing (as the legacy
-                        // SearchView's query-refinement arrow did), placing the caret
-                        // at the end so a backspace strips trailing suffixes; tapping
-                        // the row itself reopens the word, like any other suggestion.
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { openWord(currentWord.uri.toAndroidUri(), currentWord.mTitle) }
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = currentWord.searchHeadword,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                if (currentWord.dictionary.isNotEmpty()) {
+                    if (searchQuery.isBlank()) {
+                        if (currentWord != null) {
+                            // Artificial first suggestion with an empty search bar: the
+                            // current word. The trailing north-west arrow fills the word
+                            // into the search field for easy manual editing (as the legacy
+                            // SearchView's query-refinement arrow did), placing the caret
+                            // at the end so a backspace strips trailing suffixes; tapping
+                            // the row itself reopens the word, like any other suggestion.
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { openWord(currentWord.uri.toAndroidUri(), currentWord.mTitle) }
+                                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = currentWord.dictionary,
-                                        fontSize = 11.sp,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        text = currentWord.searchHeadword,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Medium,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
+                                    if (currentWord.dictionary.isNotEmpty()) {
+                                        Text(
+                                            text = currentWord.dictionary,
+                                            fontSize = 11.sp,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+                                IconButton(
+                                    onClick = { textFieldState.setTextAndPlaceCursorAtEnd(currentWord.searchHeadword) }
+                                ) {
+                                    Icon(
+                                        Icons.Filled.NorthWest,
+                                        contentDescription = stringResource(R.string.search_fill_current_word),
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
-                            IconButton(
-                                onClick = { textFieldState.setTextAndPlaceCursorAtEnd(currentWord.searchHeadword) }
-                            ) {
-                                Icon(
-                                    Icons.Filled.NorthWest,
-                                    contentDescription = stringResource(R.string.search_fill_current_word),
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                        }
+                        // History fills the suggestions area while the box is
+                        // empty (there is no separate history screen anymore).
+                        val historyShown = HistorySuggestionList(
+                            context = context,
+                            ordboken = ordboken,
+                            onOpenWord = { title, url, sources -> openHistory(title, url, sources) },
+                            excludeUrl = currentWord?.uri?.toString()
+                        )
+                        if (currentWord == null && !historyShown) {
+                            Text(
+                                text = stringResource(R.string.no_results),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(16.dp)
+                            )
                         }
                     } else if (suggestions.isEmpty()) {
                         Text(

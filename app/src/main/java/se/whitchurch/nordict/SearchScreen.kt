@@ -22,15 +22,25 @@ import kotlinx.coroutines.withContext
 /**
  * The search-results destination. Runs [Dictionary.fullSearch] for the route
  * query on the current dictionary, with loading/error/empty status panels
- * ported from the legacy MainActivity.
+ * ported from the legacy MainActivity. An empty query shows the history
+ * list instead (there is no separate history screen anymore).
  */
 @Composable
 fun SearchScreen(
     context: Context,
     ordboken: Ordboken,
     query: String,
-    onOpenWord: (SearchResult) -> Unit
+    onOpenWord: (SearchResult) -> Unit,
+    onOpenHistory: (title: String, url: String, sources: String) -> Unit
 ) {
+    if (query.trim().isEmpty()) {
+        HistoryList(
+            context = context,
+            ordboken = ordboken,
+            onOpenWord = onOpenHistory
+        )
+        return
+    }
     var retries by remember { mutableIntStateOf(0) }
     var results by remember(query, retries) { mutableStateOf<List<SearchResult>?>(null) }
     var isLoading by remember(query, retries) { mutableStateOf(false) }

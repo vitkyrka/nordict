@@ -30,8 +30,8 @@ import java.util.concurrent.TimeUnit
  * polling [Ordboken.currentWord] and the navigation destination — the app's
  * own coroutines do the heavy lifting.
  *
- * The app is a single-[MainActivity] Compose navigation graph (`home`,
- * `search`, `word` routed through `NavHostController`), so `open`/`openUri`/
+ * The app is a single-[MainActivity] Compose navigation graph (`search`,
+ * `word` routed through `NavHostController`), so `open`/`openUri`/
  * `nextPage` navigate a word destination and `back` pops one destination.
  * `state.activity` reports the current route rather than an activity class.
  */
@@ -402,8 +402,7 @@ class AppDriver(private val app: android.app.Application) {
 
     /** Project route patterns (e.g. `word?uri={uri}&title={title}`) onto their base names. */
     private fun routeName(route: String): String = when {
-        route == "home" -> "home"
-        route.startsWith("search?") -> "search"
+        route == "search" || route.startsWith("search?") -> "search"
         route.startsWith("word?") -> "word"
         else -> route.substringBefore('?')
     }
