@@ -15,7 +15,6 @@ import android.webkit.WebView
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -31,6 +30,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -56,7 +57,14 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
     private var currentCardId: String? = null
     private var mAudio: List<String> by mutableStateOf(emptyList())
     private var mDictImages: ArrayList<String> = ArrayList()
-    private val selectedDefinitions = mutableStateListOf<Word.Definition>()
+    // Merge selection, keyed by stable hide-keys (see Cards.hideKey) rather
+    // than Definition object identity or per-card remember state: LazyColumn
+    // disposes off-screen cards (scrolling a merged entry out of view drops
+    // its remember), and proposals() mints fresh Definition copies for split
+    // (Collins) definitions on every call, so neither would survive a scroll
+    // or recomposition. The map value is the Definition instance at selection
+    // time, used to build the merged Back/examples.
+    private val selectedDefinitions = mutableStateMapOf<Any, Word.Definition>()
     private var saveDeckName = true
     private var mLeftCards = 0
     private var deckName: String by mutableStateOf("")
@@ -190,9 +198,11 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
             ) {
                 // Key by the stable proposal id (see CardProposal.id), not by
                 // position: without a key the per-card `remember` state
-                // (the Merge switch, extra examples, audio index) is reused by
-                // position, so after created entries are removed the entry
-                // sliding into their slot inherits their Merge selection.
+                // (extra examples, audio index) is reused by position, so
+                // after created entries are removed the entry sliding into
+                // their slot inherits it. (Merge selection lives in
+                // selectedDefinitions keyed by stable hide-keys, so it
+                // survives both slot reuse and scroll-out disposal.)
                 // The key must be Bundle-storable (String): the hide-key
                 // objects (Word.Gloss/Definition/Idiom) crash LazyColumn's
                 // saveable-state provider on device.
@@ -203,10 +213,10 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                             proposal = proposal,
                             audio = audio,
                             onCreate = { created ->
-                                hiddenCards = hiddenCards +
-                                    created.map { Cards.hideKey(it) } +
+                                val createdKeys = created.map { Cards.hideKey(it) }.toSet() +
                                     Cards.hideKey(proposal.definition)
-                                selectedDefinitions.removeAll(created.toSet())
+                                hiddenCards = hiddenCards + createdKeys
+                                createdKeys.forEach { selectedDefinitions.remove(it) }
                             }
                         )
                         is CardProposal.Idiom -> IdiomCard(
@@ -272,7 +282,11 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         val title = proposal.title
         val extraExamples = remember { mutableStateListOf<String>() }
         val audioIdx = remember { mutableIntStateOf(0) }
-        val merged = remember { mutableStateOf(false) }
+        // Derived from the hoisted merge set (keyed by stable hide-key), not
+        // per-card remember: remember is dropped when the card scrolls out of
+        // view, which used to silently unmerge the entry on scroll-back.
+        val mergeKey = Cards.hideKey(definition)
+        val isMerged = selectedDefinitions.containsKey(mergeKey)
         val images = imagesMap[proposal.id].orEmpty()
 
         Card(
@@ -280,7 +294,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 .fillMaxWidth()
                 .padding(vertical = 5.dp),
             shape = RoundedCornerShape(2.dp),
-            colors = if (merged.value && selectedDefinitions.contains(definition)) {
+            colors = if (isMerged) {
                 CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
             } else {
                 CardDefaults.cardColors()
@@ -323,13 +337,10 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 }
 
                 val toggleMerge: (Boolean) -> Unit = { checked ->
-                    merged.value = checked
                     if (checked) {
-                        if (!selectedDefinitions.contains(definition)) {
-                            selectedDefinitions.add(definition)
-                        }
+                        selectedDefinitions[mergeKey] = definition
                     } else {
-                        selectedDefinitions.remove(definition)
+                        selectedDefinitions.remove(mergeKey)
                     }
                 }
 
@@ -399,25 +410,26 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
                 ) {
+                    // No text label: the switch alone fits on the button row
+                    // next to Preview/Create. The content description names it
+                    // for accessibility. Checked state is derived from the
+                    // hoisted merge set, so it survives scrolling out of view.
                     Row(
                         modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Switch(
-                            checked = merged.value,
-                            onCheckedChange = toggleMerge
-                        )
-                        Text(
-                            "Merge",
-                            modifier = Modifier
-                                .padding(start = 8.dp)
-                                .clickable { toggleMerge(!merged.value) }
+                            checked = isMerged,
+                            onCheckedChange = toggleMerge,
+                            modifier = Modifier.semantics {
+                                contentDescription = "Merge"
+                            }
                         )
                     }
                     OutlinedButton(onClick = {
                         val effectiveDefs =
                             if (selectedDefinitions.isEmpty()) listOf(definition)
-                            else selectedDefinitions.toList()
+                            else selectedDefinitions.values.toList()
                         previewTitle = title
                         preview = Cards.preview(
                             Cards.definitionBack(word, effectiveDefs, ordboken.currentCss),
@@ -438,7 +450,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                     Button(onClick = {
                         val effectiveDefs =
                             if (selectedDefinitions.isEmpty()) listOf(definition)
-                            else selectedDefinitions.toList()
+                            else selectedDefinitions.values.toList()
                         val imagesForCard = imagesMap[proposal.id].orEmpty()
                         val cardExamples = Cards.examples(word, effectiveDefs, extraExamples)
                         val noteId = createCard(

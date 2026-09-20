@@ -237,6 +237,40 @@ class CardsTest {
             .containsExactlyElementsIn(all.drop(1).dropLast(1).map { Cards.proposalHideKey(it) })
     }
 
+    @Test
+    fun mergeSelection_byHideKey_survivesFreshProposalCopies() {
+        // Regression test for the card-view merge bug: merge state was held
+        // in per-card remember + Definition object identity, so scrolling a
+        // merged entry out of view (LazyColumn disposal) or recomputing
+        // proposals (Collins split copies are fresh objects every call)
+        // silently unmerged it. The card view now keys the merge set by
+        // stable hide-keys, which must still match after fresh copies.
+        val word = parseCollinsMorir()
+        val first = Cards.proposals(word).filterIsInstance<CardProposal.Definition>()
+        assertThat(first.size).isGreaterThan(1)
+
+        // Select the first entry by hide-key (what toggleMerge stores).
+        val selected = mutableMapOf<Any, Word.Definition>()
+        selected[Cards.proposalHideKey(first[0])] = first[0].definition
+
+        // Simulate scroll-out + scroll-back: a fresh proposals() call mints
+        // new Definition objects, but the stored key must still resolve.
+        val again = Cards.proposals(word).filterIsInstance<CardProposal.Definition>()
+        assertThat(again.map { it.definition }).isNotEqualTo(first.map { it.definition })
+        for (proposal in again) {
+            val isMerged = selected.containsKey(Cards.proposalHideKey(proposal))
+            assertThat(isMerged).isEqualTo(Cards.proposalHideKey(proposal) == Cards.proposalHideKey(first[0]))
+        }
+
+        // Merging a second entry keeps both; deselecting by key clears one.
+        selected[Cards.proposalHideKey(again[1])] = again[1].definition
+        assertThat(selected).hasSize(2)
+        selected.remove(Cards.proposalHideKey(first[0]))
+        val third = Cards.proposals(word).filterIsInstance<CardProposal.Definition>()
+        assertThat(selected.containsKey(Cards.proposalHideKey(third[0]))).isFalse()
+        assertThat(selected.containsKey(Cards.proposalHideKey(third[1]))).isTrue()
+    }
+
     // ---- definition Back ----
 
     @Test
