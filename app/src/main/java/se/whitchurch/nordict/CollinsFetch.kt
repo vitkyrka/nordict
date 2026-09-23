@@ -133,6 +133,66 @@ fun infopediaPageFetcher(client: OkHttpClient): PageFetcher = FallbackPageFetche
 )
 
 /**
+ * Cookies the app's WebViews currently hold for [url], if any. CookieManager
+ * is process-wide, so everything the hidden challenge-solving WebView picked
+ * up (the `cf_clearance` it minted, Cloudflare's `__cf_bm`, site sessions)
+ * comes back automatically — including cookies minted after the
+ * [CollinsClearance]/[InfopediaClearance] sync ran. Null when the jar is
+ * empty or WebView isn't usable (unit tests); never throws.
+ */
+fun webViewCookiesFor(url: String): String? = try {
+    android.webkit.CookieManager.getInstance().getCookie(url)?.takeIf { it.isNotBlank() }
+} catch (e: Exception) {
+    null
+}
+
+/** Merges jar cookies with a synced `cf_clearance`, without duplicating it. */
+fun mergeCookies(jar: String?, syncedCookie: String?): String? {
+    val synced = syncedCookie?.removePrefix("Cookie=")?.trim()?.takeIf { it.isNotEmpty() }
+    return when {
+        jar != null && synced != null && "cf_clearance=" !in jar -> "$jar; $synced"
+        jar != null -> jar
+        synced != null -> synced
+        else -> null
+    }
+}
+
+/**
+ * Request headers for in-app audio playback (the word view's ExoPlayer, the
+ * card screen's MediaPlayer). The challenged hosts' pronunciation clips —
+ * Infopedia TTS, Collins hwd_sounds — live behind the same Cloudflare
+ * challenge as the word pages, but the players use their own HTTP stacks that
+ * never solved it: without the WebView-held cookies the clip request is
+ * refused (403) and ExoPlayer fails with a silent source error, so nothing
+ * plays even though the word page (and its audio URL) loaded fine.
+ *
+ * Infopedia additionally hotlink-guards its TTS endpoint: a bare fetch of
+ * the clip URL answers 404 (the site's "desaparecida" page) unless it carries
+ * the word page as `Referer`, so callers pass the playing word's page URL.
+ * Collins' static sound files 403 the same kind of bare fetch, so they get
+ * the word page as `Referer` too.
+ */
+fun audioRequestHeaders(url: String, referer: String? = null): Map<String, String> {
+    val headers = HashMap<String, String>()
+    val synced = CollinsClearance.cookieHeaderFor(url)["Cookie"]
+        ?: InfopediaClearance.cookieHeaderFor(url)["Cookie"]
+    mergeCookies(webViewCookiesFor(url), synced)?.let { headers["Cookie"] = it }
+    if (referer != null && ("infopedia.pt" in url || "collinsdictionary.com" in url)) {
+        headers["Referer"] = referer
+    }
+    if ("infopedia.pt" in url || "collinsdictionary.com" in url) {
+        // The sites' own players fetch clips as browser subresources; send
+        // the same metadata so bot-fighting doesn't tell us apart.
+        headers["Accept"] = "*/*"
+        headers["Accept-Language"] = "en-US,en;q=0.9"
+        headers["Sec-Fetch-Dest"] = "audio"
+        headers["Sec-Fetch-Mode"] = "no-cors"
+        headers["Sec-Fetch-Site"] = "same-origin"
+    }
+    return headers
+}
+
+/**
  * Last-seen WebView-fallback state, so UI/agent messages can tell "the
  * dictionary is empty" apart from "the dictionary challenged us". Sticky for
  * two minutes: a lookup that just went through the fallback explains the

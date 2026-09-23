@@ -49,7 +49,13 @@ import androidx.webkit.WebSettingsCompat.FORCE_DARK_OFF
 import androidx.webkit.WebSettingsCompat.FORCE_DARK_ON
 import androidx.webkit.WebViewFeature
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.common.MediaLibraryInfo
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -90,6 +96,17 @@ class WordViewModel(
     companion object {
         // Shared across word destinations (Espresso idling).
         val loadResource: CountingIdlingResource = CountingIdlingResource("word")
+
+        // Stock Chrome-on-Android UA. Cloudflare bot-fights the player's
+        // default ExoPlayerLibrary UA on the challenged hosts even when the
+        // request carries a valid clearance, so their clips are fetched the
+        // way the site's own player fetches them. Shared with tests.
+        const val BROWSER_UA =
+            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+
+        /** True for the Cloudflare-challenged audio hosts. */
+        fun isChallengedAudioHost(url: String): Boolean =
+            "infopedia.pt" in url || "collinsdictionary.com" in url
     }
 
     // Wiring from the composing screen (reassigned on every recomposition).
@@ -180,9 +197,104 @@ class WordViewModel(
     private var switchDictGeneration = 0
     private var switchDictJob: kotlinx.coroutines.Job? = null
 
+    // The HTTP transport the player fetches pronunciation clips through.
+    // Challenged-host clips (Infopedia TTS, Collins sounds) need the synced
+    // cf_clearance cookie, refreshed from [audioRequestHeaders] on every play;
+    // internal so tests can observe the headers a play sends.
+    internal val httpDataSourceFactory: DefaultHttpDataSource.Factory =
+        DefaultHttpDataSource.Factory()
+
+    // The headers the last [playAudio] handed to [httpDataSourceFactory];
+    // internal so tests can observe them (the factory offers no read-back).
+    internal var lastAudioHeaders: Map<String, String> = emptyMap()
+        private set
+
+    // The User-Agent the last [playAudio] set; same observability reason.
+    internal var lastAudioUserAgent: String = MediaLibraryInfo.VERSION_SLASHY
+        private set
+
     // internal so tests can observe the playlist (a re-play must reset it).
     internal val player: ExoPlayer by lazy {
-        ExoPlayer.Builder(getApplication()).build()
+        val app = getApplication<android.app.Application>()
+        // DefaultDataSource routes file:// (fallback cache clips) and other
+        // local schemes to their own sources; http(s) goes through the
+        // header/UA-carrying transport above.
+        val dataSourceFactory = DefaultDataSource.Factory(app, httpDataSourceFactory)
+        val mediaSourceFactory = DefaultMediaSourceFactory(app).setDataSourceFactory(dataSourceFactory)
+        ExoPlayer.Builder(app).setMediaSourceFactory(mediaSourceFactory).build().also {
+            it.addListener(object : Player.Listener {
+                override fun onPlayerError(error: PlaybackException) {
+                    onAudioError()
+                }
+            })
+        }
+    }
+
+    // Generation of the current play: a re-play supersedes an in-flight
+    // fallback fetch, and a fallback re-play of its own never refalls-back.
+    private var audioGeneration = 0
+    private var audioFallbackDoneForGen = -1
+
+    // A direct clip fetch failed in the player. Challenged-host clips get one
+    // silent recovery per play — bytes through the hidden challenge WebView
+    // (the Chromium stack the site's own player uses), replayed from a cache
+    // file — because only the toast remains otherwise.
+    private fun onAudioError() {
+        val gen = audioGeneration
+        if (gen == audioFallbackDoneForGen) {
+            toastAudioError()
+            return
+        }
+        val urls = ArrayList<String>()
+        for (i in 0 until player.mediaItemCount) {
+            player.getMediaItemAt(i).localConfiguration?.uri?.toString()?.let { urls.add(it) }
+        }
+        android.util.Log.i("NordictAudio", "play failed for $urls")
+        val httpUrls = urls.filter { it.startsWith("http") && isChallengedAudioHost(it) }
+        if (httpUrls.isEmpty()) {
+            toastAudioError()
+            return
+        }
+        audioFallbackDoneForGen = gen
+        val referer = mWord?.uri?.toString()
+        viewModelScope.launch(Dispatchers.IO) {
+            val files = httpUrls.mapIndexedNotNull { index, url ->
+                val fetched = ChallengeWebView.fetchBytes(url, referer)
+                android.util.Log.i("NordictAudio", "webview fetch $url -> ${fetched.status}")
+                if (!fetched.ok) return@mapIndexedNotNull null
+                val file = java.io.File(
+                    getApplication<android.app.Application>().cacheDir,
+                    "audio-fallback-$index.mp3"
+                )
+                try {
+                    file.writeBytes(fetched.bytes!!)
+                    file
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            withContext(Dispatchers.Main) {
+                if (gen != audioGeneration || files.size != httpUrls.size) {
+                    if (gen == audioGeneration) toastAudioError()
+                    return@withContext
+                }
+                android.util.Log.i("NordictAudio", "replaying ${files.size} clip(s) from cache")
+                player.clearMediaItems()
+                files.forEach {
+                    player.addMediaItem(MediaItem.fromUri(android.net.Uri.fromFile(it)))
+                }
+                player.prepare()
+                player.play()
+            }
+        }
+    }
+
+    private fun toastAudioError() {
+        android.widget.Toast.makeText(
+            getApplication(),
+            R.string.error_audio,
+            android.widget.Toast.LENGTH_SHORT
+        ).show()
     }
 
     init {
@@ -585,6 +697,23 @@ class WordViewModel(
 
     fun playAudio(urls: java.util.ArrayList<String>) {
         if (urls.isEmpty()) return
+        audioGeneration += 1
+        // The player's own HTTP stack never solved the Cloudflare challenge,
+        // so challenged-host clips 403 without the synced clearance cookie;
+        // Infopedia's TTS endpoint additionally needs the word page as
+        // Referer or it answers 404.
+        val referer = mWord?.uri?.toString()
+        val headers = urls.flatMap { audioRequestHeaders(it, referer).entries }
+            .associate { it.key to it.value }
+        lastAudioHeaders = headers
+        httpDataSourceFactory.setDefaultRequestProperties(headers)
+        // Challenged hosts bot-fight the player's library UA even with a
+        // valid clearance; unchallenged hosts keep the stock one.
+        val ua =
+            if (urls.any { isChallengedAudioHost(it) }) BROWSER_UA
+            else MediaLibraryInfo.VERSION_SLASHY
+        lastAudioUserAgent = ua
+        httpDataSourceFactory.setUserAgent(ua)
         player.clearMediaItems()
         urls.forEach { player.addMediaItem(MediaItem.fromUri(it)) }
         player.prepare()

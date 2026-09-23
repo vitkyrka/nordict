@@ -426,6 +426,17 @@ Fixtures covering both edges: `testdata/colspan/feble.*` (single-clip
 fallback) and `testdata/colspan/pócima.*` (two Spain clips: `es_es_pocima.mp3`
 + `ES-ES-W....mp3`).
 
+Playback: the word view's ExoPlayer (and the card screen's MediaPlayer) fetch
+clips with their own HTTP stacks, which Cloudflare bot-blocks (403) on these
+hosts even with a valid `cf_clearance`, so `audioRequestHeaders(url, referer)`
+(`CollinsFetch.kt`: WebView-jar cookies + synced clearance, word-page
+`Referer`, browser UA + subresource metadata) goes out on every play, and a
+failed challenged-host clip falls back to bytes fetched through the hidden
+challenge WebView (`ChallengeWebView.fetchBytes`: same Chromium stack and
+cleared session as the site's own player, same-origin via the word page),
+replayed from a cache file (`audio-fallback-*.mp3`, `DefaultDataSource` routes
+the `file://` replay). Failures log under `NordictAudio`.
+
 Tests: `CollinsParserTest`/`CollfrenParserTest` (both `:core`, plain JUnit
 goldens), `CollinsIntegrationTest`/`ColfrenIntegrationTest` (MockWebServer).
 Fixtures: `testdata/{colspan,colfren}/<word>.{html,json}` and
@@ -699,7 +710,10 @@ URL prefixes, `<base>`, and Insert scripts back to live-site form.
   `.dolSilab` syllabification (me.sa) + `.dolRegfonFonet` transcription (ˈmezɐ)
   + the `.dolEntrinfoOrtoep` orthoepy note (/ê/), space-joined. Audio comes from
   `audio.audio-player-word-tts` (the word's TTS clip, e.g.
-  `/dicionarios/lingua-portuguesa/tts/word/mesa?homografia=0`).
+  `/dicionarios/lingua-portuguesa/tts/word/mesa?homografia=0`). The TTS
+  endpoint is hotlink-guarded (a bare fetch 404s), so playback sends the word
+  page as `Referer` — same `audioRequestHeaders` + WebView-bytes fallback as
+  Collins above.
 - **Etymology**: `.dolVverbeteEtim` text after the `.dolVverbeteEtim-corpo`
   descendant with the leading "Etimologia:" label stripped (mesa: "Do latim
   mensa-, «idem»"). This section and the `.dolRelacoes` boxes sit *after* the

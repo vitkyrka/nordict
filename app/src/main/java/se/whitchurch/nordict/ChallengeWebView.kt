@@ -59,6 +59,11 @@ object ChallengeWebView {
 
     data class WebFetch(val result: PageResult, val cookies: String?)
 
+    /** The outcome of [fetchBytes]: the HTTP status and the clip bytes (null unless 200). */
+    data class WebBytes(val status: Int, val bytes: ByteArray?) {
+        val ok: Boolean get() = status == 200 && bytes != null
+    }
+
     private data class Probe(
         val entry: Boolean = false,
         val json: Boolean = false,
@@ -159,6 +164,153 @@ object ChallengeWebView {
         }
         CookieManager.getInstance().flush()
         return WebFetch(PageResult(200, raw), readCookies(url))
+    }
+
+    /**
+     * Fetches a pronunciation clip's bytes through the hidden WebView's
+     * Chromium stack — the same stack (TLS fingerprint, cookies, solved
+     * challenge) the site's own player uses. The players' own HTTP stacks get
+     * bot-blocked (403) on some challenged hosts even with a valid clearance
+     * and browser headers, so audio playback falls back to this when the
+     * direct fetch fails.
+     *
+     * A same-origin page must host the `fetch` (cross-origin reads need CORS
+     * headers static file servers don't send), so the WebView is first parked
+     * on [referer] — or the clip URL's own origin root when no word page is
+     * at hand. [referer] doubles as the request's referrer. Never call on the
+     * main thread (returns a failure rather than deadlocking).
+     */
+    fun fetchBytes(
+        url: String,
+        referer: String?,
+        timeoutMs: Long = 45_000L
+    ): WebBytes {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            log.severe("fetchBytes called on the main thread for $url")
+            return WebBytes(-1, null)
+        }
+        if (appContext == null) {
+            android.util.Log.w("NordictAudio", "fetchBytes before init for $url")
+            return WebBytes(-1, null)
+        }
+        val deadline = System.currentTimeMillis() + timeoutMs
+        val gen = generation.incrementAndGet()
+
+        if (!parkSameOrigin(url, referer, gen, deadline)) {
+            android.util.Log.w("NordictAudio", "cannot park webview same-origin for $url")
+            return WebBytes(-1, null)
+        }
+        if (gen != generation.get()) return WebBytes(-1, null)
+
+        // `evaluateJavascript` does not unwrap promises, so the async fetch
+        // stashes its outcome in a generation-tagged global that the poll
+        // loop below reads back (synchronous expressions only).
+        val slot = "__nordictAudio$gen"
+        kickFetch(slot, url, referer)
+        val readJs = "(function(){return window.$slot||null})()"
+        while (System.currentTimeMillis() < deadline) {
+            if (gen != generation.get()) return WebBytes(-1, null)
+            val raw = evalString(readJs)
+            if (raw != null) {
+                android.util.Log.i("NordictAudio", "fetch eval -> ${raw.take(80)}")
+                return bytesOf(raw, url)
+            }
+            Thread.sleep(250L)
+        }
+        android.util.Log.w("NordictAudio", "fetch poll timed out for $url")
+        return WebBytes(-1, null)
+    }
+
+    private fun kickFetch(slot: String, url: String, referer: String?) {
+        val urlJson = Gson().toJson(url)
+        val refJson = Gson().toJson(referer ?: "")
+        val js = "window.$slot=null;" +
+            "fetch($urlJson,{credentials:'include',referrer:$refJson||undefined})" +
+            ".then(async function(r){" +
+            "if(!r.ok){window.$slot=JSON.stringify({status:r.status});return;}" +
+            "var b=await r.arrayBuffer();" +
+            "var u8=new Uint8Array(b);var s='';" +
+            "for(var i=0;i<u8.length;i+=0x8000){" +
+            "s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000));}" +
+            "window.$slot=JSON.stringify({status:r.status,b64:btoa(s)});})" +
+            ".catch(function(e){window.$slot=JSON.stringify({status:-1});});"
+        mainHandler.post { webView?.evaluateJavascript(js, null) }
+    }
+
+    private fun bytesOf(raw: String, url: String): WebBytes {
+        return try {
+            val parsed = Gson().fromJson(raw, FetchResult::class.java)
+            if (parsed.status == 200 && !parsed.b64.isNullOrEmpty()) {
+                WebBytes(200, android.util.Base64.decode(parsed.b64, android.util.Base64.DEFAULT))
+            } else {
+                android.util.Log.w("NordictAudio", "audio fetch status ${parsed.status} for $url")
+                WebBytes(parsed.status, null)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("NordictAudio", "audio fetch decode failed for $url: ${e.message}")
+            WebBytes(-1, null)
+        }
+    }
+
+    private data class FetchResult(val status: Int = -1, val b64: String? = null)
+
+    // Parks the shared WebView on the clip's origin (loading [referer], else
+    // the origin root) so the byte fetch below is same-origin and readable.
+    // Already there (or a lookup just left it there) costs nothing.
+    private fun parkSameOrigin(url: String, referer: String?, gen: Int, deadline: Long): Boolean {
+        val target = referer?.takeIf { it.isNotBlank() } ?: originRoot(url)
+        val current = onMainSync<String>(5_000L) { done -> done(webView?.url) }
+        if (current != null && sameOrigin(current, url)) return true
+        val latch = CountDownLatch(1)
+        var settled = false
+        mainHandler.post {
+            val view = try {
+                ensureWebView()
+            } catch (e: Exception) {
+                latch.countDown()
+                return@post
+            }
+            view.webViewClient = object : WebViewClient() {
+                override fun onPageFinished(view: WebView, finishedUrl: String) {
+                    if (gen == generation.get()) {
+                        settled = true
+                        latch.countDown()
+                    }
+                }
+
+                override fun onReceivedError(
+                    view: WebView,
+                    request: android.webkit.WebResourceRequest,
+                    error: android.webkit.WebResourceError
+                ) {
+                    if (request.isForMainFrame && gen == generation.get()) latch.countDown()
+                }
+            }
+            view.loadUrl(target)
+        }
+        val remaining = deadline - System.currentTimeMillis()
+        latch.await(maxOf(remaining, 0L), TimeUnit.MILLISECONDS)
+        android.util.Log.i("NordictAudio", "park settled=$settled current=${current?.take(80)} target=${target.take(80)}")
+        return settled && gen == generation.get()
+    }
+
+    private fun originRoot(url: String): String {
+        return try {
+            val u = android.net.Uri.parse(url)
+            "${u.scheme}://${u.authority}/"
+        } catch (e: Exception) {
+            url
+        }
+    }
+
+    private fun sameOrigin(a: String, b: String): Boolean {
+        return try {
+            val ua = android.net.Uri.parse(a)
+            val ub = android.net.Uri.parse(b)
+            ua.scheme == ub.scheme && ua.authority == ub.authority
+        } catch (e: Exception) {
+            false
+        }
     }
 
     private fun requestTap() {

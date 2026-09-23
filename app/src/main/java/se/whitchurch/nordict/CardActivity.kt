@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Bundle
 import android.util.Base64
 import android.webkit.WebView
@@ -689,7 +690,20 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         }
     }
 
+    // The clip a WebView-bytes fallback already recovered in this card
+    // session: its replay must toast instead of refetching in a loop.
+    private var audioFallbackDoneForUrl: String? = null
+
     private fun playAudio(url: String) {
+        playAudioSource(url, isFallbackFile = false)
+    }
+
+    // Plays a clip URL, or a cache file a previous fallback wrote. A failed
+    // challenged-host clip gets one silent recovery per URL — bytes through
+    // the hidden challenge WebView (the Chromium stack the site's own player
+    // uses), replayed from a cache file — because only the toast remains
+    // otherwise.
+    private fun playAudioSource(url: String, isFallbackFile: Boolean) {
         val mediaPlayer = MediaPlayer()
         mediaPlayer.setAudioAttributes(
             AudioAttributes.Builder()
@@ -699,7 +713,16 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         )
 
         try {
-            mediaPlayer.setDataSource(url)
+            if (isFallbackFile) {
+                mediaPlayer.setDataSource(url)
+            } else {
+                // Challenged-host clips (Infopedia TTS, Collins sounds) need
+                // the synced cf_clearance cookie or the request 403s, and
+                // Infopedia's TTS endpoint additionally needs the word page as
+                // Referer — see audioRequestHeaders.
+                val referer = mWord?.uri?.toString()
+                mediaPlayer.setDataSource(applicationContext, Uri.parse(url), audioRequestHeaders(url, referer))
+            }
         } catch (e: Exception) {
             android.widget.Toast.makeText(applicationContext, R.string.error_audio, android.widget.Toast.LENGTH_SHORT)
                 .show()
@@ -711,12 +734,50 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         }
 
         mediaPlayer.setOnErrorListener { mp, what, extra ->
-            android.widget.Toast.makeText(applicationContext, R.string.error_audio, android.widget.Toast.LENGTH_SHORT)
-                .show()
+            if (!isFallbackFile && audioFallbackDoneForUrl != url &&
+                url.startsWith("http") && WordViewModel.isChallengedAudioHost(url)
+            ) {
+                audioFallbackDoneForUrl = url
+                fetchClipBytesAndPlay(url)
+            } else {
+                android.widget.Toast.makeText(applicationContext, R.string.error_audio, android.widget.Toast.LENGTH_SHORT)
+                    .show()
+            }
             false
         }
 
         mediaPlayer.prepareAsync()
+    }
+
+    private fun fetchClipBytesAndPlay(url: String) {
+        val referer = mWord?.uri?.toString()
+        lifecycleScope.launch(Dispatchers.IO) {
+            val fetched = ChallengeWebView.fetchBytes(url, referer)
+            if (!fetched.ok) {
+                withContext(Dispatchers.Main) {
+                    android.widget.Toast.makeText(
+                        applicationContext, R.string.error_audio,
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+                return@launch
+            }
+            val file = java.io.File(cacheDir, "audio-fallback-card.mp3")
+            try {
+                file.writeBytes(fetched.bytes!!)
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    android.widget.Toast.makeText(
+                        applicationContext, R.string.error_audio,
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+                return@launch
+            }
+            withContext(Dispatchers.Main) {
+                playAudioSource(file.absolutePath, isFallbackFile = true)
+            }
+        }
     }
 
     fun urlsToData(urls: ArrayList<String>): ArrayList<String> {

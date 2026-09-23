@@ -115,6 +115,19 @@ class CollinsFetchTest {
     }
 
     @Test
+    fun testAudioByteFetchFailsFastBeforeInit() {
+        // Robolectric never inits the holder (and runs on the main thread):
+        // the WebView-bytes audio fallback must fail fast, never deadlock.
+        val fetched = ChallengeWebView.fetchBytes(
+            "https://www.collinsdictionary.com/sounds/hwd_sounds/ES-ES-W0034030.mp3",
+            "https://www.collinsdictionary.com/dictionary/spanish-english/frente",
+            timeoutMs = 5_000L
+        )
+
+        assertThat(fetched.ok).isFalse()
+    }
+
+    @Test
     fun testDefaultRegistryGivesCollinsTheFallbackTransport() {
         val app = ApplicationProvider.getApplicationContext<android.app.Application>()
         NordictPrefs.clearBlocking(app)
@@ -175,8 +188,7 @@ class CollinsFetchTest {
     }
 
     @Test
-    fun testInfopediaTransportNoticeTracksFallback() {
-        assertThat(InfopediaTransport.recentFallbackNotice()).isNull()
+    fun testInfopediaTransportNoticeTracksFallback() {        assertThat(InfopediaTransport.recentFallbackNotice()).isNull()
 
         InfopediaTransport.noteFallback(true)
         assertThat(InfopediaTransport.recentFallbackNotice()).contains("Infopedia")
@@ -184,5 +196,90 @@ class CollinsFetchTest {
 
         InfopediaTransport.noteFallback(false)
         assertThat(InfopediaTransport.recentFallbackNotice()).contains("could not solve")
+    }
+
+    @Test
+    fun testAudioHeadersCarryInfopediaClearanceToTtsClips() {
+        // The word view's ExoPlayer fetches the TTS clip with its own HTTP
+        // stack: without the synced clearance the clip 403s and nothing plays.
+        assertThat(
+            audioRequestHeaders("https://www.infopedia.pt/dicionarios/lingua-portuguesa/tts/word/mesa?homografia=0")
+        ).doesNotContainKey("Cookie")
+
+        InfopediaClearance.noteCookies(
+            "https://www.infopedia.pt/dicionarios/lingua-portuguesa/mesa",
+            "cf_clearance=tok456; _ga=abc"
+        )
+        assertThat(
+            audioRequestHeaders("https://www.infopedia.pt/dicionarios/lingua-portuguesa/tts/word/mesa?homografia=0")["Cookie"]
+        ).isEqualTo("cf_clearance=tok456")
+    }
+
+    @Test
+    fun testAudioHeadersCarryCollinsClearanceToSoundClips() {
+        assertThat(
+            audioRequestHeaders("https://www.collinsdictionary.com/sounds/hwd_sounds/ES-419-A0021400.mp3")
+        ).doesNotContainKey("Cookie")
+
+        CollinsClearance.noteCookies(
+            "https://www.collinsdictionary.com/dictionary/spanish-english/mesa",
+            "cf_clearance=tok123"
+        )
+        assertThat(
+            audioRequestHeaders("https://www.collinsdictionary.com/sounds/hwd_sounds/ES-419-A0021400.mp3")["Cookie"]
+        ).isEqualTo("cf_clearance=tok123")
+        // Collins' token never leaks onto Infopedia clips and vice versa.
+        assertThat(
+            audioRequestHeaders("https://www.infopedia.pt/dicionarios/lingua-portuguesa/tts/word/mesa?homografia=0")
+        ).doesNotContainKey("Cookie")
+    }
+
+    @Test
+    fun testAudioHeadersStayEmptyOffChallengedHosts() {
+        CollinsClearance.noteCookies("https://www.collinsdictionary.com/x", "cf_clearance=tok123")
+        InfopediaClearance.noteCookies("https://www.infopedia.pt/x", "cf_clearance=tok456")
+
+        assertThat(audioRequestHeaders("https://dle.rae.es/frente")).isEmpty()
+    }
+
+    @Test
+    fun testAudioHeadersAddWordPageRefererForInfopediaTts() {
+        // Infopedia hotlink-guards its TTS endpoint: a bare fetch of the clip
+        // URL answers 404 unless it carries the word page as Referer.
+        val tts = "https://www.infopedia.pt/dicionarios/lingua-portuguesa/tts/word/mesa?homografia=0"
+        val page = "https://www.infopedia.pt/dicionarios/lingua-portuguesa/mesa"
+
+        val withReferer = audioRequestHeaders(tts, page)
+        assertThat(withReferer["Referer"]).isEqualTo(page)
+        assertThat(withReferer["Sec-Fetch-Dest"]).isEqualTo("audio")
+        // Without a word page there is no Referer, but the subresource
+        // metadata still goes out; other hosts never get any of it.
+        val bare = audioRequestHeaders(tts)
+        assertThat(bare).doesNotContainKey("Referer")
+        assertThat(bare["Sec-Fetch-Dest"]).isEqualTo("audio")
+        // Collins' static sound files get the word page as Referer too (a
+        // bare fetch 403s); unrelated hosts still get nothing.
+        val collins = audioRequestHeaders(
+            "https://www.collinsdictionary.com/sounds/hwd_sounds/ES-419-A0021400.mp3",
+            "https://www.collinsdictionary.com/dictionary/spanish-english/mesa"
+        )
+        assertThat(collins["Referer"])
+            .isEqualTo("https://www.collinsdictionary.com/dictionary/spanish-english/mesa")
+        assertThat(collins["Sec-Fetch-Dest"]).isEqualTo("audio")
+        assertThat(audioRequestHeaders("https://dle.rae.es/frente", "https://dle.rae.es/frente"))
+            .isEmpty()
+    }
+
+    @Test
+    fun testMergeCookiesPrefersJarAndAppendsMissingClearance() {
+        assertThat(mergeCookies(null, null)).isNull()
+        assertThat(mergeCookies("a=b", null)).isEqualTo("a=b")
+        assertThat(mergeCookies(null, "cf_clearance=t")).isEqualTo("cf_clearance=t")
+        // The jar already carries a clearance: no duplicate.
+        assertThat(mergeCookies("x=y; cf_clearance=j", "cf_clearance=s"))
+            .isEqualTo("x=y; cf_clearance=j")
+        // Otherwise the synced clearance rides along with the jar.
+        assertThat(mergeCookies("__cf_bm=z", "cf_clearance=s"))
+            .isEqualTo("__cf_bm=z; cf_clearance=s")
     }
 }

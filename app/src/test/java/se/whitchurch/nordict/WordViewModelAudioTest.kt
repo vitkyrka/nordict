@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.SavedStateHandle
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
+import okhttp3.HttpUrl.Companion.toHttpUrl
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -20,6 +21,18 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])
 class WordViewModelAudioTest {
+
+    @org.junit.Before
+    fun setUp() {
+        CollinsClearance.reset()
+        InfopediaClearance.reset()
+    }
+
+    @org.junit.After
+    fun tearDown() {
+        CollinsClearance.reset()
+        InfopediaClearance.reset()
+    }
 
     @Test
     fun playAudioResetsThePlaylistSoPlaybackCanRepeat() {
@@ -49,5 +62,65 @@ class WordViewModelAudioTest {
         )
 
         assertThat(vm.player.mediaItemCount).isEqualTo(2)
+    }
+
+    @Test
+    fun playAudioSendsSyncedClearanceToChallengedHostClips() {
+        // The player's own HTTP stack never solved the Cloudflare challenge:
+        // an Infopedia TTS clip must go out with the synced cf_clearance
+        // cookie or the request 403s and playback fails with a source error.
+        // The TTS endpoint is additionally hotlink-guarded, so the word page
+        // goes along as Referer.
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val vm = WordViewModel(app, SavedStateHandle(mapOf("uri" to "https://example.com/frente")))
+        vm.mWord = Word(
+            "INFOPEDIA", "mesa", "mesa", "mesa",
+            "https://www.infopedia.pt/dicionarios/lingua-portuguesa/mesa".toHttpUrl(),
+            java.util.ArrayList(listOf("1"))
+        )
+
+        vm.playAudio(
+            java.util.ArrayList(
+                listOf("https://www.infopedia.pt/dicionarios/lingua-portuguesa/tts/word/mesa?homografia=0")
+            )
+        )
+        assertThat(vm.lastAudioHeaders["Referer"])
+            .isEqualTo("https://www.infopedia.pt/dicionarios/lingua-portuguesa/mesa")
+
+        InfopediaClearance.noteCookies(
+            "https://www.infopedia.pt/dicionarios/lingua-portuguesa/mesa",
+            "cf_clearance=tok456"
+        )
+        vm.playAudio(
+            java.util.ArrayList(
+                listOf("https://www.infopedia.pt/dicionarios/lingua-portuguesa/tts/word/mesa?homografia=0")
+            )
+        )
+        assertThat(vm.lastAudioHeaders["Cookie"]).isEqualTo("cf_clearance=tok456")
+        assertThat(vm.lastAudioHeaders["Referer"])
+            .isEqualTo("https://www.infopedia.pt/dicionarios/lingua-portuguesa/mesa")
+        // Challenged-host clips go out with a browser UA (Cloudflare
+        // bot-fights the player's library UA even with a valid clearance).
+        assertThat(vm.lastAudioUserAgent).isEqualTo(WordViewModel.BROWSER_UA)
+
+        // A later play without clearance held stops sending the cookie again.
+        InfopediaClearance.reset()
+        vm.playAudio(java.util.ArrayList(listOf("https://example.com/a.mp3")))
+        assertThat(vm.lastAudioHeaders).isEmpty()
+        assertThat(vm.lastAudioUserAgent)
+            .isEqualTo(androidx.media3.common.MediaLibraryInfo.VERSION_SLASHY)
+    }
+
+    @Test
+    fun playAudioUsesBrowserUaForCollinsClips() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val vm = WordViewModel(app, SavedStateHandle(mapOf("uri" to "https://example.com/frente")))
+
+        vm.playAudio(
+            java.util.ArrayList(
+                listOf("https://www.collinsdictionary.com/sounds/hwd_sounds/ES-ES-W0034030.mp3")
+            )
+        )
+        assertThat(vm.lastAudioUserAgent).isEqualTo(WordViewModel.BROWSER_UA)
     }
 }
