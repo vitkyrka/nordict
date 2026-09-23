@@ -14,33 +14,31 @@ It builds upon ideas previously implemented in
 
 ## Supported dictionaries
 
+### Swedish
+
 - [Svensk ordbok utgiven av Svenska Akademien](https://svenska.se/so/) (SO).
   [Official
   app](https://play.google.com/store/apps/details?id=se.svenskaakademien.so16).
   Note that the official app works offline but Nordict requires an Internet
   connection.
 
-- [Den Danske Ordbog](https://ordnet.dk/ddo) (DDO).  [Official
-  app](https://play.google.com/store/apps/details?id=dk.dsl.ordnet.ddo).
-
 - [Svensk-Dansk Ordbog](https://sdo.dsl.dk/) (SDO).  [Official
   app](https://play.google.com/store/apps/details?id=dk.dsl.ordnet.sdo).
 
-- [Wiktionnaire](https://fr.wiktionary.org/) (WFR).
+### Danish
 
-- [Dico en ligne Le Robert](https://dictionnaire.lerobert.com/) (ROB).
+- [Den Danske Ordbog](https://ordnet.dk/ddo) (DDO).  [Official
+  app](https://play.google.com/store/apps/details?id=dk.dsl.ordnet.ddo).
 
-- [Collins French-English dictionary](https://www.collinsdictionary.com/dictionary/french-english) (COLFREN).
-
-- [Linguee (Portuguese<->English)](https://www.linguee.pt/) (LINGPT).
-
-- [Infopédia](https://www.infopedia.pt/) (INFOPEDIA).
+### Spanish
 
 - [Diccionario de la lengua española](https://dle.rae.es/) (DLE).
 
 - [Diccionario del estudiante](https://www.rae.es/diccionario-estudiante) (EST).
 
 - [Collins Spanish-English dictionary](https://www.collinsdictionary.com/dictionary/spanish-english) (COLSPAN).
+
+### Catalan
 
 - [DIDAC](https://www.diccionari.cat/didac) (DIDAC).
 
@@ -49,6 +47,20 @@ It builds upon ideas previously implemented in
 - [Diccionari català-castellà](https://www.diccionari.cat/) (CA-ES).
 
 - [Diccionari català-anglès](https://www.diccionari.cat/) (CA-EN).
+
+### Portuguese
+
+- [Linguee (Portuguese<->English)](https://www.linguee.pt/) (LINGPT).
+
+- [Infopédia](https://www.infopedia.pt/) (INFOPEDIA).
+
+### French
+
+- [Wiktionnaire](https://fr.wiktionary.org/) (WFR).
+
+- [Dico en ligne Le Robert](https://dictionnaire.lerobert.com/) (ROB).
+
+- [Collins French-English dictionary](https://www.collinsdictionary.com/dictionary/french-english) (COLFREN).
 
 ## Features
 
