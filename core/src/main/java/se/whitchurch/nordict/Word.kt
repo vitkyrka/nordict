@@ -132,7 +132,9 @@ class Word(
         val pronunciation: String = "",
         val definitions: ArrayList<Definition> = ArrayList(),
         val idioms: ArrayList<Idiom> = ArrayList(),
-        val audio: ArrayList<String> = ArrayList()
+        val audio: ArrayList<String> = ArrayList(),
+        // Word-level gender (SO "t"/"n" for the neuter/common aids; "" elsewhere).
+        val gender: String = ""
     )
 
     companion object {
@@ -153,7 +155,8 @@ class Word(
                 pronunciation = word.pronunciation,
                 definitions = ArrayList(word.definitions),
                 idioms = ArrayList(word.idioms),
-                audio = ArrayList(word.audio)
+                audio = ArrayList(word.audio),
+                gender = word.gender
             )
         }
 

@@ -1151,3 +1151,71 @@ test('renders RAE entry-number superscripts in headword and synonyms', () => {
     expect($('.synonyms a.synonym').text()).toBe('cara1');
     expect($('.antonyms .antonym sup').text()).toBe('1');
 });
+
+test('marks SO neuter headwords for the (ett) prefix and bold declined form', () => {
+    const word = {
+        mTitle: 'hus',
+        gender: 't',
+        conjugation: '<strong>huset</strong>, plural hus, bestämd form plural husen',
+        definitions: [
+            { glosses: [{ definition: 'uppbyggd konstruktion.', grammar: 'substantiv', gender: '', examples: [] }] }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('h1').text()).toBe('hus');
+    expect($('h1').hasClass('so-neuter')).toBe(true);
+    expect($('.morphology .conjugation strong').text()).toBe('huset');
+});
+
+test('marks SO common headwords without the neuter prefix', () => {
+    const word = {
+        mTitle: 'kutter',
+        gender: 'n',
+        conjugation: 'kuttern <strong>kuttrar</strong>',
+        definitions: [
+            { glosses: [{ definition: 'enmastat segelfartyg.', grammar: 'substantiv', gender: '', examples: [] }] }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('h1').text()).toBe('kutter');
+    expect($('h1').hasClass('so-neuter')).toBe(false);
+    expect($('h1').hasClass('so-common')).toBe(true);
+    expect($('.morphology .conjugation strong').text()).toBe('kuttrar');
+});
+
+test('leaves h1 unmarked when word gender is absent', () => {
+    const word = {
+        mTitle: 'frente',
+        definitions: [
+            { glosses: [{ definition: 'Parte superior de la cara.', grammar: 'nombre femenino', gender: '', examples: [] }] }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('h1').attr('class')).toBe('');
+});
+
+test('renders etymology below the definitions', () => {
+    const word = {
+        mTitle: 'table',
+        etymology: 'Du latin tabula.',
+        definitions: [
+            { glosses: [{ definition: 'Meuble sur pied(s).', grammar: 'nom féminin', gender: '', examples: [] }] }
+        ],
+        idioms: []
+    };
+
+    renderWord(word);
+
+    expect($('.etymology').text()).toContain('Du latin tabula.');
+    const article = $('article');
+    expect(article.find('.definitions').index()).toBeLessThan(article.find('.etymology').index());
+});

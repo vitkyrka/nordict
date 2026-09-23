@@ -54,6 +54,7 @@ const loadScript = words.length === 1 ? `
             conjugation: w.conjugation || '',
             participle: w.participle || '',
             etymology: w.etymology || '',
+            gender: w.gender || '',
             definitions: w.definitions || [],
             idioms: w.idioms || [],
             audio: w.audio || []

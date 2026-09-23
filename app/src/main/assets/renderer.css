@@ -12,6 +12,7 @@
     --muted-color: #555;
     --feminine-bg: #fee;
     --masculine-bg: #eef;
+    --neuter-color: #1a7f1a;
     --symbols-label-color: #336;
 }
 
@@ -26,6 +27,7 @@
         --muted-color: #b0b0b0;
         --feminine-bg: #3d2a2a;
         --masculine-bg: #2a2a3d;
+        --neuter-color: #6fbf6f;
         --symbols-label-color: #9b9bd0;
     }
 }
@@ -223,6 +225,26 @@ span.antonyms-label {
 
 span.antonym {
     font-style: italic;
+}
+
+/* ---- SO gender memorization aids (Olle Kjellin's EN-ETT technique) ----
+ *
+ * SoParser sets word-level gender "t" (neuter) / "n" (common) from the
+ * böjningstabell indefinite article and wraps the Kjellin-technique declined
+ * form (definite singular for neuter, indefinite plural for common) in
+ * <strong> in the conjugation HTML. Neuter headwords get the "(ett)" prefix
+ * and a green tint, mirroring the old HTML pipeline's .superlemma.neuter. */
+
+#content header h1.so-neuter {
+    color: var(--neuter-color);
+}
+
+#content header h1.so-neuter:before {
+    content: "(ett) ";
+}
+
+div.morphology span.conjugation strong {
+    color: var(--neuter-color);
 }
 
 /* Compact layout */

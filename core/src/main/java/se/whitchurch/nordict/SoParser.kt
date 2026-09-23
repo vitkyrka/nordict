@@ -38,6 +38,90 @@ class SoParser {
                 ?: emptyList()
 
         /**
+         * One `böjningstabell` row: the inflected form (`böjningsform`) for a
+         * `postskript` slot ("obestämd form", "bestämd form", …) under a
+         * `rubrik` ("Singular"/"Plural"). The singular indefinite slot also
+         * carries the indefinite article as `ledtext` ("en"/"ett") — the
+         * reliable neuter/common signal that replaces the old site's
+         * definite-ending heuristic.
+         */
+        private fun tableForms(
+            source: JsonObject,
+            rubrik: String,
+            postskript: String
+        ): List<Pair<String, String>> {
+            val out = ArrayList<Pair<String, String>>()
+            arr(source, "böjningstabell")?.forEach { table ->
+                if (!table.isJsonObject) return@forEach
+                if (str(table, "rubrik") != rubrik) return@forEach
+                arr(table, "rader")?.forEach { row ->
+                    if (str(row, "postskript") != postskript) return@forEach
+                    arr(row, "böjningsvarianter")?.forEach { variant ->
+                        val form = str(variant, "böjningsform") ?: return@forEach
+                        out.add(Pair(str(variant, "ledtext") ?: "", form))
+                    }
+                }
+            }
+            return out
+        }
+
+        /**
+         * Neuter ("t") vs common ("n") gender for a noun, mirroring the old
+         * HTML pipeline's `parseGrammar` values. Preferred signal is the
+         * `böjningstabell` singular indefinite `ledtext` ("ett" vs "en");
+         * falls back to the old definite-ending heuristic on the `böjning`
+         * text (definite singular ending in "t", "neutr." mentions) when the
+         * table is absent. Non-nouns return "".
+         */
+        private fun inflectionGender(source: JsonObject, ordklass: String, bojningText: String): String {
+            if (normalizePos(ordklass) != Pos.NOUN) return ""
+            tableForms(source, "Singular", "obestämd form").firstOrNull()?.let { (ledtext, _) ->
+                when (ledtext.trim().lowercase()) {
+                    "ett" -> return "t"
+                    "en" -> return "n"
+                }
+            }
+            if (bojningText.contains("ingen böjning", ignoreCase = true)) {
+                val neutr = bojningText.indexOf("neutr.")
+                if (neutr < 0) return ""
+                val ngenus = bojningText.indexOf("n-genus")
+                return if (ngenus < 0 || neutr < ngenus) "t" else "n"
+            }
+            val definite = bojningText.split("[ ,]".toRegex()).firstOrNull { it.isNotEmpty() } ?: return ""
+            return if (definite.endsWith("t")) "t" else "n"
+        }
+
+        /**
+         * Highlights the Kjellin-technique declined form inside the plain-text
+         * `böjning`: the definite singular for neuter nouns, the indefinite
+         * plural for common nouns (the old pipeline wrapped the same forms in
+         * `<strong>`). Forms come from `böjningstabell` when present
+         * (singular "bestämd form" / plural "obestämd form"); "~" shorthand
+         * is expanded to the headword first. Returns HTML for the renderer's
+         * `conjugation` slot, which is inserted unescaped.
+         */
+        private fun highlightConjugation(
+            source: JsonObject,
+            headword: String,
+            gender: String,
+            bojningText: String
+        ): String {
+            var text = bojningText.replace("~", headword)
+            if (gender != "t" && gender != "n") return text
+            val definite = tableForms(source, "Singular", "bestämd form")
+                .firstOrNull()?.second
+                ?: text.split("[ ,]".toRegex()).firstOrNull { it.isNotEmpty() }
+                ?: return text
+            val plural = tableForms(source, "Plural", "obestämd form")
+                .firstOrNull()?.second ?: ""
+            val target = if (gender == "t") definite else plural.ifEmpty { return text }
+            if (target.isEmpty() || target == headword) return text
+            // Whole-token match only, so "huset" doesn't bold inside "husets".
+            val regex = Regex("(?<![\\p{L}])${Regex.escape(target)}(?![\\p{L}])")
+            return regex.replaceFirst(text, "<strong>$target</strong>")
+        }
+
+        /**
          * `svenska.se/api/autocomplete` responses: a `{"saol","so","saob"}` map of
          * suggestion arrays. Each SO item carries `{label, word_class, target:
          * {id,...}}` where `target.id` is the article `l_nr`; `uriOf` maps it onto
@@ -81,6 +165,13 @@ class SoParser {
          * another headword (e.g. "stor som ett hus") are dropped; real idioms
          * (`idiombetydelser`) keep their leading `definitionsinledare`, definition,
          * `definitionstillägg`, `exempel` example, and `bruklighetskommentar`.
+         *
+         * Nouns also get the gender memorization aids of the old HTML pipeline:
+         * `gender` ("t" neuter / "n" common, from the `böjningstabell`
+         * indefinite article) drives the renderer's "(ett)" headword prefix,
+         * and the Kjellin-technique declined form (definite singular for
+         * neuter, indefinite plural for common) is wrapped in `<strong>` in
+         * the `conjugation` HTML.
          */
         fun parse(
             page: String,
@@ -106,8 +197,10 @@ class SoParser {
             word.rawHeadword = headword
             word.pos = normalizePos(ordklass)
 
-            str(source, "böjning")?.let {
-                word.conjugation = Jsoup.parse(it).text().trim()
+            val bojningText = str(source, "böjning")?.let { Jsoup.parse(it).text().trim() } ?: ""
+            word.gender = inflectionGender(source, ordklass, bojningText)
+            if (bojningText.isNotEmpty()) {
+                word.conjugation = highlightConjugation(source, headword, word.gender, bojningText)
             }
 
             val pronunciation = ArrayList<String>()

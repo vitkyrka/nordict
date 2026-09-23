@@ -10,6 +10,14 @@ const genderClass = (gender) =>
     gender === GENDERS.FEMININE ? 'feminine' :
     gender === GENDERS.MASCULINE ? 'masculine' : '';
 
+// Word-level SO gender ("t" neuter / "n" common, set by SoParser from the
+// böjningstabell indefinite article). Neuter headwords get the "(ett)"
+// prefix and green declined-form highlighting per Olle Kjellin's
+// EN-ETT technique (see renderer.css).
+const soGenderClass = (gender) =>
+    gender === 't' ? 'so-neuter' :
+    gender === 'n' ? 'so-common' : '';
+
 const renderGlosses = (glosses) => (glosses || []).map(gloss => `
     <div class="gloss">
         ${gloss.senseNumber ? `<span class="sense-number">${gloss.senseNumber}</span> ` : ''}
@@ -158,7 +166,7 @@ const template = (word) => {
     <article>
         <header>
             ${word.dictionary ? `<div class="dictionary-label">${word.dictionary}</div>` : ''}
-            <h1>${word.mTitle}</h1>
+            <h1 class="${soGenderClass(word.gender)}">${word.mTitle}</h1>
             ${word.pronunciation ? `<div class="pronunciation"><a class="normalx">${word.pronunciation}</a></div>` : ''}
             ${word.conjugation || word.participle ? `
                 <div class="morphology">
@@ -167,13 +175,13 @@ const template = (word) => {
                     ${word.participle ? `<span class="participle">part. <b>${word.participle}</b></span>` : ''}
                 </div>
             ` : ''}
-            ${word.etymology ? `<div class="etymology">${word.etymology}</div>` : ''}
         </header>
         ${senses.length > 0 ? `
             <div class="definitions">
                 ${senses.map(s => s.idiom ? renderIdiomBlock(s) : renderDefinitionBlock(s)).join('')}
             </div>
         ` : ''}
+        ${word.etymology ? `<div class="etymology">${word.etymology}</div>` : ''}
         ${!numberedIdioms && idioms.length > 0 ? `
             ${idioms.map(renderIdiomSection).join('')}
         ` : ''}

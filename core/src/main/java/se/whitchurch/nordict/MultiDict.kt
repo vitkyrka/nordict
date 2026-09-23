@@ -275,7 +275,8 @@ object MultiDict {
                 pronunciation = e.pronunciation,
                 definitions = e.definitions,
                 idioms = e.idioms,
-                audio = e.audio
+                audio = e.audio,
+                gender = e.gender
             )
         }
     }

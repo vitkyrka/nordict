@@ -24,8 +24,10 @@ class SoParserTest {
         val word = words.single()
         assertThat(word.mTitle).isEqualTo("hus")
         assertThat(word.pos).isEqualTo(Pos.NOUN)
+        // Neuter noun (böjningstabell ledtext "ett"): gender aid + bold definite.
+        assertThat(word.gender).isEqualTo("t")
         assertThat(word.conjugation)
-            .isEqualTo("huset, plural hus, bestämd form plural husen, åld. dativ huse")
+            .isEqualTo("<strong>huset</strong>, plural hus, bestämd form plural husen, åld. dativ huse")
         // The head pronunciation stress entry is absent on this article.
         assertThat(word.pronunciation).isEmpty()
         assertThat(word.audio).containsExactly(
@@ -90,6 +92,9 @@ class SoParserTest {
         val word = words.single()
         assertThat(word.mTitle).isEqualTo("kutter")
         assertThat(word.pos).isEqualTo(Pos.NOUN)
+        // Common noun (böjningstabell ledtext "en"): bold indefinite plural.
+        assertThat(word.gender).isEqualTo("n")
+        assertThat(word.conjugation).isEqualTo("kuttern <strong>kuttrar</strong>")
         assertThat(word.pronunciation).isEqualTo("kutt´er")
         assertThat(word.definitions).hasSize(2)
         assertThat(word.definitions[0].glosses).hasSize(2)
