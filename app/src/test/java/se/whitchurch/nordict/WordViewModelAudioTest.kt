@@ -139,6 +139,39 @@ class WordViewModelAudioTest {
     }
 
     @Test
+    fun playAudioShowsLoadingUntilPlaybackIsReady() {
+        // Slow challenged-host fetches (buffering + WebView-bytes fallback)
+        // surface a loading ring around the play button: play sets the flag,
+        // buffering keeps it, READY/ENDED clears it.
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val vm = WordViewModel(app, SavedStateHandle(mapOf("uri" to "https://example.com/frente")))
+        assertThat(vm.isAudioLoading).isFalse()
+
+        vm.playAudio(java.util.ArrayList(listOf("https://example.com/a.mp3")))
+        assertThat(vm.isAudioLoading).isTrue()
+
+        vm.onAudioPlaybackStateChanged(androidx.media3.common.Player.STATE_BUFFERING)
+        assertThat(vm.isAudioLoading).isTrue()
+
+        vm.onAudioPlaybackStateChanged(androidx.media3.common.Player.STATE_READY)
+        assertThat(vm.isAudioLoading).isFalse()
+    }
+
+    @Test
+    fun audioErrorClearsLoadingWhenNoFallbackApplies() {
+        // A failed unchallenged clip has no WebView-bytes recovery, so the
+        // ring must clear instead of spinning past the error toast.
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val vm = WordViewModel(app, SavedStateHandle(mapOf("uri" to "https://example.com/frente")))
+
+        vm.playAudio(java.util.ArrayList(listOf("https://example.com/a.mp3")))
+        assertThat(vm.isAudioLoading).isTrue()
+
+        vm.onAudioError()
+        assertThat(vm.isAudioLoading).isFalse()
+    }
+
+    @Test
     fun replayIgnoresEmptyCacheFiles() {
         // A zero-byte cache entry is not usable: the http URL plays instead,
         // so a corrupt file can still refetch through the fallback.

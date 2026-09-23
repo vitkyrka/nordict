@@ -2,6 +2,7 @@ package se.whitchurch.nordict
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.os.Build
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
@@ -29,6 +30,7 @@ import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -131,6 +133,11 @@ class WordViewModel(
 
     var mWord: Word? by mutableStateOf(null)
     var autoPlay: Boolean by mutableStateOf(false)
+    /** True while pronunciation audio is buffering or being recovered through
+     * the challenge-WebView fallback; drives the loading ring around the
+     * word bar's play button. */
+    var isAudioLoading: Boolean by mutableStateOf(false)
+        private set
     var webViewVisible: Boolean by mutableStateOf(false)
     var pageFinished: Boolean by mutableStateOf(false)
     var uiStatus: WordUiStatus by mutableStateOf(WordUiStatus.Loading)
@@ -223,6 +230,9 @@ class WordViewModel(
         val mediaSourceFactory = DefaultMediaSourceFactory(app).setDataSourceFactory(dataSourceFactory)
         ExoPlayer.Builder(app).setMediaSourceFactory(mediaSourceFactory).build().also {
             it.addListener(object : Player.Listener {
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    onAudioPlaybackStateChanged(playbackState)
+                }
                 override fun onPlayerError(error: PlaybackException) {
                     onAudioError()
                 }
@@ -239,13 +249,25 @@ class WordViewModel(
     // its source URL and refetches instead of sticking on a corrupt file.
     private val fallbackFileToUrl = HashMap<String, String>()
 
+    // internal so tests can drive the loading-ring transitions without a real
+    // player error.
+    internal fun onAudioPlaybackStateChanged(playbackState: Int) {
+        if (playbackState == Player.STATE_READY ||
+            playbackState == Player.STATE_ENDED
+        ) {
+            isAudioLoading = false
+        }
+    }
+
     // A direct clip fetch failed in the player. Challenged-host clips get one
     // silent recovery per play — bytes through the hidden challenge WebView
     // (the Chromium stack the site's own player uses), replayed from a cache
     // file — because only the toast remains otherwise.
-    private fun onAudioError() {
+    // internal so tests can drive the terminal (non-challenged) error path.
+    internal fun onAudioError() {
         val gen = audioGeneration
         if (gen == audioFallbackDoneForGen) {
+            isAudioLoading = false
             toastAudioError()
             return
         }
@@ -260,6 +282,7 @@ class WordViewModel(
         android.util.Log.i("NordictAudio", "play failed for $urls")
         val httpUrls = urls.filter { it.startsWith("http") && isChallengedAudioHost(it) }
         if (httpUrls.isEmpty()) {
+            isAudioLoading = false
             toastAudioError()
             return
         }
@@ -287,7 +310,10 @@ class WordViewModel(
             }
             withContext(Dispatchers.Main) {
                 if (gen != audioGeneration || files.size != httpUrls.size) {
-                    if (gen == audioGeneration) toastAudioError()
+                    if (gen == audioGeneration) {
+                        isAudioLoading = false
+                        toastAudioError()
+                    }
                     return@withContext
                 }
                 android.util.Log.i("NordictAudio", "replaying ${files.size} clip(s) from cache")
@@ -710,6 +736,7 @@ class WordViewModel(
     fun playAudio(urls: java.util.ArrayList<String>) {
         if (urls.isEmpty()) return
         audioGeneration += 1
+        isAudioLoading = true
         // A challenged-host clip fetched earlier replays straight from its
         // cache file: no 403, no slow fallback fetch again.
         val cacheDir = getApplication<android.app.Application>().cacheDir
@@ -930,6 +957,7 @@ fun WordScreen(
                     .padding(horizontal = 16.dp, vertical = 16.dp),
                 scrollBehavior = bottomBarScrollBehavior,
                 audioEnabled = word.audio.isNotEmpty(),
+                audioLoading = vm.isAudioLoading,
                 autoPlay = vm.autoPlay,
                 onPlayAudio = { vm.mWord?.audio?.let { audio -> vm.playAudio(audio) } },
                 onOpenInBrowser = {
@@ -965,7 +993,7 @@ fun WordScreen(
  *  distance the bar is stuck off-screen until the page is back near the top).
  *  Position the pill from the clamped `heightOffset`.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 internal fun FloatingWordToolbar(
     scrollBehavior: BottomAppBarScrollBehavior,
@@ -976,7 +1004,8 @@ internal fun FloatingWordToolbar(
     onToggleAutoPlay: () -> Unit,
     onResetZoom: () -> Unit,
     onAddCard: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    audioLoading: Boolean = false
 ) {
     val density = LocalDensity.current
     val bottomPadding = 16.dp
@@ -1008,11 +1037,38 @@ internal fun FloatingWordToolbar(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            IconButton(onClick = onPlayAudio, enabled = audioEnabled) {
-                Icon(
-                    painterResource(R.drawable.play),
-                    contentDescription = stringResource(R.string.menu_play_audio)
-                )
+            // Subtle loading feedback for slow challenged-host fetches
+            // (direct buffering + the WebView-bytes fallback): a thin ring
+            // around the play button. Lives inside the button's 48.dp box so
+            // the bar never resizes or shifts while loading.
+            Box(
+                modifier = Modifier.size(48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                IconButton(onClick = onPlayAudio, enabled = audioEnabled) {
+                    Icon(
+                        painterResource(R.drawable.play),
+                        contentDescription = stringResource(R.string.menu_play_audio)
+                    )
+                }
+                if (audioLoading && audioEnabled) {
+                    // M3 Expressive wavy ring, matching LoadingIndicator. Its
+                    // animation never idles under Robolectric (see
+                    // LoadingIndicator), so tests get a static placeholder
+                    // with the same tag instead.
+                    if (Build.FINGERPRINT == "robolectric") {
+                        Box(
+                            modifier = Modifier.size(42.dp)
+                                .testTag("audioLoading")
+                        )
+                    } else {
+                        CircularWavyProgressIndicator(
+                            modifier = Modifier.size(42.dp)
+                                .testTag("audioLoading"),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f)
+                        )
+                    }
+                }
             }
 
             IconButton(onClick = onAddCard) {

@@ -368,10 +368,10 @@ class AppDriver(private val app: android.app.Application) {
                 "loaded word has no audio URLs (${word.dictionary}) — pass a `url` to `audio`"
             )
         }
-        val count = onMain {
-            val vm = topWordViewModel() ?: return@onMain -1
+        val (count, loading) = onMain {
+            val vm = topWordViewModel() ?: return@onMain Pair(-1, false)
             vm.playAudio(urls)
-            vm.player.mediaItemCount
+            Pair(vm.player.mediaItemCount, vm.isAudioLoading)
         }
         if (count < 0) {
             return AgentResult.error(AgentOps.AUDIO, "no word destination up to play audio")
@@ -379,7 +379,7 @@ class AppDriver(private val app: android.app.Application) {
         return AgentResult(
             ok = true,
             op = AgentOps.AUDIO,
-            message = "queued ${urls.size} audio URL(s); playlist has $count item(s)",
+            message = "queued ${urls.size} audio URL(s); playlist has $count item(s); loading=$loading",
             state = snapshot()
         )
     }

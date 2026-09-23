@@ -14,6 +14,7 @@ import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -49,7 +50,7 @@ class FloatingWordToolbarTest {
     private fun string(resId: Int): String =
         ApplicationProvider.getApplicationContext<android.app.Application>().getString(resId)
 
-    private fun setBar(audioEnabled: Boolean) {
+    private fun setBar(audioEnabled: Boolean, audioLoading: Boolean = false) {
         played = false
         cardRequested = false
         composeRule.setContent {
@@ -66,7 +67,8 @@ class FloatingWordToolbarTest {
                         onOpenInBrowser = {},
                         onToggleAutoPlay = {},
                         onResetZoom = {},
-                        onAddCard = { cardRequested = true }
+                        onAddCard = { cardRequested = true },
+                        audioLoading = audioLoading
                     )
                 }
             }
@@ -147,6 +149,29 @@ class FloatingWordToolbarTest {
             .onNodeWithContentDescription(string(R.string.menu_play_audio))
             .getBoundsInRoot()
         assertThat(restored.top.value).isEqualTo(visible.top.value)
+    }
+
+    @Test
+    fun loadingRingHiddenByDefault() {
+        setBar(audioEnabled = true)
+        composeRule.onNodeWithTag("audioLoading").assertDoesNotExist()
+    }
+
+    @Test
+    fun loadingRingShowsWhileAudioLoads() {
+        setBar(audioEnabled = true, audioLoading = true)
+        composeRule.onNodeWithTag("audioLoading").assertIsDisplayed()
+        // The play button stays usable underneath the ring (re-tap
+        // supersedes via the playback generation counter).
+        composeRule
+            .onNodeWithContentDescription(string(R.string.menu_play_audio))
+            .assertIsEnabled()
+    }
+
+    @Test
+    fun loadingRingHiddenWhenTheWordHasNoAudio() {
+        setBar(audioEnabled = false, audioLoading = true)
+        composeRule.onNodeWithTag("audioLoading").assertDoesNotExist()
     }
 
     @Test
