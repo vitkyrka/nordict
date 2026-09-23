@@ -5,8 +5,8 @@ dictionaries.  Major dictionaries of both these languages have official,
 free-of-cost apps, but Nordict has unique features which may be helpful for
 non-native speakers.
 
-Nordict also has varying degrees of support for various French, Portuguese and
-Spanish dictionaries.
+Nordict also has varying degrees of support for various Catalan, Spanish,
+French and Portuguese dictionaries.
 
 It builds upon ideas previously implemented in
 [Bildkortsappen](https://github.com/vitkyrka/bildkortsappen) and
@@ -38,7 +38,17 @@ It builds upon ideas previously implemented in
 
 - [Diccionario de la lengua española](https://dle.rae.es/) (DLE).
 
+- [Diccionario del estudiante](https://www.rae.es/diccionario-estudiante) (EST).
+
 - [Collins Spanish-English dictionary](https://www.collinsdictionary.com/dictionary/spanish-english) (COLSPAN).
+
+- [DIDAC](https://www.diccionari.cat/didac) (DIDAC).
+
+- [Gran Diccionari de la Llengua Catalana](https://www.diccionari.cat/) (GDLC).
+
+- [Diccionari català-castellà](https://www.diccionari.cat/) (CA-ES).
+
+- [Diccionari català-anglès](https://www.diccionari.cat/) (CA-EN).
 
 ## Features
 
@@ -46,7 +56,7 @@ It builds upon ideas previously implemented in
   be clicked to either jump directly to its definition (if there is a unique,
   perfect match) or to put it in the search box to save some typing.
 
-* **AnkiDroid integration (DDO, SO, WFR).** [AnkiDroid](https://github.com/ankidroid/Anki-Android)
+* **AnkiDroid integration (all).** [AnkiDroid](https://github.com/ankidroid/Anki-Android)
   flashcards can be created directly from the app:
   * The different meanings for the headword are split so that each flashcard
     only contains one meaning.
@@ -59,16 +69,19 @@ It builds upon ideas previously implemented in
   * The pronunciation audio is also included and works offline and plays
     automatically in the back of the flashcard.
 
-* **Phonetic transcription (DDO).** The official DDO website includes a
-  phonetic transcription for each word in a [simplified version of the
+* **Phonetic transcription (DDO, SDO, SO, WFR, ROB, INFOPEDIA, diccionari.cat).**
+  The official DDO website includes a phonetic transcription for each word in
+  a [simplified version of the
   IPA](https://ordnet.dk/ddo/artiklernes-opbygning/udtale), but this is omitted
-  in the official Android app.  Nordict displays these.
+  in the official Android app.  Nordict displays these, as well as the
+  pronunciation guides of the other transcribed dictionaries.
 
-* **Gender highlighting (DDO, SO).**  The vast majority of nouns in both
-  Swedish and Danish are of the common gender, so Nordict highlights the
-  entries for neuter nouns in an attempt to make them more memorable.
+* **Gender highlighting (Spanish, Catalan, French, Portuguese).**  Masculine
+  and feminine grammar markers are highlighted with different backgrounds in
+  an attempt to make them more memorable.  (Swedish/Danish neuter aids are
+  covered separately below.)
 
-* **Proper navigation (DDO, SDO, SO).**  The official SO app already gets this
+* **Proper navigation (all).**  The official SO app already gets this
   right, but in the DDO app it is not possible to return to a word with the
   back button after navigating to another word via a hyperlink.  This is fixed
   in Nordict.
@@ -77,14 +90,15 @@ It builds upon ideas previously implemented in
   flaws which make it hard to use: for example, in words with more than one
   meaning, there is no overview so one is forced to scroll throw a large amount
   of content (such as translations to dozens of languages) to jump between meanings.
-  Also, the (sometimes quite large) Etymology section is placed at the top, even
-  before the definitions, which is unhelpful.  These problems are fixed in Nordict.
+  These problems are fixed in Nordict: translations are stripped, each part of
+  speech gets its own headed entry on one page, and the etymology is shown
+  below the definitions instead of above them.
 
-* **Smooth inter-dictionary navigation (SDO).**  The official SDO app shows a
-  dialog whenever a link from SDO to DDO is clicked, but this is not present in
-  Nordict.
+* **Smooth inter-dictionary navigation (all, e.g. SDO to DDO).**  The official
+  SDO app shows a dialog whenever a link from SDO to DDO is clicked, but this
+  is not present in Nordict.
 
-* **Inflected forms expansion (DDO, SO).**  The swung dashes/tildes in the
+* **Inflected forms expansion (DDO, SDO, SO).**  The swung dashes/tildes in the
   inflected forms are replaced with the word which they represent.  The idea is
   that seeing the forms fully spelled out will help in remembering them.
 
@@ -93,8 +107,9 @@ It builds upon ideas previously implemented in
   neuter and common gender nouns, in order to aid in applying [the techniques
   described by Olle Kjellin](https://bit.ly/EN-ETT-in-Swedish).
 
-* **Pronunciation auto-play (DDO, ROB, SO, WFR).**  The recorded pronunciations
-  can be configured to automatically play when the entry is opened.
+* **Pronunciation auto-play (DDO, SO, WFR, ROB, COLSPAN, COLFREN, LINGPT,
+  INFOPEDIA).**  The recorded pronunciations can be configured to automatically
+  play when the entry is opened.
 
 ## License
 
