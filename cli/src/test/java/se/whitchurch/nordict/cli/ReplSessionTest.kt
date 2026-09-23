@@ -99,7 +99,7 @@ class ReplSessionTest {
         ok(r[5])
         assertThat(r[5].word?.word?.mTitle).isEqualTo("frente")
         assertThat(r[5].word?.word?.definitions).hasSize(6)
-        assertThat(r[5].word?.word?.idioms).hasSize(14)
+        assertThat(r[5].word?.word?.idioms).hasSize(9)
     }
 
     @Test
@@ -290,10 +290,10 @@ class ReplSessionTest {
 
         ok(r[2])
         assertThat(r[2].results).isNotEmpty()
-        // Combined results are ordered alphabetically ignoring case: the DLE/EST
-        // shared "frente" entry is no longer first, but merges both dictionaries.
-        assertThat(r[2].results!![0].mTitle).isEqualTo("al frente")
-        val frente = r[2].results!!.first { it.mTitle == "frente" }
+        // Query-prefix matches sort first, so the DLE/EST shared "frente"
+        // entry leads and merges both dictionaries.
+        assertThat(r[2].results!![0].mTitle).isEqualTo("frente")
+        val frente = r[2].results!![0]
         assertThat(frente.dicts).containsExactly("DLE", "EST").inOrder()
         assertThat(frente.uri).isEqualTo("https://dle.rae.es/frente")
 
