@@ -18,7 +18,7 @@ import java.net.Socket
  * A loopback agent server for the debug build: one line-delimited JSON
  * [AgentCommand] per line on a socket connection, exactly one [AgentResult]
  * per command back, in order (the same wire framing as the headless `:cli
- * repl`). The host reaches it through `adb reverse tcp:42837 tcp:42837`.
+ * repl`). The host reaches it through `adb forward tcp:42837 tcp:42837`.
  *
  * Binding failure (another instance/tests already bound the port) is logged
  * and non-fatal, so normal app startup is never affected.

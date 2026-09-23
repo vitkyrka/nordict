@@ -17,7 +17,7 @@ import com.google.gson.GsonBuilder
  * reserved for diagnostics.
  */
 object AgentProtocol {
-    /** Loopback port the debug app binds (host reaches it via `adb reverse`). */
+    /** Loopback port the debug app binds (host reaches it via `adb forward`). */
     const val PORT = 42837
 
     val gson: Gson = GsonBuilder().disableHtmlEscaping().create()

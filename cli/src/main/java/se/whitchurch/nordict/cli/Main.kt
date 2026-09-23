@@ -609,7 +609,7 @@ class Main {
             Reads one JSON command per line from stdin and writes exactly one
             JSON result per command to stdout. Headless by default (searches and
             parses pages with the shared parsers); --device drives the debug
-            build of the real app over adb reverse.
+            build of the real app over adb forward.
 
             commands ({"op":"search","query":"frente"}, ...):
               search   search the current dictionary, returning {mTitle,mSummary,uri} results
@@ -626,7 +626,7 @@ class Main {
                quit     close the session
 
             options:
-              --device SERIAL    drive the app on a connected device (adb reverse on port 42837)
+              --device SERIAL    drive the app on a connected device (adb forward on port 42837)
               --command 'json'   run one command and print its one-line result, then exit
               -h, --help         show this help
 
