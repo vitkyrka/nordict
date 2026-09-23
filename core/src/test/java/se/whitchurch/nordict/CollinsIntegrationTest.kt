@@ -32,7 +32,7 @@ class CollinsIntegrationTest {
 
     @Test
     fun testSearch() {
-        val json = File("../testdata/colspan-search.json").readText()
+        val json = Goldens.fixtureText("../testdata/colspan-search.json")
         server.enqueue(MockResponse().setBody(json))
 
         val results = dictionary.search("cagar")
@@ -55,7 +55,7 @@ class CollinsIntegrationTest {
 
     @Test
     fun testSearchTrimsSurroundingWhitespace() {
-        val json = File("../testdata/colspan-search.json").readText()
+        val json = Goldens.fixtureText("../testdata/colspan-search.json")
         server.enqueue(MockResponse().setBody(json))
 
         val results = dictionary.search("  cagar  ")
@@ -77,7 +77,7 @@ class CollinsIntegrationTest {
 
     @Test
     fun testGet() {
-        val html = File("../testdata/colspan/morir.html").readText()
+        val html = Goldens.fixtureText("../testdata/colspan/morir.html")
         server.enqueue(MockResponse().setBody(html))
 
         val uri: HttpUrl = server.url("/dictionary/spanish-english/morir")
@@ -94,7 +94,7 @@ class CollinsIntegrationTest {
 
     @Test
     fun testGetRefResolvesMainHeadword() {
-        val html = File("../testdata/colspan/morir.html").readText()
+        val html = Goldens.fixtureText("../testdata/colspan/morir.html")
 
         // __ref=2 -> the first main dictionary headword.
         server.enqueue(MockResponse().setBody(html))
@@ -116,7 +116,7 @@ class CollinsIntegrationTest {
 
     @Test
     fun testGetRefResolvesEasyLearning() {
-        val html = File("../testdata/colspan/frente.html").readText()
+        val html = Goldens.fixtureText("../testdata/colspan/frente.html")
 
         // Default (no __ref) -> the first easy-learning headword.
         server.enqueue(MockResponse().setBody(html))
@@ -151,7 +151,7 @@ class CollinsIntegrationTest {
 
     @Test
     fun testGetCrossReferenceEntry() {
-        val html = File("../testdata/colspan/ley+de+la+gravedad.html").readText()
+        val html = Goldens.fixtureText("../testdata/colspan/ley+de+la+gravedad.html")
 
         // Default view -> the cross-reference stub headword.
         server.enqueue(MockResponse().setBody(html))

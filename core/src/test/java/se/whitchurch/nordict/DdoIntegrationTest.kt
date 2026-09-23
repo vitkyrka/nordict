@@ -36,8 +36,8 @@ class DdoIntegrationTest {
 
     @Test
     fun testSearch() {
-        val query = File("../testdata/ddo-query.html").readText()
-        val search = File("../testdata/ddo-search.json").readText()
+        val query = Goldens.fixtureText("../testdata/ddo-query.html")
+        val search = Goldens.fixtureText("../testdata/ddo-search.json")
         server.enqueue(MockResponse().setBody(query))
         server.enqueue(MockResponse().setBody(search))
 
@@ -60,7 +60,7 @@ class DdoIntegrationTest {
 
     @Test
     fun testGet() {
-        val html = File("../testdata/ddo/arbejde.html").readText()
+        val html = Goldens.fixtureText("../testdata/ddo/arbejde.html")
         server.enqueue(MockResponse().setBody(html))
 
         val uri = server.url("/ddo/ordbog")
@@ -80,8 +80,8 @@ class DdoIntegrationTest {
 
     @Test
     fun testGetApiWord() {
-        val query = File("../testdata/ddo-query.html").readText()
-        val html = File("../testdata/ddo/arbejde.html").readText()
+        val query = Goldens.fixtureText("../testdata/ddo-query.html")
+        val html = Goldens.fixtureText("../testdata/ddo/arbejde.html")
         server.enqueue(MockResponse().setBody(query))
         server.enqueue(MockResponse().setBody(html))
 

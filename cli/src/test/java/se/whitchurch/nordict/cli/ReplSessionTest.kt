@@ -8,7 +8,6 @@ import se.whitchurch.nordict.AgentProtocol
 import se.whitchurch.nordict.AgentResult
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
-import java.io.File
 import java.io.PrintStream
 
 /**
@@ -23,17 +22,17 @@ class ReplSessionTest {
     private fun fixtureFetch(url: HttpUrl): String {
         return when {
             url.host == "dle.rae.es" && url.encodedPath == "/srv/keys" ->
-                File("../testdata/dle-search.json").readText()
+                TestFixtures.fixtureText("../testdata/dle-search.json")
             url.host == "dle.rae.es" && url.encodedPath == "/frente" ->
-                File("../testdata/dle/frente.html").readText()
+                TestFixtures.fixtureText("../testdata/dle/frente.html")
             url.host == "www.rae.es" && url.encodedPath == "/diccionario-estudiante/srv/keys" ->
-                File("../testdata/est-search.json").readText()
+                TestFixtures.fixtureText("../testdata/est-search.json")
             url.host == "www.rae.es" && url.encodedPath.startsWith("/diccionario-estudiante/muerte") ->
-                File("../testdata/est/muerte.html").readText()
+                TestFixtures.fixtureText("../testdata/est/muerte.html")
             url.host == "www.rae.es" && url.encodedPath.endsWith("/frente") ->
-                File("../testdata/est.html").readText()
+                TestFixtures.fixtureText("../testdata/est.html")
             url.host == "www.rae.es" && url.encodedPath.endsWith("/cagar") ->
-                File("../testdata/est/cagar.html").readText()
+                TestFixtures.fixtureText("../testdata/est/cagar.html")
             else -> throw IllegalArgumentException("unexpected fetch: $url")
         }
     }
@@ -58,6 +57,9 @@ class ReplSessionTest {
 
     @Test
     fun persistentSessionRunsMultiCommandScriptInOrder() {
+        // fixtureFetch swallows Assume skips into error results, so require
+        // testdata eagerly on the test thread.
+        TestFixtures.requireTestdata()
         val r = runScript(
             driver(),
             """{"op":"state"}""",
@@ -102,6 +104,7 @@ class ReplSessionTest {
 
     @Test
     fun runSearchResolvesTheResultsDestinationList() {
+        TestFixtures.requireTestdata()
         val r = runScript(
             driver(),
             """{"op":"runSearch","query":"frente"}"""
@@ -116,6 +119,7 @@ class ReplSessionTest {
 
     @Test
     fun openUriAndNextPageWalkHomographs() {
+        TestFixtures.requireTestdata()
         val r = runScript(
             driver(),
             """{"op":"setDict","tag":"est"}""",
@@ -166,6 +170,7 @@ class ReplSessionTest {
 
     @Test
     fun subEntryUrlResolvesByLastPathSegment() {
+        TestFixtures.requireTestdata()
         val r = runScript(
             driver(),
             """{"op":"setDict","tag":"est"}""",
@@ -263,6 +268,7 @@ class ReplSessionTest {
 
     @Test
     fun combinedSelectionSearchesAndOpensAcrossDictionaries() {
+        TestFixtures.requireTestdata()
         val r = runScript(
             driver(),
             """{"op":"setDict","tag":"DLE,EST"}""",
@@ -309,6 +315,7 @@ class ReplSessionTest {
 
     @Test
     fun setDictCollapsesCombinedSelectionBackToSingle() {
+        TestFixtures.requireTestdata()
         val r = runScript(
             driver(),
             """{"op":"setDict","tags":["DLE","EST"]}""",

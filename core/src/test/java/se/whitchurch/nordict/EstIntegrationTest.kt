@@ -30,7 +30,7 @@ class EstIntegrationTest {
 
     @Test
     fun testSearch() {
-        val json = File("../testdata/est-search.json").readText()
+        val json = Goldens.fixtureText("../testdata/est-search.json")
         server.enqueue(MockResponse().setBody(json))
 
         val results = dictionary.search("frente")
@@ -47,7 +47,7 @@ class EstIntegrationTest {
 
     @Test
     fun testGet() {
-        val html = File("../testdata/est.html").readText()
+        val html = Goldens.fixtureText("../testdata/est.html")
         server.enqueue(MockResponse().setBody(html))
 
         val uri: HttpUrl = server.url("/frente")
@@ -67,7 +67,7 @@ class EstIntegrationTest {
 
     @Test
     fun testGetSubEntry() {
-        val html = File("../testdata/est/muerte.html").readText()
+        val html = Goldens.fixtureText("../testdata/est/muerte.html")
 
         // Search-result URL for a .sols sub-entry resolves to that headword.
         server.enqueue(MockResponse().setBody(html))

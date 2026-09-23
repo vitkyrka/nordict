@@ -32,7 +32,7 @@ class LingueeIntegrationTest {
 
     @Test
     fun testSearch() {
-        val body = File("../testdata/lingpt-search.json").readText(Charsets.ISO_8859_1)
+        val body = Goldens.fixtureText("../testdata/lingpt-search.json", Charsets.ISO_8859_1)
         server.enqueue(MockResponse().setBody(body))
 
         val results = dictionary.search("mesa")
@@ -50,7 +50,7 @@ class LingueeIntegrationTest {
 
     @Test
     fun testGet() {
-        val html = File("../testdata/lingpt/mesa.html").readText(Charsets.ISO_8859_1)
+        val html = Goldens.fixtureText("../testdata/lingpt/mesa.html", Charsets.ISO_8859_1)
         server.enqueue(MockResponse().setBody(html))
 
         val uri: HttpUrl = server.url("/portugues-ingles/traducao/mesa.html")
@@ -67,7 +67,7 @@ class LingueeIntegrationTest {
 
     @Test
     fun testGetRefResolvesSecondEntry() {
-        val html = File("../testdata/lingpt/mesa.html").readText(Charsets.ISO_8859_1)
+        val html = Goldens.fixtureText("../testdata/lingpt/mesa.html", Charsets.ISO_8859_1)
 
         // Default (no __ref) -> the first exact match on the page.
         server.enqueue(MockResponse().setBody(html))

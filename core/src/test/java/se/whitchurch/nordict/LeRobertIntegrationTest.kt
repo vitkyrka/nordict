@@ -29,7 +29,7 @@ class LeRobertIntegrationTest {
 
     @Test
     fun testSearch() {
-        val json = File("../testdata/rob-search.json").readText()
+        val json = Goldens.fixtureText("../testdata/rob-search.json")
         server.enqueue(MockResponse().setBody(json))
 
         val results = dictionary.search("table")
@@ -53,7 +53,7 @@ class LeRobertIntegrationTest {
 
     @Test
     fun testGet() {
-        val html = File("../testdata/rob/table.html").readText()
+        val html = Goldens.fixtureText("../testdata/rob/table.html")
         server.enqueue(MockResponse().setBody(html))
 
         val uri = server.url("/definition/table")
@@ -68,7 +68,7 @@ class LeRobertIntegrationTest {
 
     @Test
     fun testGetHomographRef() {
-        val html = File("../testdata/rob/table.html").readText()
+        val html = Goldens.fixtureText("../testdata/rob/table.html")
 
         // A __ref=2 URL still resolves (the fixture has a single entry, so the
         // parser falls back to the first word rather than failing).

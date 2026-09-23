@@ -26,7 +26,7 @@ class LingueeParserTest {
 
     @Test
     fun testParseMesa() {
-        val htmlFile = File("../testdata/lingpt/mesa.html")
+        val htmlFile = Goldens.fixture("../testdata/lingpt/mesa.html")
         val page = htmlFile.readText(Charsets.ISO_8859_1)
         val uri = httpUrl("https://www.linguee.pt/portugues-ingles/traducao/mesa.html")
         val words = LingueeParser.parse(page, uri, "LINGPT")
@@ -74,7 +74,7 @@ class LingueeParserTest {
 
     @Test
     fun testParseSearch() {
-        val body = File("../testdata/lingpt-search.json").readText(Charsets.ISO_8859_1)
+        val body = Goldens.fixtureText("../testdata/lingpt-search.json", Charsets.ISO_8859_1)
 
         val results = LingueeParser.parseSearch(body) { page ->
             httpUrl("https://www.linguee.pt$page")

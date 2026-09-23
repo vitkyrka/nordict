@@ -20,7 +20,7 @@ class LeRobertParserTest {
 
     @Test
     fun testParseTable() {
-        val htmlFile = File("../testdata/rob/table.html")
+        val htmlFile = Goldens.fixture("../testdata/rob/table.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://dictionnaire.lerobert.com/definition/table")
         val words = LeRobertParser.parse(page, uri, "ROB")
@@ -63,7 +63,7 @@ class LeRobertParserTest {
 
     @Test
     fun testParseSearch() {
-        val body = File("../testdata/rob-search.json").readText()
+        val body = Goldens.fixtureText("../testdata/rob-search.json")
 
         val results = LeRobertParser.parseSearch(body) { page ->
             httpUrl("https://dictionnaire.lerobert.com$page")

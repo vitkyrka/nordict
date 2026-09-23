@@ -30,7 +30,7 @@ class DleIntegrationTest {
 
     @Test
     fun testSearch() {
-        val json = File("../testdata/dle-search.json").readText()
+        val json = Goldens.fixtureText("../testdata/dle-search.json")
         server.enqueue(MockResponse().setBody(json))
 
         val results = dictionary.search("frente")
@@ -47,7 +47,7 @@ class DleIntegrationTest {
 
     @Test
     fun testGet() {
-        val html = File("../testdata/dle.html").readText()
+        val html = Goldens.fixtureText("../testdata/dle.html")
         server.enqueue(MockResponse().setBody(html))
 
         val uri: HttpUrl = server.url("/frente")

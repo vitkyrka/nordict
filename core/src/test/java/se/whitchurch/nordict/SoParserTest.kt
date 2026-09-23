@@ -13,7 +13,7 @@ class SoParserTest {
 
     @Test
     fun testHusGolden() {
-        val page = File("../testdata/so/hus.article.json").readText()
+        val page = Goldens.fixtureText("../testdata/so/hus.article.json")
         val words = SoParser.parse(page, husUrl, "SO", "https://svenska.se")
         Goldens.assertGolden(
             words.map { it.toWordData() },
@@ -79,7 +79,7 @@ class SoParserTest {
 
     @Test
     fun testKutterGolden() {
-        val page = File("../testdata/so/kutter.article.json").readText()
+        val page = Goldens.fixtureText("../testdata/so/kutter.article.json")
         val words = SoParser.parse(page, kutterUrl, "SO", "https://svenska.se")
         Goldens.assertGolden(
             words.map { it.toWordData() },
@@ -104,7 +104,7 @@ class SoParserTest {
 
     @Test
     fun testParseSearch() {
-        val body = File("../testdata/so-search.json").readText()
+        val body = Goldens.fixtureText("../testdata/so-search.json")
         val results = SoParser.parseSearch(body) { id ->
             "https://svenska.se/api/article/so/$id".toHttpUrl()!!
         }

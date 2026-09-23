@@ -36,8 +36,8 @@ class SdoIntegrationTest {
 
     @Test
     fun testSearch() {
-        val query = File("../testdata/sdo/hus.html").readText()
-        val search = File("../testdata/sdo-search.json").readText()
+        val query = Goldens.fixtureText("../testdata/sdo/hus.html")
+        val search = Goldens.fixtureText("../testdata/sdo-search.json")
         server.enqueue(MockResponse().setBody(query))
         server.enqueue(MockResponse().setBody(search))
 
@@ -58,7 +58,7 @@ class SdoIntegrationTest {
 
     @Test
     fun testGet() {
-        val html = File("../testdata/sdo/hus.html").readText()
+        val html = Goldens.fixtureText("../testdata/sdo/hus.html")
         server.enqueue(MockResponse().setBody(html))
 
         val uri = server.url("/sdo/ordbog")
@@ -79,8 +79,8 @@ class SdoIntegrationTest {
 
     @Test
     fun testGetApiWord() {
-        val query = File("../testdata/sdo/skaffa.html").readText()
-        val html = File("../testdata/sdo/skaffa.html").readText()
+        val query = Goldens.fixtureText("../testdata/sdo/skaffa.html")
+        val html = Goldens.fixtureText("../testdata/sdo/skaffa.html")
         server.enqueue(MockResponse().setBody(query))
         server.enqueue(MockResponse().setBody(html))
 
@@ -106,7 +106,7 @@ class SdoIntegrationTest {
     fun testGetRehostsSiteQueryUrl() {
         // A `query?q=` URL resolved against a main-site word uri comes back on
         // the site host; get() must re-host it onto the api base.
-        val query = File("../testdata/sdo/skaffa.html").readText()
+        val query = Goldens.fixtureText("../testdata/sdo/skaffa.html")
         server.enqueue(MockResponse().setBody(query))
         server.enqueue(MockResponse().setBody(query))
 

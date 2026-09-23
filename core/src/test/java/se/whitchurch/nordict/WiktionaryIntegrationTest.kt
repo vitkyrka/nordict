@@ -29,7 +29,7 @@ class WiktionaryIntegrationTest {
 
     @Test
     fun testSearch() {
-        val json = File("../testdata/wfr-search.json").readText()
+        val json = Goldens.fixtureText("../testdata/wfr-search.json")
         server.enqueue(MockResponse().setBody(json))
 
         val results = dictionary.search("table")
@@ -45,7 +45,7 @@ class WiktionaryIntegrationTest {
 
     @Test
     fun testGet() {
-        val html = File("../testdata/wfr/table.html").readText()
+        val html = Goldens.fixtureText("../testdata/wfr/table.html")
         server.enqueue(MockResponse().setBody(html))
 
         val uri = server.url("/wiki/table")
@@ -62,7 +62,7 @@ class WiktionaryIntegrationTest {
 
     @Test
     fun testGetHomographRef() {
-        val html = File("../testdata/wfr/table.html").readText()
+        val html = Goldens.fixtureText("../testdata/wfr/table.html")
 
         // A __ref=fr-flex-verb-1 URL resolves the Forme de verbe homograph.
         server.enqueue(MockResponse().setBody(html))

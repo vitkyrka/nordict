@@ -35,7 +35,7 @@ class DiccionariIntegrationTest {
     @Test
     fun testGdlcSearch() {
         val dict = gdlc()
-        server.enqueue(MockResponse().setBody(File("../testdata/gdlc-search.json").readText()))
+        server.enqueue(MockResponse().setBody(Goldens.fixtureText("../testdata/gdlc-search.json")))
 
         val results = dict.search("cap")
 
@@ -53,7 +53,7 @@ class DiccionariIntegrationTest {
     @Test
     fun testGdlcFullSearch() {
         val dict = gdlc()
-        server.enqueue(MockResponse().setBody(File("../testdata/gdlc/cap.html").readText()))
+        server.enqueue(MockResponse().setBody(Goldens.fixtureText("../testdata/gdlc/cap.html")))
 
         val results = dict.fullSearch("cap")
 
@@ -71,7 +71,7 @@ class DiccionariIntegrationTest {
     @Test
     fun testGdlcGet() {
         val dict = gdlc()
-        server.enqueue(MockResponse().setBody(File("../testdata/gdlc/cap1.html").readText()))
+        server.enqueue(MockResponse().setBody(Goldens.fixtureText("../testdata/gdlc/cap1.html")))
 
         val uri: HttpUrl = server.url("/GDLC/cap1")
         val word = dict.get(uri)
@@ -90,7 +90,7 @@ class DiccionariIntegrationTest {
         // A numbered homograph ("cap2") served from the full search-view page
         // resolves via the __ref query parameter.
         val dict = gdlc()
-        server.enqueue(MockResponse().setBody(File("../testdata/gdlc/cap.html").readText()))
+        server.enqueue(MockResponse().setBody(Goldens.fixtureText("../testdata/gdlc/cap.html")))
 
         val uri: HttpUrl = server.url("/GDLC/cap2?__ref=3")
         val word = dict.get(uri)
@@ -105,7 +105,7 @@ class DiccionariIntegrationTest {
     @Test
     fun testCaEsSearch() {
         val dict = caes()
-        server.enqueue(MockResponse().setBody(File("../testdata/ca-es-search.json").readText()))
+        server.enqueue(MockResponse().setBody(Goldens.fixtureText("../testdata/ca-es-search.json")))
 
         val results = dict.search("taula")
 
@@ -123,7 +123,7 @@ class DiccionariIntegrationTest {
     @Test
     fun testCaEsGet() {
         val dict = caes()
-        server.enqueue(MockResponse().setBody(File("../testdata/ca-es/taula.html").readText()))
+        server.enqueue(MockResponse().setBody(Goldens.fixtureText("../testdata/ca-es/taula.html")))
 
         val uri: HttpUrl = server.url("/catala-castella/taula")
         val word = dict.get(uri)
@@ -141,7 +141,7 @@ class DiccionariIntegrationTest {
         // Locution/proper-noun entries are served from the search-view page
         // that embeds all matching entries; the slug picks the right headword.
         val dict = caes()
-        server.enqueue(MockResponse().setBody(File("../testdata/ca-es/cap.html").readText()))
+        server.enqueue(MockResponse().setBody(Goldens.fixtureText("../testdata/ca-es/cap.html")))
 
         val uri: HttpUrl = server.url("/catala-castella/cap-verd")
         val word = dict.get(uri)
@@ -158,7 +158,7 @@ class DiccionariIntegrationTest {
         // "Canaveral, cap" has a comma in its title but a plain slug:
         // normalization must match "canaveral-cap".
         val dict = caes()
-        server.enqueue(MockResponse().setBody(File("../testdata/ca-es/cap.html").readText()))
+        server.enqueue(MockResponse().setBody(Goldens.fixtureText("../testdata/ca-es/cap.html")))
 
         val uri: HttpUrl = server.url("/catala-castella/canaveral-cap")
         val word = dict.get(uri)
@@ -174,7 +174,7 @@ class DiccionariIntegrationTest {
     @Test
     fun testCaEnSearch() {
         val dict = caen()
-        server.enqueue(MockResponse().setBody(File("../testdata/ca-en-search.json").readText()))
+        server.enqueue(MockResponse().setBody(Goldens.fixtureText("../testdata/ca-en-search.json")))
 
         val results = dict.search("taula")
 
@@ -192,7 +192,7 @@ class DiccionariIntegrationTest {
     @Test
     fun testCaEnGet() {
         val dict = caen()
-        server.enqueue(MockResponse().setBody(File("../testdata/ca-en/taula.html").readText()))
+        server.enqueue(MockResponse().setBody(Goldens.fixtureText("../testdata/ca-en/taula.html")))
 
         val uri: HttpUrl = server.url("/catala-angles/taula")
         val word = dict.get(uri)

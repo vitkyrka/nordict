@@ -27,7 +27,7 @@ class DiccionariParserTest {
         nodeClass: String,
         bilingual: Boolean
     ): List<Word> {
-        val page = File("../testdata/$file").readText()
+        val page = Goldens.fixture("../testdata/$file").readText()
         return DiccionariParser.parse(page, httpUrl(uri), tag, nodeClass, bilingual)
     }
 
@@ -236,7 +236,7 @@ class DiccionariParserTest {
     @Test
     fun testParseSearch() {
         val results = DiccionariParser.parseSearch(
-            File("../testdata/gdlc-search.json").readText(),
+            Goldens.fixtureText("../testdata/gdlc-search.json"),
             "GDLC"
         ) { path ->
             httpUrl("https://www.diccionari.cat$path")
@@ -254,7 +254,7 @@ class DiccionariParserTest {
         // completions resolved into this dictionary's entry URL space. The
         // query-echo trailer ("taula", no suffix span) is dropped.
         val caEs = DiccionariParser.parseSearch(
-            File("../testdata/ca-es-search.json").readText(),
+            Goldens.fixtureText("../testdata/ca-es-search.json"),
             "catala-castella"
         ) { path ->
             httpUrl("https://www.diccionari.cat$path")
@@ -267,7 +267,7 @@ class DiccionariParserTest {
         assertThat(caEs[3].uri.toString()).isEqualTo("https://www.diccionari.cat/catala-castella/taulaplom")
 
         val caEn = DiccionariParser.parseSearch(
-            File("../testdata/ca-en-search.json").readText(),
+            Goldens.fixtureText("../testdata/ca-en-search.json"),
             "catala-angles"
         ) { path ->
             httpUrl("https://www.diccionari.cat$path")

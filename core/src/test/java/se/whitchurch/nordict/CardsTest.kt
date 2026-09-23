@@ -18,17 +18,17 @@ class CardsTest {
     private fun httpUrl(url: String): HttpUrl = url.toHttpUrlOrNull()!!
 
     private fun parseDleOtro(): Word {
-        val page = File("../testdata/dle/otro.html").readText()
+        val page = Goldens.fixtureText("../testdata/dle/otro.html")
         return DleParser.parse(page, httpUrl("https://dle.rae.es/otro"), "DLE").single()
     }
 
     private fun parseEstOtro(): Word {
-        val page = File("../testdata/est/otro.html").readText()
+        val page = Goldens.fixtureText("../testdata/est/otro.html")
         return EstParser.parse(page, httpUrl("https://www.rae.es/diccionario-estudiante/otro"), "EST").single()
     }
 
     private fun parseCollinsFrente(): Word {
-        val page = File("../testdata/colspan/frente.html").readText()
+        val page = Goldens.fixtureText("../testdata/colspan/frente.html")
         return CollinsParser.parse(
             page,
             httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/frente"),
@@ -37,7 +37,7 @@ class CardsTest {
     }
 
     private fun parseCollinsMorir(): Word {
-        val page = File("../testdata/colspan/morir.html").readText()
+        val page = Goldens.fixtureText("../testdata/colspan/morir.html")
         return CollinsParser.parse(
             page,
             httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/morir"),
@@ -99,7 +99,7 @@ class CardsTest {
 
     @Test
     fun proposals_collinsMasculineFrente_splitsGlossesIntoSeparateCards() {
-        val page = File("../testdata/colspan/frente.html").readText()
+        val page = Goldens.fixtureText("../testdata/colspan/frente.html")
         val words = CollinsParser.parse(
             page,
             httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/frente"),
@@ -138,7 +138,7 @@ class CardsTest {
     fun proposals_multiGlossNonCollinsDefinition_staysWhole() {
         // EST morir def1 carries a secondary "También prnl." gloss; those are
         // one sense with extra grammar, not separate cards.
-        val page = File("../testdata/est/morir.html").readText()
+        val page = Goldens.fixtureText("../testdata/est/morir.html")
         val word = EstParser.parse(
             page, httpUrl("https://www.rae.es/diccionario-estudiante/morir"), "EST"
         ).first { w -> w.definitions.any { it.glosses.size > 1 } }
@@ -189,7 +189,7 @@ class CardsTest {
 
     @Test
     fun hideKey_splitDefinitions_matchAcrossProposalCalls() {
-        val page = File("../testdata/colspan/frente.html").readText()
+        val page = Goldens.fixtureText("../testdata/colspan/frente.html")
         val masc = CollinsParser.parse(
             page,
             httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/frente"),
@@ -298,7 +298,7 @@ class CardsTest {
         assertThat(def.element.outerHtml()).contains("feminine noun")
 
         // The page-level chrome stays out of the card back.
-        val page = File("../testdata/colspan/frente.html").readText()
+        val page = Goldens.fixtureText("../testdata/colspan/frente.html")
         assertThat(page).contains("Log in here")
         assertThat(back).doesNotContain("Log in here")
     }

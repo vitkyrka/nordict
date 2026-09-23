@@ -27,7 +27,7 @@ class WiktionaryParserTest {
 
     @Test
     fun testParseTable() {
-        val htmlFile = File("../testdata/wfr/table.html")
+        val htmlFile = Goldens.fixture("../testdata/wfr/table.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://fr.m.wiktionary.org/wiki/table")
         val words = WiktionaryParser.parse(page, uri, "WFR", "fr")
@@ -91,7 +91,7 @@ class WiktionaryParserTest {
 
     @Test
     fun testParseSearch() {
-        val body = File("../testdata/wfr-search.json").readText()
+        val body = Goldens.fixtureText("../testdata/wfr-search.json")
 
         val results = WiktionaryParser.parseSearch(body, "fr") { id, title ->
             httpUrl("https://fr.m.wiktionary.org/?curid=$id")

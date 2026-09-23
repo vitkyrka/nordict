@@ -30,7 +30,7 @@ class DidacIntegrationTest {
 
     @Test
     fun testSearch() {
-        val json = File("../testdata/didac-search.json").readText()
+        val json = Goldens.fixtureText("../testdata/didac-search.json")
         server.enqueue(MockResponse().setBody(json))
 
         val results = dictionary.search("cap")
@@ -49,7 +49,7 @@ class DidacIntegrationTest {
 
     @Test
     fun testFullSearch() {
-        val html = File("../testdata/didac/cap.html").readText()
+        val html = Goldens.fixtureText("../testdata/didac/cap.html")
         server.enqueue(MockResponse().setBody(html))
 
         val results = dictionary.fullSearch("cap")
@@ -67,7 +67,7 @@ class DidacIntegrationTest {
 
     @Test
     fun testGet() {
-        val html = File("../testdata/didac/cap1.html").readText()
+        val html = Goldens.fixtureText("../testdata/didac/cap1.html")
         server.enqueue(MockResponse().setBody(html))
 
         val uri: HttpUrl = server.url("/didac/cap1")
@@ -90,7 +90,7 @@ class DidacIntegrationTest {
     fun testGetLocutionFromCombinedPage() {
         // A locution URL is served from the search-view page that embeds all
         // the "cap" entries; the URL slug picks the right headword.
-        val html = File("../testdata/didac/cap.html").readText()
+        val html = Goldens.fixtureText("../testdata/didac/cap.html")
         server.enqueue(MockResponse().setBody(html))
 
         val uri: HttpUrl = server.url("/didac/al-cap-de")

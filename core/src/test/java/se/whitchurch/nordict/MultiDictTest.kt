@@ -22,10 +22,11 @@ class MultiDictTest {
     private lateinit var dle: DleDictionary
     private lateinit var est: EstDictionary
 
-    private fun fixture(name: String): String = File("../testdata/$name").readText()
+    private fun fixture(name: String): String = Goldens.fixtureText("../testdata/$name")
 
     @Before
     fun setUp() {
+        Goldens.requireTestdata()
         server = MockWebServer()
         server.start()
         val base = server.url("/").toString().removeSuffix("/")
@@ -60,7 +61,9 @@ class MultiDictTest {
 
     @After
     fun tearDown() {
-        server.shutdown()
+        // setUp() skips (Assume) when testdata is absent, leaving server
+        // uninitialized — guard so the skip isn't turned into a failure.
+        if (::server.isInitialized) server.shutdown()
     }
 
     private fun lookups() = listOf(dle, est)

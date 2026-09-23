@@ -24,7 +24,7 @@ class EstParserTest {
 
     @Test
     fun testParseEst() {
-        val htmlFile = File("../testdata/est.html")
+        val htmlFile = Goldens.fixture("../testdata/est.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.rae.es/diccionario-estudiante/frente")
         val words = EstParser.parse(page, uri, "EST")
@@ -68,7 +68,7 @@ class EstParserTest {
 
     @Test
     fun testParseEstCagar() {
-        val htmlFile = File("../testdata/est/cagar.html")
+        val htmlFile = Goldens.fixture("../testdata/est/cagar.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.rae.es/diccionario-estudiante/cagar")
         val words = EstParser.parse(page, uri, "EST")
@@ -104,7 +104,7 @@ class EstParserTest {
 
     @Test
     fun testParseEstMorir() {
-        val htmlFile = File("../testdata/est/morir.html")
+        val htmlFile = Goldens.fixture("../testdata/est/morir.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.rae.es/diccionario-estudiante/morir")
         val words = EstParser.parse(page, uri, "EST")
@@ -205,7 +205,7 @@ class EstParserTest {
 
     @Test
     fun testParseEstMuerte() {
-        val htmlFile = File("../testdata/est/muerte.html")
+        val htmlFile = Goldens.fixture("../testdata/est/muerte.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.rae.es/diccionario-estudiante/muerte")
         val words = EstParser.parse(page, uri, "EST")
@@ -295,7 +295,7 @@ class EstParserTest {
 
     @Test
     fun testParseEstOtro() {
-        val htmlFile = File("../testdata/est/otro.html")
+        val htmlFile = Goldens.fixture("../testdata/est/otro.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.rae.es/diccionario-estudiante/otro")
         val words = EstParser.parse(page, uri, "EST")
@@ -391,7 +391,7 @@ class EstParserTest {
 
     @Test
     fun testParseSearch() {
-        val body = File("../testdata/est-search.json").readText()
+        val body = Goldens.fixtureText("../testdata/est-search.json")
 
         val results = EstParser.parseSearch(body) { item ->
             httpUrl("https://www.rae.es/diccionario-estudiante/$item")

@@ -26,7 +26,7 @@ class ColfrenParserTest {
 
     @Test
     fun testParseTable() {
-        val htmlFile = File("../testdata/colfren/table.html")
+        val htmlFile = Goldens.fixture("../testdata/colfren/table.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.collinsdictionary.com/dictionary/french-english/table")
         val words = CollinsParser.parse(page, uri, "COLFREN", "french-english")
@@ -95,7 +95,7 @@ class ColfrenParserTest {
 
     @Test
     fun testParseSearch() {
-        val body = File("../testdata/colfren-search.json").readText()
+        val body = Goldens.fixtureText("../testdata/colfren-search.json")
 
         val results = CollinsParser.parseSearch(body) { title ->
             httpUrl("https://www.collinsdictionary.com/dictionary/french-english/${title.replace(" ", "-").lowercase()}")

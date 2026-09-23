@@ -20,7 +20,7 @@ class DdoParserTest {
 
     @Test
     fun testParseArbejde() {
-        val htmlFile = File("../testdata/ddo/arbejde.html")
+        val htmlFile = Goldens.fixture("../testdata/ddo/arbejde.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://ordnet.dk/ddo/ordbog?entry_id=11002240&query=arbejde")
         val words = DdoParser.parse(page, uri, "DDO")
@@ -76,7 +76,7 @@ class DdoParserTest {
 
     @Test
     fun testParseSearch() {
-        val body = File("../testdata/ddo-search.json").readText()
+        val body = Goldens.fixtureText("../testdata/ddo-search.json")
 
         val results = DdoParser.parseSearch(body) { word ->
             httpUrl("https://ws.dsl.dk/ddo/query?app=android&version=2.1.5&q=$word")

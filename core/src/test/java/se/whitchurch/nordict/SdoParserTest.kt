@@ -13,7 +13,7 @@ class SdoParserTest {
 
     @Test
     fun testSkaffaGolden() {
-        val page = File("../testdata/sdo/skaffa.html").readText()
+        val page = Goldens.fixtureText("../testdata/sdo/skaffa.html")
         val words = SdoParser.parse(page, skaffaUrl, "SDO", "https://ordnet.dk/sdo/")
         Goldens.assertGolden(
             words.map { it.toWordData() },
@@ -52,7 +52,7 @@ class SdoParserTest {
 
     @Test
     fun testHusGolden() {
-        val page = File("../testdata/sdo/hus.html").readText()
+        val page = Goldens.fixtureText("../testdata/sdo/hus.html")
         val words = SdoParser.parse(page, husUrl, "SDO", "https://ordnet.dk/sdo/")
         Goldens.assertGolden(
             words.map { it.toWordData() },

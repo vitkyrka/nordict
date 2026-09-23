@@ -32,7 +32,7 @@ class ColfrenIntegrationTest {
 
     @Test
     fun testSearch() {
-        val json = File("../testdata/colfren-search.json").readText()
+        val json = Goldens.fixtureText("../testdata/colfren-search.json")
         server.enqueue(MockResponse().setBody(json))
 
         val results = dictionary.search("table")
@@ -55,7 +55,7 @@ class ColfrenIntegrationTest {
 
     @Test
     fun testGet() {
-        val html = File("../testdata/colfren/table.html").readText()
+        val html = Goldens.fixtureText("../testdata/colfren/table.html")
         server.enqueue(MockResponse().setBody(html))
 
         val uri: HttpUrl = server.url("/dictionary/french-english/table")
@@ -74,7 +74,7 @@ class ColfrenIntegrationTest {
 
     @Test
     fun testGetRefResolvesMainHeadword() {
-        val html = File("../testdata/colfren/table.html").readText()
+        val html = Goldens.fixtureText("../testdata/colfren/table.html")
 
         // __ref=2 -> the main dictionary headword.
         server.enqueue(MockResponse().setBody(html))
@@ -90,7 +90,7 @@ class ColfrenIntegrationTest {
 
     @Test
     fun testGetRefResolvesEasyLearning() {
-        val html = File("../testdata/colfren/table.html").readText()
+        val html = Goldens.fixtureText("../testdata/colfren/table.html")
 
         // Default (no __ref) -> easy-learning headword.
         server.enqueue(MockResponse().setBody(html))

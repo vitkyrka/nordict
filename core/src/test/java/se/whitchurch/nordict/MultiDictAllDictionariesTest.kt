@@ -25,10 +25,11 @@ class MultiDictAllDictionariesTest {
     private lateinit var linguee: LingueeDictionary
     private lateinit var infopedia: InfopediaDictionary
 
-    private fun fixture(name: String): String = File("../testdata/$name").readText()
+    private fun fixture(name: String): String = Goldens.fixtureText("../testdata/$name")
 
     @Before
     fun setUp() {
+        Goldens.requireTestdata()
         server = MockWebServer()
         server.start()
         client = OkHttpClient()
@@ -42,7 +43,7 @@ class MultiDictAllDictionariesTest {
                 return when {
                     path.startsWith("/portugues-ingles/traducao/mesa") ->
                         MockResponse().setBody(
-                            File("../testdata/lingpt/mesa.html").readText(Charsets.ISO_8859_1)
+                            Goldens.fixtureText("../testdata/lingpt/mesa.html", Charsets.ISO_8859_1)
                         )
                     path.startsWith("/dicionarios/lingua-portuguesa/mesa") ->
                         MockResponse().setBody(fixture("infopedia/mesa.html"))
@@ -54,7 +55,9 @@ class MultiDictAllDictionariesTest {
 
     @After
     fun tearDown() {
-        server.shutdown()
+        // setUp() skips (Assume) when testdata is absent, leaving server
+        // uninitialized — guard so the skip isn't turned into a failure.
+        if (::server.isInitialized) server.shutdown()
     }
 
     @Test

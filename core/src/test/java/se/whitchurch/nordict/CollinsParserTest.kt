@@ -26,7 +26,7 @@ class CollinsParserTest {
 
     @Test
     fun testParseFrente() {
-        val htmlFile = File("../testdata/colspan/frente.html")
+        val htmlFile = Goldens.fixture("../testdata/colspan/frente.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/frente")
         val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
@@ -125,7 +125,7 @@ class CollinsParserTest {
 
     @Test
     fun testParseCagar() {
-        val htmlFile = File("../testdata/colspan/cagar.html")
+        val htmlFile = Goldens.fixture("../testdata/colspan/cagar.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/cagar")
         val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
@@ -163,7 +163,7 @@ class CollinsParserTest {
 
     @Test
     fun testParseMorir() {
-        val htmlFile = File("../testdata/colspan/morir.html")
+        val htmlFile = Goldens.fixture("../testdata/colspan/morir.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/morir")
         val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
@@ -205,7 +205,7 @@ class CollinsParserTest {
 
     @Test
     fun testParseMuerte() {
-        val htmlFile = File("../testdata/colspan/muerte.html")
+        val htmlFile = Goldens.fixture("../testdata/colspan/muerte.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/muerte")
         val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
@@ -242,7 +242,7 @@ class CollinsParserTest {
 
     @Test
     fun testParseOtro() {
-        val htmlFile = File("../testdata/colspan/otro.html")
+        val htmlFile = Goldens.fixture("../testdata/colspan/otro.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/otro")
         val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
@@ -288,7 +288,7 @@ class CollinsParserTest {
 
     @Test
     fun testParseLeyDeLaGravedad() {
-        val htmlFile = File("../testdata/colspan/ley+de+la+gravedad.html")
+        val htmlFile = Goldens.fixture("../testdata/colspan/ley+de+la+gravedad.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/ley-de-la-gravedad")
         val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
@@ -322,7 +322,7 @@ class CollinsParserTest {
 
     @Test
     fun testParseFeble() {
-        val htmlFile = File("../testdata/colspan/feble.html")
+        val htmlFile = Goldens.fixture("../testdata/colspan/feble.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/feble")
         val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
@@ -342,7 +342,7 @@ class CollinsParserTest {
 
     @Test
     fun testParsePocima() {
-        val htmlFile = File("../testdata/colspan/pócima.html")
+        val htmlFile = Goldens.fixture("../testdata/colspan/pócima.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/p%C3%B3cima")
         val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
@@ -369,7 +369,7 @@ class CollinsParserTest {
         // pos must be just the label — otherwise the whole entry text lands
         // in one red pos span — and the three top-level senses must parse,
         // with the nested "[de neumático] tread" sub-sense inline in sense 1.
-        val htmlFile = File("../testdata/colspan/rodadura.html")
+        val htmlFile = Goldens.fixture("../testdata/colspan/rodadura.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/rodadura")
         val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
@@ -394,7 +394,7 @@ class CollinsParserTest {
 
     @Test
     fun testParseSearch() {
-        val body = File("../testdata/colspan-search.json").readText()
+        val body = Goldens.fixtureText("../testdata/colspan-search.json")
 
         val results = CollinsParser.parseSearch(body) { title ->
             httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/${title.replace(" ", "-").lowercase()}")

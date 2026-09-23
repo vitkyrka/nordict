@@ -34,6 +34,7 @@ import se.whitchurch.nordict.GdlcDictionary
 import se.whitchurch.nordict.LeRobertDictionary
 import se.whitchurch.nordict.MainActivity
 import se.whitchurch.nordict.Ordboken
+import se.whitchurch.nordict.TestFixtures
 import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -165,7 +166,7 @@ class AppDriverTest {
 
     @Test
     fun searchReturnsResults() {
-        server.enqueue(MockResponse().setBody(File("../testdata/dle-search.json").readText()))
+        server.enqueue(MockResponse().setBody(TestFixtures.fixtureText("../testdata/dle-search.json")))
 
         val search = drive(AgentCommand(op = AgentOps.SEARCH, query = "frente"))
         assertThat(search.ok).isTrue()
@@ -296,6 +297,7 @@ class AppDriverTest {
 
     @Test
     fun combinedSelectionSearchesAndOpensAcrossDictionaries() {
+        TestFixtures.requireTestdata()
         // Re-seed Ordboken with the two dictionaries on distinct base paths so
         // the combined engine can tell DLE and EST apart; a single dispatcher
         // then serves every endpoint.
@@ -318,7 +320,7 @@ class AppDriverTest {
             override fun dispatch(request: RecordedRequest): MockResponse {
                 val path = request.path ?: return MockResponse().setResponseCode(404)
                 val q = request.requestUrl?.queryParameter("q").orEmpty()
-                val fixtures = File("../testdata")
+                val fixtures = TestFixtures.requireTestdata()
                 return when {
                     path.startsWith("/diccionario-estudiante/srv/keys") ->
                         if (q == "frente") MockResponse().setBody(File(fixtures, "est-search.json").readText())
@@ -404,7 +406,8 @@ class AppDriverTest {
 
     @Test
     fun stateSnapshotsWordView() {
-        val html = File("../testdata/est/muerte.html").readText()
+        TestFixtures.requireTestdata()
+        val html = TestFixtures.fixtureText("../testdata/est/muerte.html")
         // getWord probes dictionaries in order; DLE also fetches /muerte (and
         // returns null), so serve the page twice for the EST retrieval.
         server.enqueue(MockResponse().setBody(html))
@@ -428,7 +431,8 @@ class AppDriverTest {
 
     @Test
     fun backLeavesWordView() {
-        val html = File("../testdata/est/muerte.html").readText()
+        TestFixtures.requireTestdata()
+        val html = TestFixtures.fixtureText("../testdata/est/muerte.html")
         server.enqueue(MockResponse().setBody(html))
         server.enqueue(MockResponse().setBody(html))
         launchMain()
@@ -489,7 +493,7 @@ class AppDriverTest {
         htmlFile: String = "../testdata/dle.html",
         enqueueTwice: Boolean = false
     ): String {
-        val html = File(htmlFile).readText()
+        val html = TestFixtures.fixture(htmlFile).readText()
         server.enqueue(MockResponse().setBody(html))
         if (enqueueTwice) server.enqueue(MockResponse().setBody(html))
         launchMain()
@@ -566,10 +570,11 @@ class AppDriverTest {
 
     @Test
     fun createCardRemovesTheFirstEntryFromTheCardView() {
+        TestFixtures.requireTestdata()
         // Collins POS-group definitions split into one card per gloss, and
         // every proposals() call mints fresh Definition copies — hiding by
         // object identity left the created first entry visible.
-        val page = File("../testdata/colspan/frente.html").readText()
+        val page = TestFixtures.fixtureText("../testdata/colspan/frente.html")
         val masc = CollinsParser.parse(
             page,
             "https://www.collinsdictionary.com/dictionary/spanish-english/frente".toHttpUrl(),
@@ -738,11 +743,12 @@ class AppDriverTest {
 
     @Test
     fun stateReportsSoundEnabledForAWordWithAudio() {
+        TestFixtures.requireTestdata()
         // Serve the LE ROBERT fixture: DLE and EST probe the page first (each
         // consumes a response and finds nothing), then ROB parses it into a
         // word whose audio list is non-empty, so `sound` must be true (play
         // button enabled).
-        val html = File("../testdata/rob/table.html").readText()
+        val html = TestFixtures.fixtureText("../testdata/rob/table.html")
         repeat(3) { server.enqueue(MockResponse().setBody(html)) }
 
         // Temporarily reseed the app with the ROB dictionary added so the

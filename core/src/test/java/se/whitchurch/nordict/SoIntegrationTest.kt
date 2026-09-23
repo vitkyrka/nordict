@@ -32,7 +32,7 @@ class SoIntegrationTest {
 
     @Test
     fun testSearch() {
-        val search = File("../testdata/so-search.json").readText()
+        val search = Goldens.fixtureText("../testdata/so-search.json")
         server.enqueue(MockResponse().setBody(search))
 
         val results = dictionary.search("kutter")
@@ -50,7 +50,7 @@ class SoIntegrationTest {
 
     @Test
     fun testGet() {
-        val article = File("../testdata/so/hus.article.json").readText()
+        val article = Goldens.fixtureText("../testdata/so/hus.article.json")
         server.enqueue(MockResponse().setBody(article))
 
         val uri = server.url("/api/article/so/185690")
@@ -73,7 +73,7 @@ class SoIntegrationTest {
     fun testGetCanonicalSiteUrl() {
         // A legacy ?activeTab=so&q=<word> page (or any url carrying `id`) resolves
         // to the numbered article.
-        val article = File("../testdata/so/kutter.article.json").readText()
+        val article = Goldens.fixtureText("../testdata/so/kutter.article.json")
         server.enqueue(MockResponse().setBody(article))
 
         val uri = server.url("/so/")

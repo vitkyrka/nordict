@@ -21,7 +21,7 @@ class DleParserTest {
 
     @Test
     fun testParseDleFrente() {
-        val htmlFile = File("../testdata/dle/frente.html")
+        val htmlFile = Goldens.fixture("../testdata/dle/frente.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://dle.rae.es/frente")
         val words = DleParser.parse(page, uri, "DLE")
@@ -91,7 +91,7 @@ class DleParserTest {
 
     @Test
     fun testParseDleCagar() {
-        val htmlFile = File("../testdata/dle/cagar.html")
+        val htmlFile = Goldens.fixture("../testdata/dle/cagar.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://dle.rae.es/cagar")
         val words = DleParser.parse(page, uri, "DLE")
@@ -126,7 +126,7 @@ class DleParserTest {
 
     @Test
     fun testParseDleMorir() {
-        val htmlFile = File("../testdata/dle/morir.html")
+        val htmlFile = Goldens.fixture("../testdata/dle/morir.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://dle.rae.es/morir")
         val words = DleParser.parse(page, uri, "DLE")
@@ -166,7 +166,7 @@ class DleParserTest {
 
     @Test
     fun testParseSearch() {
-        val body = File("../testdata/dle-search.json").readText()
+        val body = Goldens.fixtureText("../testdata/dle-search.json")
 
         val results = DleParser.parseSearch(body) { item ->
             httpUrl("https://dle.rae.es/$item")
@@ -199,7 +199,7 @@ class DleParserTest {
 
     @Test
     fun testParseDleOtro() {
-        val htmlFile = File("../testdata/dle/otro.html")
+        val htmlFile = Goldens.fixture("../testdata/dle/otro.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://dle.rae.es/otro")
         val words = DleParser.parse(page, uri, "DLE")

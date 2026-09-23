@@ -32,7 +32,7 @@ class InfopediaIntegrationTest {
 
     @Test
     fun testSearch() {
-        val body = File("../testdata/infopedia-search.json").readText()
+        val body = Goldens.fixtureText("../testdata/infopedia-search.json")
         server.enqueue(MockResponse().setBody(body))
 
         val results = dictionary.search("mesa")
@@ -49,7 +49,7 @@ class InfopediaIntegrationTest {
 
     @Test
     fun testGet() {
-        val html = File("../testdata/infopedia/mesa.html").readText()
+        val html = Goldens.fixtureText("../testdata/infopedia/mesa.html")
         server.enqueue(MockResponse().setBody(html))
 
         val uri: HttpUrl = server.url("/dicionarios/lingua-portuguesa/mesa")

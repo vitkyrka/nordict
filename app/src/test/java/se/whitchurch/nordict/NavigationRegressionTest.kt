@@ -42,7 +42,6 @@ import org.junit.runners.model.Statement
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import java.io.File
 import java.net.InetAddress
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -134,10 +133,10 @@ class NavigationRegressionTest {
     private fun dleBase(): String = dle.url("/").toString().removeSuffix("/")
     private fun estBase(): String = est.url("/").toString().removeSuffix("/")
 
-    private fun dleFrente() = File("../testdata/dle.html").readText()
-    private fun estFrente() = File("../testdata/est.html").readText()
-    private fun estMuerte() = File("../testdata/est/muerte.html").readText()
-    private fun estCagar() = File("../testdata/est/cagar.html").readText()
+    private fun dleFrente() = TestFixtures.fixtureText("../testdata/dle.html")
+    private fun estFrente() = TestFixtures.fixtureText("../testdata/est.html")
+    private fun estMuerte() = TestFixtures.fixtureText("../testdata/est/muerte.html")
+    private fun estCagar() = TestFixtures.fixtureText("../testdata/est/cagar.html")
 
     private fun ordboken(): Ordboken = Ordboken.getInstance(app!!)
 

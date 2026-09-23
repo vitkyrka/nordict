@@ -21,7 +21,7 @@ class InfopediaParserTest {
 
     @Test
     fun testParseMesa() {
-        val htmlFile = File("../testdata/infopedia/mesa.html")
+        val htmlFile = Goldens.fixture("../testdata/infopedia/mesa.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.infopedia.pt/dicionarios/lingua-portuguesa/mesa")
         val words = InfopediaParser.parse(page, uri, "INFOPEDIA")
@@ -85,7 +85,7 @@ class InfopediaParserTest {
 
     @Test
     fun testParseSearch() {
-        val body = File("../testdata/infopedia-search.json").readText()
+        val body = Goldens.fixtureText("../testdata/infopedia-search.json")
         // The sugestao-pesquisa response is JSON wrapping an HTML fragment;
         // the dictionary unwraps `html` before handing it to parseSearch, so
         // the test mirrors that path.

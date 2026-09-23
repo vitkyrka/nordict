@@ -21,7 +21,7 @@ class DidacParserTest {
 
     @Test
     fun testParseCapSingleEntry() {
-        val htmlFile = File("../testdata/didac/cap1.html")
+        val htmlFile = Goldens.fixture("../testdata/didac/cap1.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.diccionari.cat/didac/cap1")
         val words = DidacParser.parse(page, uri, "DIDAC")
@@ -77,7 +77,7 @@ class DidacParserTest {
 
     @Test
     fun testParseCapSearchPage() {
-        val htmlFile = File("../testdata/didac/cap.html")
+        val htmlFile = Goldens.fixture("../testdata/didac/cap.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.diccionari.cat/cerca/didac?search_api_fulltext_cust=cap&show=title")
         val words = DidacParser.parse(page, uri, "DIDAC")
@@ -134,7 +134,7 @@ class DidacParserTest {
 
     @Test
     fun testParsePersona() {
-        val htmlFile = File("../testdata/didac/persona.html")
+        val htmlFile = Goldens.fixture("../testdata/didac/persona.html")
         val page = htmlFile.readText()
         val uri = httpUrl("https://www.diccionari.cat/didac/persona")
         val words = DidacParser.parse(page, uri, "DIDAC")
@@ -173,7 +173,7 @@ class DidacParserTest {
 
     @Test
     fun testParseSearch() {
-        val body = File("../testdata/didac-search.json").readText()
+        val body = Goldens.fixtureText("../testdata/didac-search.json")
 
         val results = DidacParser.parseSearch(body) { path ->
             httpUrl("https://www.diccionari.cat$path")
