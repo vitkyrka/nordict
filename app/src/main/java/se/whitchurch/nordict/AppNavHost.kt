@@ -21,6 +21,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusEvent
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -97,6 +98,12 @@ fun NordictApp(
 
     // Tapping the closed bar opens the sheet with a cleared field; expanding
     // via the edit action or onFillSearch sets preserveQueryOnExpand first.
+    // The primary clear lives in the collapsed field's onFocusChanged below so
+    // it lands synchronously on tap — before expansion, before the sheet
+    // composes, before focus reaches the sheet field. (Clearing in an effect
+    // on currentValue flashed the stale query and its suggestions in the
+    // already-focused sheet.) This effect is the backstop for expansions that
+    // never focus the collapsed field, and it consumes the preserve flag.
     LaunchedEffect(searchBarState.currentValue) {
         if (searchBarState.currentValue != SearchBarValue.Collapsed) {
             if (!preserveQueryOnExpand && textFieldState.text.isNotEmpty()) {
@@ -246,11 +253,33 @@ fun NordictApp(
     // The search field shared by the collapsed bar and the expanded fullscreen
     // sheet, so the caret position set when filling a word sticks in both.
     val inputField: @Composable () -> Unit = {
+        // While collapsed, the field tap is the clear-and-type-a-new-word
+        // path: wipe the stale query the moment focus enters the field —
+        // synchronously on tap, before M3's expansion, the sheet composition,
+        // and the sheet-field focus all run. onFocusEvent (not onFocusChanged)
+        // so focus on M3's inner text node still triggers us. The edit action
+        // and onFillSearch set preserveQueryOnExpand, so their expansions keep
+        // the text.
+        val fieldModifier = if (searchBarState.currentValue == SearchBarValue.Collapsed) {
+            Modifier
+                .fillMaxWidth()
+                .onFocusEvent { focusState ->
+                    if (focusState.hasFocus &&
+                        searchBarState.currentValue == SearchBarValue.Collapsed &&
+                        !preserveQueryOnExpand &&
+                        textFieldState.text.isNotEmpty()
+                    ) {
+                        textFieldState.setTextAndPlaceCursorAtEnd("")
+                    }
+                }
+        } else {
+            Modifier.fillMaxWidth()
+        }
         SearchBarDefaults.InputField(
             textFieldState = textFieldState,
             searchBarState = searchBarState,
             onSearch = { runSearch(it) },
-            modifier = Modifier.fillMaxWidth(),
+            modifier = fieldModifier,
             placeholder = { Text(stringResource(R.string.search_hint)) },
             leadingIcon = {
                 // The current language's flag takes over the role of the
