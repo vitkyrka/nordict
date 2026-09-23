@@ -700,9 +700,9 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
 
     private fun playAudio(url: String) {
         // A challenged-host clip fetched earlier replays straight from its
-        // cache file: no 403, no slow fallback fetch again.
+        // (shared) cache file: no 403, no slow fallback fetch again.
         val file = audioFallbackFile(cacheDir, url)
-        if (WordViewModel.isChallengedAudioHost(url) && isUsableFallbackFile(file)) {
+        if (isChallengedAudioHost(url) && isUsableFallbackFile(file)) {
             fallbackFileToUrl[file.absolutePath] = url
             playAudioSource(file.absolutePath, isFallbackFile = true)
         } else {
@@ -748,7 +748,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         mediaPlayer.setOnErrorListener { mp, what, extra ->
             val httpUrl = fallbackFileToUrl[url] ?: url.takeIf { it.startsWith("http") }
             if (httpUrl != null && audioFallbackDoneForUrl != httpUrl &&
-                WordViewModel.isChallengedAudioHost(httpUrl)
+                isChallengedAudioHost(httpUrl)
             ) {
                 audioFallbackDoneForUrl = httpUrl
                 // A stale cache file resolves back to its clip and refetches.
@@ -767,8 +767,10 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
     private fun fetchClipBytesAndPlay(url: String) {
         val referer = mWord?.uri?.toString()
         lifecycleScope.launch(Dispatchers.IO) {
-            val fetched = ChallengeWebView.fetchBytes(url, referer)
-            if (!fetched.ok) {
+            // Shared clip fetcher (see CollinsFetch.kt): the same cache and
+            // silent WebView-bytes recovery the word view uses, so a clip the
+            // word view already solved replays here with no second challenge.
+            if (fetchAudioBytes(url, referer, cacheDir, ordboken.client) == null) {
                 withContext(Dispatchers.Main) {
                     android.widget.Toast.makeText(
                         applicationContext, R.string.error_audio,
@@ -778,20 +780,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 return@launch
             }
             val file = audioFallbackFile(cacheDir, url)
-            try {
-                val tmp = java.io.File(file.absolutePath + ".tmp")
-                tmp.writeBytes(fetched.bytes!!)
-                if (!tmp.renameTo(file)) {
-                    withContext(Dispatchers.Main) {
-                        android.widget.Toast.makeText(
-                            applicationContext, R.string.error_audio,
-                            android.widget.Toast.LENGTH_SHORT
-                        ).show()
-                    }
-                    return@launch
-                }
-                pruneAudioFallbackCache(cacheDir)
-            } catch (e: Exception) {
+            if (!isUsableFallbackFile(file)) {
                 withContext(Dispatchers.Main) {
                     android.widget.Toast.makeText(
                         applicationContext, R.string.error_audio,
@@ -807,25 +796,49 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         }
     }
 
-    fun urlsToData(urls: ArrayList<String>): ArrayList<String> {
+    /**
+     * Downloads [urls] (word audio or images) as `data:` URLs for Anki card
+     * fields. Challenged-host clips (Collins sounds, Infopedia TTS) go
+     * through the shared clip fetcher ([fetchAudioBytes]): shared cache hit,
+     * clearance-carrying direct fetch, then silent WebView-bytes recovery —
+     * reusing a challenge the word view already solved (shared cookies/cache)
+     * and never prompting the user again (no `tapHost` here; total failure
+     * just embeds silence for that clip). Must be called off the main thread
+     * (the `onCreate` loader already is).
+     */
+    fun urlsToData(urls: ArrayList<String>, referer: String? = mWord?.uri?.toString()): ArrayList<String> {
         val data = ArrayList<String>()
 
-        urls.forEach {
-            val request = Request.Builder().url(it)
-                .build()
-            val response = ordboken.client.newCall(request).execute()
-            if (!response.isSuccessful) return@forEach
+        urls.forEach { url ->
+            if (isChallengedAudioHost(url)) {
+                val bytes = fetchAudioBytes(url, referer, cacheDir, ordboken.client)
+                    ?: return@forEach
+                // Challenged-host media are pronunciation clips (mp3 bytes).
+                val base64 = Base64.encodeToString(bytes, Base64.DEFAULT)
+                data.add("data:audio/mpeg;base64,$base64")
+                return@forEach
+            }
+            try {
+                ordboken.client.newCall(Request.Builder().url(url).build()).execute().use { response ->
+                    if (!response.isSuccessful) {
+                        android.util.Log.i("NordictAudio", "media fetch $url -> ${response.code}")
+                        return@forEach
+                    }
+                    val body = response.body ?: return@forEach
+                    val type = if (url.endsWith(".mp3")) {
+                        "audio/mpeg"
+                    } else {
+                        body.contentType()
+                    }
+                    val bytes = body.bytes()
+                    if (bytes.isEmpty()) return@forEach
 
-            response.body?.let { body ->
-                val type = if (it.endsWith(".mp3")) {
-                    "audio/mpeg"
-                } else {
-                    body.contentType()
+                    val base64 = Base64.encodeToString(bytes, Base64.DEFAULT)
+
+                    data.add("data:$type;base64,$base64")
                 }
-
-                val base64 = Base64.encodeToString(body.bytes(), Base64.DEFAULT)
-
-                data.add("data:$type;base64,$base64")
+            } catch (e: Exception) {
+                android.util.Log.i("NordictAudio", "media fetch failed for $url: ${e.message}")
             }
         }
 

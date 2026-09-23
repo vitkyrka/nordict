@@ -2,6 +2,7 @@ package se.whitchurch.nordict
 
 import android.os.Looper
 import okhttp3.OkHttpClient
+import okhttp3.Request
 import java.util.logging.Logger
 
 /**
@@ -214,6 +215,131 @@ fun audioRequestHeaders(url: String, referer: String? = null): Map<String, Strin
         headers["Sec-Fetch-Site"] = "same-origin"
     }
     return headers
+}
+
+/**
+ * Stock Chrome-on-Android UA for pronunciation-clip downloads. Cloudflare
+ * bot-fights non-browser UAs on the challenged hosts even when the request
+ * carries a valid clearance, so clips are fetched the way the site's own
+ * player fetches them. Canonical definition; `WordViewModel.BROWSER_UA`
+ * aliases it for the ExoPlayer path.
+ */
+const val AUDIO_BROWSER_UA =
+    "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
+
+/** True for the Cloudflare-challenged audio hosts (canonical definition). */
+fun isChallengedAudioHost(url: String): Boolean =
+    "infopedia.pt" in url || "collinsdictionary.com" in url
+
+/**
+ * OkHttp request for downloading one pronunciation clip: the clearance /
+ * `Referer` / subresource headers from [audioRequestHeaders], plus the
+ * browser UA on challenged hosts (harmless elsewhere, so always set there).
+ * Shared by word-view playback recovery and card audio embedding.
+ */
+fun buildAudioRequest(
+    url: String,
+    referer: String? = null,
+    isChallenged: Boolean = isChallengedAudioHost(url)
+): Request {
+    val builder = Request.Builder().url(url)
+    audioRequestHeaders(url, referer).forEach { (name, value) -> builder.addHeader(name, value) }
+    if (isChallenged) builder.header("User-Agent", AUDIO_BROWSER_UA)
+    return builder.build()
+}
+
+/**
+ * Atomically writes [bytes] to this clip's shared cache file
+ * ([audioFallbackFile]) and prunes the cache. Returns the file, or null when
+ * the write failed. Both activities share the same `cacheDir`, so a clip
+ * recovered while playing replays/embeds instantly on the other screen.
+ */
+fun writeAudioFallback(cacheDir: java.io.File, url: String, bytes: ByteArray): java.io.File? {
+    val file = audioFallbackFile(cacheDir, url)
+    return try {
+        val tmp = java.io.File(file.absolutePath + ".tmp")
+        tmp.writeBytes(bytes)
+        if (!tmp.renameTo(file)) return null
+        pruneAudioFallbackCache(cacheDir)
+        file
+    } catch (e: Exception) {
+        android.util.Log.w("NordictAudio", "fallback cache write failed for $url: ${e.message}")
+        null
+    }
+}
+
+/**
+ * Shared pronunciation-clip byte fetcher used by word-view playback recovery
+ * and card audio embedding (`urlsToData`), so challenged-host clips (Collins
+ * sounds, Infopedia TTS) download the same way everywhere. Order:
+ *
+ * 1. Shared cache hit ([audioFallbackFile] + [isUsableFallbackFile]) — a clip
+ *    the other screen already recovered needs no network at all.
+ * 2. Direct OkHttp fetch via [buildAudioRequest] (synced `cf_clearance`,
+ *    word-page `Referer`, browser UA); a success also warms the shared cache.
+ * 3. Silent WebView-bytes recovery ([ChallengeWebView.fetchBytes], default)
+ *    for challenged hosts only, then cached like any other success.
+ *
+ * Deliberately silent: it only uses `fetchBytes` (which never escalates to
+ * the manual-tap dialog — that lives in `loadAndExtract` and its `tapHost`,
+ * owned by `MainActivity`), so a card fetch after a word view already solved
+ * the challenge reuses the shared cookies/cache and never prompts the user
+ * again. On total failure returns null and the caller plays/embeds silence.
+ *
+ * Call off the main thread (both activities already do: `Dispatchers.IO`);
+ * on the main thread / before `ChallengeWebView.init` the WebView step fails
+ * fast to null instead of deadlocking. [isChallenged] is a test seam so unit
+ * tests can force the challenged path against a MockWebServer URL.
+ */
+fun fetchAudioBytes(
+    url: String,
+    referer: String?,
+    cacheDir: java.io.File,
+    client: OkHttpClient,
+    isChallenged: Boolean = isChallengedAudioHost(url),
+    webFetch: (url: String, referer: String?) -> ChallengeWebView.WebBytes =
+        { u, r -> ChallengeWebView.fetchBytes(u, r) }
+): ByteArray? {
+    if (!url.startsWith("http")) return null
+    if (isChallenged) {
+        val cached = audioFallbackFile(cacheDir, url)
+        if (isUsableFallbackFile(cached)) {
+            try {
+                return cached.readBytes()
+            } catch (e: Exception) {
+                android.util.Log.i("NordictAudio", "cache read failed for $url, refetching")
+            }
+        }
+    }
+    try {
+        client.newCall(buildAudioRequest(url, referer, isChallenged)).execute().use { response ->
+            if (response.isSuccessful) {
+                val bytes = response.body?.bytes()
+                if (bytes != null && bytes.isNotEmpty()) {
+                    if (isChallenged) writeAudioFallback(cacheDir, url, bytes)
+                    return bytes
+                }
+            } else {
+                android.util.Log.i("NordictAudio", "direct fetch $url -> ${response.code}")
+            }
+        }
+    } catch (e: Exception) {
+        android.util.Log.i("NordictAudio", "direct fetch failed for $url: ${e.message}")
+    }
+    if (!isChallenged) return null
+    val fetched = try {
+        webFetch(url, referer)
+    } catch (e: Exception) {
+        android.util.Log.w("NordictAudio", "webview fetch failed for $url: ${e.message}")
+        return null
+    }
+    if (!fetched.ok) {
+        android.util.Log.i("NordictAudio", "webview fetch $url -> ${fetched.status}")
+        return null
+    }
+    val bytes = fetched.bytes ?: return null
+    writeAudioFallback(cacheDir, url, bytes)
+    return bytes
 }
 
 /**

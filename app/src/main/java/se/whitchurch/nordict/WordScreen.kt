@@ -102,13 +102,9 @@ class WordViewModel(
         // Stock Chrome-on-Android UA. Cloudflare bot-fights the player's
         // default ExoPlayerLibrary UA on the challenged hosts even when the
         // request carries a valid clearance, so their clips are fetched the
-        // way the site's own player fetches them. Shared with tests.
-        const val BROWSER_UA =
-            "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36"
-
-        /** True for the Cloudflare-challenged audio hosts. */
-        fun isChallengedAudioHost(url: String): Boolean =
-            "infopedia.pt" in url || "collinsdictionary.com" in url
+        // way the site's own player fetches them. Shared with tests; aliases
+        // the canonical AUDIO_BROWSER_UA in CollinsFetch.kt.
+        const val BROWSER_UA = AUDIO_BROWSER_UA
     }
 
     // Wiring from the composing screen (reassigned on every recomposition).
@@ -289,24 +285,19 @@ class WordViewModel(
         audioFallbackDoneForGen = gen
         val referer = mWord?.uri?.toString()
         viewModelScope.launch(Dispatchers.IO) {
-            // Written under the URL-keyed cache name, so the next play of
-            // the same clip replays the file instead of refetching.
+            // Shared clip fetcher (see CollinsFetch.kt): cache hit, direct
+            // clearance-carrying fetch, then silent WebView-bytes recovery —
+            // the same bytes the card screen embeds, under the same
+            // URL-keyed cache name, so the next play replays the file.
             val cacheDir = getApplication<android.app.Application>().cacheDir
             val files = httpUrls.mapNotNull { url ->
-                val fetched = ChallengeWebView.fetchBytes(url, referer)
-                android.util.Log.i("NordictAudio", "webview fetch $url -> ${fetched.status}")
-                if (!fetched.ok) return@mapNotNull null
-                val file = audioFallbackFile(cacheDir, url)
-                try {
-                    val tmp = java.io.File(file.absolutePath + ".tmp")
-                    tmp.writeBytes(fetched.bytes!!)
-                    if (!tmp.renameTo(file)) return@mapNotNull null
-                    pruneAudioFallbackCache(cacheDir)
-                    fallbackFileToUrl[android.net.Uri.fromFile(file).toString()] = url
-                    file
-                } catch (e: Exception) {
-                    null
+                if (fetchAudioBytes(url, referer, cacheDir, ordboken.client) == null) {
+                    return@mapNotNull null
                 }
+                val file = audioFallbackFile(cacheDir, url)
+                if (!isUsableFallbackFile(file)) return@mapNotNull null
+                fallbackFileToUrl[android.net.Uri.fromFile(file).toString()] = url
+                file
             }
             withContext(Dispatchers.Main) {
                 if (gen != audioGeneration || files.size != httpUrls.size) {
