@@ -771,7 +771,7 @@ class NavigationRegressionTest {
     }
 
     @Test
-    fun clearButtonOnTheCollapsedBarOpensTheSearchOverlay() {
+    fun tapOnCollapsedBarClearsAndOpensTheSearchOverlay() {
         awaitNav()
 
         // Produce a collapsed bar that still holds a query the way a finished
@@ -787,16 +787,22 @@ class NavigationRegressionTest {
         composeRule.waitForIdle()
         composeRule.activity.onBackPressedDispatcher.onBackPressed()
         composeRule.waitForIdle()
+        // Closed bar: the X is replaced by the edit action; a tap on the bar
+        // itself is the clear-and-type-a-new-word path.
         composeRule
-            .onNodeWithContentDescription(app!!.getString(R.string.search_clear))
+            .onNodeWithContentDescription(app!!.getString(R.string.search_edit))
             .assertExists()
-
-        // The X on the collapsed bar clears the stale query and then does what
-        // a tap anywhere else on the bar does: open the search overlay with the
-        // caret back in the field, ready for a new query.
         composeRule
             .onNodeWithContentDescription(app!!.getString(R.string.search_clear))
-            .performSemanticsAction(SemanticsActions.OnClick)
+            .assertDoesNotExist()
+
+        // Tapping the closed bar clears the stale query and opens the search
+        // overlay with the caret back in the field, ready for a new query.
+        composeRule.onNode(hasSetTextAction())
+            .performTouchInput {
+                down(center)
+                up()
+            }
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText(app!!.getString(R.string.no_results)).assertExists()
@@ -813,6 +819,47 @@ class NavigationRegressionTest {
             .fetchSemanticsNodes()
             .count { it.config.getOrNull(SemanticsProperties.Focused) == true }
         assertThat(focusedEditableFields).isEqualTo(1)
+    }
+
+    @Test
+    fun editButtonOnCollapsedBarKeepsTextAndFocusesAtEnd() {
+        awaitNav()
+
+        composeRule.onNode(hasSetTextAction())
+            .performTouchInput {
+                down(center)
+                up()
+            }
+        composeRule.waitForIdle()
+        composeRule.onAllNodes(hasSetTextAction())[0].performTextInput("frente")
+        composeRule.waitForIdle()
+        composeRule.activity.onBackPressedDispatcher.onBackPressed()
+        composeRule.waitForIdle()
+
+        // The edit action opens the sheet keeping the text for manual editing.
+        composeRule
+            .onNodeWithContentDescription(app!!.getString(R.string.search_edit))
+            .performSemanticsAction(SemanticsActions.OnClick)
+        composeRule.waitForIdle()
+
+        composeRule.onAllNodes(hasSetTextAction())[0].assert(
+            SemanticsMatcher.expectValue(
+                SemanticsProperties.EditableText,
+                AnnotatedString("frente")
+            )
+        )
+        val focusedEditableFields = composeRule
+            .onAllNodes(hasSetTextAction())
+            .fetchSemanticsNodes()
+            .count { it.config.getOrNull(SemanticsProperties.Focused) == true }
+        assertThat(focusedEditableFields).isEqualTo(1)
+        // The open sheet restores the X, which clears but keeps the sheet open
+        // (both the sheet copy and the collapsed copy behind it show it).
+        assertThat(
+            composeRule.onAllNodesWithContentDescription(
+                app!!.getString(R.string.search_clear)
+            ).fetchSemanticsNodes().size
+        ).isEqualTo(2)
     }
 
     @Test

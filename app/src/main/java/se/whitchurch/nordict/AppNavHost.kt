@@ -13,6 +13,7 @@ import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.NorthWest
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -89,6 +90,21 @@ fun NordictApp(
     val textFieldState = rememberTextFieldState(initialText = initialQuery)
     val searchQuery = textFieldState.text.toString()
     var suggestions by remember { mutableStateOf<List<SearchResult>>(emptyList()) }
+    // Set when the next Collapsed -> Expanded transition must keep the field
+    // text (the collapsed edit action, onFillSearch): a plain tap on the
+    // closed bar clears the field instead, so a new word can be typed at once.
+    var preserveQueryOnExpand by remember { mutableStateOf(false) }
+
+    // Tapping the closed bar opens the sheet with a cleared field; expanding
+    // via the edit action or onFillSearch sets preserveQueryOnExpand first.
+    LaunchedEffect(searchBarState.currentValue) {
+        if (searchBarState.currentValue != SearchBarValue.Collapsed) {
+            if (!preserveQueryOnExpand && textFieldState.text.isNotEmpty()) {
+                textFieldState.setTextAndPlaceCursorAtEnd("")
+            }
+            preserveQueryOnExpand = false
+        }
+    }
 
     fun openWord(uri: Uri, title: String) {
         scope.launch { searchBarState.animateToCollapsed() }
@@ -252,21 +268,30 @@ fun NordictApp(
             },
             trailingIcon = {
                 if (searchQuery.isNotEmpty()) {
-                    Icon(
-                        Icons.Filled.Clear,
-                        contentDescription = stringResource(R.string.search_clear),
-                        modifier = Modifier.clickable {
-                            textFieldState.setTextAndPlaceCursorAtEnd("")
-                            // While the bar is collapsed the X doubles as a tap
-                            // on the search bar: clear and open the input
-                            // overlay with the caret in place, ready for a new
-                            // query. In the open overlay the X stays a plain
-                            // text clear.
-                            if (searchBarState.currentValue == SearchBarValue.Collapsed) {
+                    if (searchBarState.currentValue == SearchBarValue.Collapsed) {
+                        // Closed bar: the field tap itself clears and opens, so
+                        // the trailing action is the opposite — open the sheet
+                        // keeping the text, caret at the end for editing.
+                        Icon(
+                            Icons.Filled.Edit,
+                            contentDescription = stringResource(R.string.search_edit),
+                            modifier = Modifier.clickable {
+                                textFieldState.setTextAndPlaceCursorAtEnd(searchQuery)
+                                preserveQueryOnExpand = true
                                 scope.launch { searchBarState.animateToExpanded() }
                             }
-                        }
-                    )
+                        )
+                    } else {
+                        // Open sheet: the X is back to a plain text clear and
+                        // keeps the sheet open.
+                        Icon(
+                            Icons.Filled.Clear,
+                            contentDescription = stringResource(R.string.search_clear),
+                            modifier = Modifier.clickable {
+                                textFieldState.setTextAndPlaceCursorAtEnd("")
+                            }
+                        )
+                    }
                 }
             }
         )
@@ -328,6 +353,9 @@ fun NordictApp(
                             }
                         },
                         onFillSearch = { query ->
+                            if (searchBarState.currentValue == SearchBarValue.Collapsed) {
+                                preserveQueryOnExpand = true
+                            }
                             textFieldState.setTextAndPlaceCursorAtEnd(query)
                             scope.launch { searchBarState.animateToExpanded() }
                         },
