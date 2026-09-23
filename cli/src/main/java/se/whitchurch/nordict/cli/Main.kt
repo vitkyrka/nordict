@@ -619,9 +619,11 @@ class Main {
               nextPage move to the next homograph/sub-entry of the loaded page
               back     leave the word view (headless: clear the loaded word)
               setDict  tag = a dict alias or tag (dle/est/colspan/colfren/didac/gdlc/ca-es/ca-en/so/sdo/ddo/lingpt/infopedia/rob/wfr)
-              setLang  lang = a language code (es/ca) — selects the first dict of that language
-              state    snapshot of {activity, dict, lang, query, word}
-              quit     close the session
+               setLang  lang = a language code (es/ca) — selects the first dict of that language
+               state    snapshot of {activity, dict, lang, query, word}
+               html     device-only: fetch a page's raw HTML via `tag`+`query`/`uri`,
+                        save to the app's external cache for adb pull inspection
+               quit     close the session
 
             options:
               --device SERIAL    drive the app on a connected device (adb reverse on port 42837)

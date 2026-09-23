@@ -39,6 +39,11 @@ object AgentOps {
     const val SET_LANG = "setLang"
     const val SWAP_LANG = "swapLang"
     const val STATE = "state"
+    // Device-only debug: fetch a page's raw HTML through the dictionary's
+    // transport (solving challenges like a normal lookup) and save it to
+    // the app's external cache for `adb pull` inspection. Headless CLI
+    // reports it as unknown.
+    const val HTML = "html"
     const val QUIT = "quit"
 }
 

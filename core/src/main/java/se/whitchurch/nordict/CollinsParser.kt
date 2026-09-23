@@ -209,16 +209,29 @@ class CollinsParser {
         private fun parseHom(hom: Element): Word.Definition {
             val definition = Word.Definition("", hom)
 
-            val pos = hom.selectFirst(".gramGrp")?.text()
+            // The POS label lives in the hom's gramGrp — but current Collins
+            // pages leave that span unclosed, so it swallows the senses (the
+            // browser keeps the invalid span>div nesting). Strip block
+            // descendants before reading it, or the whole entry text becomes
+            // the "pos" (rendered as one red span) and no senses are found.
+            val gramText = hom.selectFirst(".gramGrp")?.clone()?.apply {
+                select("div").forEach { it.remove() }
+            }?.text()
+            val pos = gramText
                 ?.replace("Full verb table", "")?.replace(Regex("\\s+"), " ")?.trim() ?: ""
             definition.pos = pos
             definition.grammar = pos
             definition.gender = genderOf(pos)
 
-            hom.children().forEach { child ->
-                if (child.tagName() == "div" && child.hasClass("sense")) {
-                    definition.glosses.add(parseSense(child))
-                }
+            // The hom's top-level senses: direct children on older pages,
+            // nested inside the unclosed gramGrp span on current ones. A
+            // sense nested inside another sense is a sub-sense and stays
+            // inline in its parent's rich HTML.
+            hom.select("div.sense").filter { sense ->
+                sense.parents().takeWhile { it != hom }
+                    .none { it.tagName() == "div" && it.hasClass("sense") }
+            }.forEach { child ->
+                definition.glosses.add(parseSense(child))
             }
 
             // A cross-reference stub (e.g. "ley de la gravedad" -> "law of

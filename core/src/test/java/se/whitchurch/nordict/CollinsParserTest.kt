@@ -363,6 +363,36 @@ class CollinsParserTest {
     }
 
     @Test
+    fun testParseRodadura() {
+        // Live-page regression: the gramGrp span arrives unclosed and
+        // swallows the senses (invalid span>div nesting the browser keeps).
+        // pos must be just the label — otherwise the whole entry text lands
+        // in one red pos span — and the three top-level senses must parse,
+        // with the nested "[de neumático] tread" sub-sense inline in sense 1.
+        val htmlFile = File("../testdata/colspan/rodadura.html")
+        val page = htmlFile.readText()
+        val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/rodadura")
+        val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
+
+        assertThat(words).hasSize(1)
+
+        val rod = words[0]
+        assertThat(rod.mTitle).isEqualTo("rodadura")
+        assertThat(rod.dictionary).isEqualTo("Collins Spanish-English")
+        assertThat(rod.definitions).hasSize(1)
+        assertThat(rod.definitions[0].pos).isEqualTo("feminine noun")
+        assertThat(rod.definitions[0].glosses).hasSize(3)
+        assertThat(rod.definitions[0].glosses[0].senseNumber).isEqualTo("1")
+        assertThat(rod.definitions[0].glosses[0].definition).contains("banda de rodadura")
+        assertThat(rod.definitions[0].glosses[0].definition).contains("tread")
+        assertThat(rod.definitions[0].glosses[1].senseNumber).isEqualTo("2")
+        assertThat(rod.definitions[0].glosses[2].senseNumber).isEqualTo("3")
+        assertThat(rod.definitions[0].glosses[2].definition).contains("rut")
+
+        assertGolden(words, "rodadura")
+    }
+
+    @Test
     fun testParseSearch() {
         val body = File("../testdata/colspan-search.json").readText()
 

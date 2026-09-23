@@ -65,6 +65,7 @@ class AppDriver(private val app: android.app.Application) {
                 AgentOps.SET_DICT -> opSetDict(command)
                 AgentOps.SET_LANG -> opSetLang(command)
                 AgentOps.SWAP_LANG -> opSwapLang(command)
+                AgentOps.HTML -> opHtml(command)
                 AgentOps.STATE -> AgentResult(ok = true, op = command.op, state = snapshot())
                 else -> AgentResult.error(command.op, "unknown op '${command.op}'")
             }
@@ -421,6 +422,44 @@ class AppDriver(private val app: android.app.Application) {
             val ok = ordboken().swapLang()
             ok to (if (ok) "language swapped to ${ordboken().currentDictionary.lang} (${ordboken().currentDictionary.tag})"
             else "no last language to swap to")
+        }
+    }
+
+    /**
+     * Fetches a page's raw HTML through the dictionary's own transport (the
+     * same OkHttp/WebView path a lookup takes, challenges included) and saves
+     * it to /data/local/tmp for `adb pull` inspection. Either `uri` directly,
+     * or the exact match of `query` in [tag]'s dictionary.
+     */
+    private fun opHtml(command: AgentCommand): AgentResult {
+        val tag = command.require("tag", command.tag).uppercase()
+        val dict = ordboken().dictMap[tag]
+            ?: return AgentResult.error(AgentOps.HTML, "unknown dictionary tag '$tag'")
+        val url = if (command.uri != null) {
+            command.uri!!
+        } else {
+            val query = command.require("query", command.query).trim()
+            val results = ordboken().search(query, 0)
+            val exact = ExactMatch.resolveWithSearch(query, results) { ordboken().search(it, 0) }
+                ?: return AgentResult.error(AgentOps.HTML, "no unique exact match for '$query'")
+            exact.uri.toString()
+        }
+        val result = dict.pageFetcher.fetch(url, emptyMap())
+        val slug = Uri.parse(url).lastPathSegment?.takeIf { it.isNotBlank() } ?: "page"
+        // External cache: readable via `adb pull` without root (the app
+        // sandbox cannot write /data/local/tmp on recent Android).
+        val dir = app.externalCacheDir ?: app.cacheDir
+        val file = java.io.File(dir, "nordict-${tag.lowercase()}-$slug.html")
+        return try {
+            file.writeText(result.body)
+            AgentResult(
+                ok = true,
+                op = AgentOps.HTML,
+                message = "saved ${result.body.length} bytes (code ${result.code}) to ${file.absolutePath}",
+                state = snapshot()
+            )
+        } catch (e: Exception) {
+            AgentResult.error(AgentOps.HTML, e.message ?: e.toString())
         }
     }
 
