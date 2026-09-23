@@ -27,23 +27,21 @@ Android app keeps `android.net.Uri` at the UI boundary and converts to
 core/src/                               Shared PURE-JVM parser core (no Android)
   main/java/...            Word, SearchResult, Dictionary (abstract), all
                            <Name>Dictionary.kt, <Name>Parser.kt, HttpUrlExt
-                           (URL helpers), Goldens, WordJson, Genders, Pos
-test/java/...            DleParserTest, EstParserTest, CollinsParserTest,
-                            ColfrenParserTest, DiccionariParserTest,
-                            LeRobertParserTest, LingueeParserTest,
-                            InfopediaParserTest, WiktionaryParserTest,
-                            DdoParserTest, the moved *IntegrationTest
-                            suite (plain JUnit, no
-                            Robolectric), Goldens
+                           (URL helpers), Goldens, WordJson, Genders, Pos,
+                           MultiDict, Cards, AgentProtocol, PageFetcher
+  test/java/...            All *ParserTest + *IntegrationTest suites
+                           (plain JUnit + MockWebServer, no Robolectric),
+                           plus Cards/MultiDict/AgentProtocol/PageFetcher tests
 cli/src/main/...                        Desktop CLI (application) using :core
-app/src/main/java/...      Android-only Kotlin (Ordboken registry, activities,
-                           UI, Flags.kt — the flagCode → R.drawable mapping)
+app/src/main/java/...      Android-only Kotlin (Ordboken registry, Compose UI,
+                           MainActivity/AppNavHost/WordScreen/SearchScreen,
+                           CardActivity, Flags.kt — the flagCode → R.drawable mapping)
 app/src/main/assets/        WebView assets (HTML/JS/CSS/jquery)
-app/src/test/java/...      Robolectric unit + MockWebServer tests
+app/src/debug/...           Debug-only agent server (AgentServer) for on-device driving
+app/src/test/java/...      Robolectric unit + MockWebServer tests (UI, ViewModel, AppDriver)
 app/src/test/js/            Jest tests + CLI for the JS renderer
-app/src/androidTest/java/...                Instrumented tests (WordTest.kt)
 testdata/                   Golden fixtures (.html/.json) for parser tests (separate git repo; gitignored here)
-tools/                      Standalone python scripts (crawl.py, parse.py, ...)
+tools/                      Standalone python scripts (crawl/download/parse/anki/json2html/so2json)
 ```
 
 ## Core architecture
@@ -58,15 +56,16 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
   they take `okhttp3.OkHttpClient` and return/take `okhttp3.HttpUrl` so they
   run on a desktop JVM. The Android app keeps `android.net.Uri` at the UI
   boundary (see `HttpUrlBridge`) and maps `flagCode` → drawable via
-  `Flags.kt`/`Ordboken.get`. The DLE, EST, Collins (sp/en + fr/en),
-  diccionari.cat family, Linguee, Infopedia, Le Robert, Wiktionary, and SO
+  `Flags.kt`/`Ordboken.get`. The DLE, EST, Collins (sp/en + fr/en), DIDAC, the
+  diccionari.cat releases, Linguee, Infopedia, Le Robert, Wiktionary, and SO
   dictionaries take an optional `baseUrl`; DDO/SDO share `DslDictionary`,
   parameterized with default `apiBaseUrl`/`siteBaseUrl` (the
   `ws.dsl.dk`/`ordnet.dk` hosts) so a single MockWebServer can stand in for
   both in tests. The word cache in `Ordboken` is keyed on `HttpUrl`.
 - **`Ordboken.kt`** — dictionary registry (`dictMap` keyed by `tag`), the app
   entry point for lookups (`getWord(uri)`, cached, probes every dictionary; and
-  `search(query, count)`, cached per `currentIndex`), and the persisted
+  `search(query, count)`, cached per `selectionSignature` — the single-dict tag
+  or the multi-dict `activeDicts` join), and the persisted
   `lastWhere`/`lastWhat`/`currentIndex` state. `currentIndex` is Compose state
   (`mutableStateOf`), so the Compose `DictionaryNav` rows and the search-bar
   suggestions recompose when the dictionary changes. Each language's selection
@@ -76,11 +75,12 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
   nav rows and the agent driver.
 - **`MainActivity.kt` + `AppNavHost.kt`** — the whole app is one activity: a
   global MD3 `SearchBar` (debounced live suggestions from `Ordboken.search`),
-  the `DictionaryNav` rows, and a Navigation-Compose `NavHost` with three
-  destinations — `home` (history), `search?query=`, and
-  `word?uri=&title=`. `MainActivity` sets the initial route from the persisted
-  `lastWhere` (fresh install -> Home) and honors a `data:`-style intent by
-  routing straight to the word destination.
+  the `DictionaryNav` rows, and a Navigation-Compose `NavHost` with two
+  destinations — `search?query=` (empty query shows the history list; there is
+  no separate home destination) and
+  `word?uri=&title=&sources=&ref=`. `MainActivity` sets the initial route from
+  the persisted `lastWhere` (fresh install -> search/history) and honors a
+  `data:`-style intent by routing straight to the word destination.
 - **`WordScreen.kt`** — the word destination: `WordViewModel` (scoped to the
   word `NavBackStackEntry` via `viewModel(entry)`, so stacked word views keep
   independent state like the old activities). It fetches the word through
@@ -96,7 +96,7 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
   `WordViewModel.captureScroll`/`restoreWebViewScroll` snapshot the WebView's
   scroll offset across configuration changes and the collapse state.
   Owns the WebView, an `ExoPlayer`, and the
-  oracle history DataStore writes; navigation side effects flow out through
+  history DataStore writes; navigation side effects flow out through
   `onOpenUri`/`onOpenExternal`/`onFillSearch` callbacks.
 - **`<Name>Parser.kt`** — companion-object parsers that take a raw HTML page,
   `okhttp3.HttpUrl`, and dict `tag`, and return `List<Word>`. They use Jsoup.
@@ -126,12 +126,13 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
 ### The JSON rendering + testing pipeline (what most parser work touches)
 
 1. Parser (e.g. `EstParser.parse`) builds `Word`s with the JSON schema.
-2. Golden test `EstParserTest` parses `testdata/est.html`, maps `Word`s onto
-   plain `WordData`/`DefinitionData`/`IdiomData` data classes, **rewrites**
-   `testdata/est.json`, then reads it back and asserts equality. So updating the
-   parser means the fixture JSON gets regenerated on the next run; the data
-   classes in the test must mirror any new `Word` fields (and their Gson field
-   order).
+2. Golden test `EstParserTest` parses `testdata/est.html` (legacy top-level
+   page; per-word pages live in `testdata/<tag>/<word>.html`), maps `Word`s
+   onto the shared `WordJson.WordData` schema via `Word.toWordData()` (the
+   same mapping the CLI emits), and asserts equality against the committed
+   fixture via `Goldens.assertGolden(...)`. Fixtures are never rewritten in
+   normal runs — regenerate them with `UPDATE_GOLDEN=1` after an intentional
+   parser change and review the diff.
 3. `renderer.js` renders that JSON in the app. Its output must match `word.js`
    selectors and be styled by `renderer.css`.
 4. `renderer.test.js` (Jest + jsdom) verifies the DOM produced by `renderWord`.
@@ -140,7 +141,7 @@ tools/                      Standalone python scripts (crawl.py, parse.py, ...)
 
 ### Shared-core tests + desktop CLI
 
-The DLE, EST, and Collins parsers and the golden JSON mapping live in `:core`
+All dictionary parsers and the golden JSON mapping live in `:core`
 (pure JVM — no Android, no Robolectric):
 
 ```sh
@@ -179,9 +180,9 @@ dumps the shared JSON schema (identical to `testdata/{dle,est,colspan,colfren}/*
 ```
 
 Positional first arg selects the dict (default `dle`; aliases: `est`,
-`colspan`/`col`, `colfren`, `so`, `sdo`, `ddo`, `lingpt`, `infopedia`, `rob`,
-`wfr`, `gdlc`, `ca-es`, `ca-en`); `--dict <name>` also works. The search-first
-dictionaries (`so`, `sdo`, `ddo`, and `rob`) have no word URL from a headword,
+`colspan`/`col`, `colfren`, `didac`, `so`, `sdo`, `ddo`, `lingpt`, `infopedia`,
+`rob`, `wfr`, `gdlc`, `ca-es`, `ca-en`); `--dict <name>` also works. The
+search-first dictionaries (`so`, `sdo`, `ddo`) have no word URL from a headword,
 so a bare `<word>` errors with guidance: list entries with `--search` and open
 one with `--url <result>`, or `--file` a local page (supply `--url` as the
 parse base when the dict is search-first). Collins
@@ -190,12 +191,12 @@ search-result JSON (an array of `{mTitle, mSummary, uri}`) from the dictionary's
 autocomplete endpoint (DLE/EST `srv/keys`, Collins `autocomplete/`,
 diccionari.cat `search_api_autocomplete/…`) instead of a word page; it
 composes with `--url`/`--file`/`-o`. Search responses are decoded by the same
-per-dictionary parsers the app uses — `DleParser.parseSearch`/`EstParser.parseSearch`
-(the RAE `/srv/keys` shape, via the shared `KeyItemSearchResults`),
-`CollinsParser.parseSearch` (the `/autocomplete/` `{"title"}` shape), and
-`DiccionariParser.parseSearch` (the diccionari.cat `{value,url,label}` shape) —
+per-dictionary `parseSearch` the app uses (RAE `/srv/keys` via the shared
+`KeyItemSearchResults`, Collins `/autocomplete/`, diccionari.cat
+`{value,url,label}`, DDO/SDO livesearch, SO autocomplete, Le Robert, Linguee,
+Infopédia, Wiktionary REST) —
 so the app, the CLI, and the `*ParserTest.kt` suites lock one mapping against
-`testdata/{dle,est,colspan,colfren,gdlc,ca-es,ca-en}-search.json`. Note:
+`testdata/{dle,est,colspan,colfren,didac,gdlc,ca-es,ca-en}-search.json`. Note:
 collinsdictionary.com serves a Cloudflare JS challenge to datacenter IPs, so
 live `colspan`/`colfren` fetches can 403 from this machine — use `--file`
 against the fixtures instead (the parser itself is fully covered by tests).
@@ -260,7 +261,7 @@ printf '{"op":"search","query":"frente"}\n{"op":"open","query":"frente"}\n{"op":
 The backend starts `.MainActivity` (`am start`) so the driver has a clean task
 root; `--device` retries the connection a few times to absorb cold-start
 races. `state.activity` reports the current NavHost route base name
-(`home`/`search`/`word`), not an activity class — `AppDriver.routeName`
+(`search`/`word`), not an activity class — `AppDriver.routeName`
 projects the destination's route pattern onto it. `setDict`/`setLang` clear
 the cross-link hook and switch in place, so the agent stays on the current
 word view while the next `search`/`open` uses the new dictionary (they
@@ -279,7 +280,7 @@ below has already resumed).
 
 ### Kotlin unit tests
 
-The parser and dictionary integration tests now all run in `:core` as plain
+The parser and dictionary integration tests all run in `:core` as plain
 JUnit against a MockWebServer (no Robolectric, no Android):
 
 ```sh
@@ -290,31 +291,27 @@ JUnit against a MockWebServer (no Robolectric, no Android):
 ```
 
 The parser tests (`DleParserTest`, `EstParserTest`, `CollinsParserTest`,
-`ColfrenParserTest`, `LeRobertParserTest`, `LingueeParserTest`,
-`InfopediaParserTest`, `WiktionaryParserTest`) all run in
+`ColfrenParserTest`, `DidacParserTest`, `DiccionariParserTest`,
+`DdoParserTest`, `SdoParserTest`, `SoParserTest`, `LeRobertParserTest`,
+`LingueeParserTest`, `InfopediaParserTest`, `WiktionaryParserTest`) all run in
 `:core` as plain JUnit
 and read fixtures relatively as `../testdata/...` (working dir `core/`).
-App-side integration tests spin up a MockWebServer serving
-`testdata/<tag>-search.json` / `testdata/<tag>.html`.
+The `:core` integration tests spin up a MockWebServer serving
+`testdata/<tag>-search.json` / `testdata/<tag>/<word>.html`.
 
 The parser tests use a true golden pattern via the shared
 `Goldens.assertGolden(...)` helper (`core/.../Goldens.kt`): the parsed output
-is asserted against the committed JSON fixture (`testdata/dle/`,
-`testdata/est/`, `testdata/colspan/`) and is never rewritten in normal runs.
+is asserted against the committed JSON fixture (`testdata/<tag>/`) and is
+never rewritten in normal runs.
 When parser behavior changes intentionally, regenerate the fixtures with
 
 ```sh
 UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.DleParserTest'
-UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.EstParserTest'
-UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.CollinsParserTest'
-UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.ColfrenParserTest'
-UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.LeRobertParserTest'
-UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.LingueeParserTest'
-UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.InfopediaParserTest'
-UPDATE_GOLDEN=1 ./gradlew :core:test --tests 'se.whitchurch.nordict.WiktionaryParserTest'
 ```
 
-(or any parser test class), then review the git diff; keep the test's semantic
+(or any parser test class: `Est`, `Collins`, `Colfren`, `Didac`,
+`Diccionari`, `Ddo`, `Sdo`, `So`, `LeRobert`, `Linguee`, `Infopedia`,
+`Wiktionary`), then review the git diff; keep the test's semantic
 assertions in sync.
 
 ### JS renderer tests
@@ -326,24 +323,10 @@ npm run render -- testdata-path /tmp/out.html   # cli.js, preview in browser
 ```
 
 `npm run render` (i.e. `node cli.js`) takes a JSON file (same schema as
-`testdata/est.json`) and emits a standalone HTML file with all assets inlined,
+`testdata/est/*.json`) and emits a standalone HTML file with all assets inlined,
 for browser preview. A list of words (the parser-golden shape, e.g.
 `testdata/colspan/frente.json`) is treated as a homonym set and rendered as
 the combined page with per-heading nav rows, exactly like the app does.
-
-### Instrumented tests
-
-```sh
-./gradlew connectedAndroidTest
-./gradlew connectedAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=se.whitchurch.nordict.NavigationTest   # one class
-```
-
-`NavigationTest` (Espresso) launches `MainActivity`, clears the app prefs and
-`Ordboken` singleton, and exercises the two-row language/dictionary nav
-(per-language selection memory, restore on recreate). Requires a connected
-device/emulator. The androidTest androidx.test dependencies are pinned to
-versions that work on current Android (espresso 3.6.1 / runner 1.6.2 etc.);
-older ones crash with a `PendingIntent` FLAG_IMMUTABLE error on Android 12+.
 
 ### Deploying and verifying on a device
 
@@ -356,10 +339,9 @@ adb -s <serial> shell monkey -p se.whitchurch.nordict -c android.intent.category
 ```
 
 The launcher activity is `se.whitchurch.nordict.MainActivity`, which hosts the
-whole app (Compose NavHost: home/search/word). A fresh install lands on the
-Home tab; an existing `lastWhere=WORD` restores the word view. A physical
-phone typically shows up over adb-over-TLS
-(e.g. `adb-RFCY10MKMMD-...._adb-tls-connect._tcp` series).
+whole app (Compose NavHost: search/word). A fresh install lands on the
+search screen (empty query = history); an existing `lastWhere=WORD` restores
+the word view.
 
 To inspect the running UI without eyes on the device, the `android` CLI works
 best when the serial is a TLS one (the plain `uiautomator dump` can silently
@@ -413,7 +395,7 @@ and the homograph link), not as trailing definitions of the parent lemma.
 Same pattern as EST but that site has no structured domain/geo markup: the
 parser just snapshots whole `<li>` fragments and the markers are embedded in
 the definition text. Tests: `DleParserTest.kt` (in `:core`, plain JUnit),
-`DleIntegrationTest.kt` (in `app`), fixtures `testdata/dle.{html,json,search.json}`.
+`DleIntegrationTest.kt` (in `:core`), fixtures `testdata/dle.{html,json,search.json}`.
 
 Synonyms in the DLE footer (`.c-word-list__items .sin`) are parsed into
 structured `Word.Synonym` objects: `text` is the display form, `href` is the
@@ -457,7 +439,7 @@ parser (`DidacParser`); the other three releases — the monolingual GDLC
 català-anglès (`-ca-en`) — share `DiccionariParser.parse(page, uri, tag,
 nodeClass, bilingual)`.
 
-- `- DiccionariDictionary` (app) instantiates one config per release: the
+- `DiccionariDictionary` (`:core`) instantiates one config per release: the
   autocomplete key (`diccionari_gdlc`, note ca-es is `diccionari_ca_es_` with a
   trailing underscore, `diccionari_ca_en`) and the `/cerca/<view>` search-path
   name (`gran-diccionari-de-la-llengua-catalana`, `diccionari-catala-castella`,
@@ -488,7 +470,7 @@ nodeClass, bilingual)`.
 
 Fixtures: `testdata/{gdlc,ca-es,ca-en}/*.{html,json}` (word pages + goldens) and
 `{gdlc,ca-es,ca-en}-search.json`. Tests: `DiccionariParserTest` (`:core`, plain
-JUnit), `DiccionariIntegrationTest` (`app`, Robolectric + MockWebServer).
+JUnit), `DiccionariIntegrationTest` (`:core`, plain JUnit + MockWebServer).
 
 ## SO (Svensk ordbok, published by Svenska Akademien)
 
@@ -784,13 +766,15 @@ CLI: `wfr table` / `wfr table --search` (or `--dict wfr --file …` offline).
 - Unit tests use Robolectric (`@RunWith(RobolectricTestRunner::class)`,
   `@Config(sdk = [28])`) when Android classes (e.g. `Uri`) are involved.
   The shared `:core` tests — `DleParserTest`, `EstParserTest`,
-  `CollinsParserTest`, `DiccionariParserTest`, `LeRobertParserTest`,
-  `LingueeParserTest`, `WiktionaryParserTest`, and the moved
-  `{Est,Dle,Collins,Didac,Diccionari,LeRobert,Linguee,Infopedia,Wiktionary}IntegrationTest` suites
+  `CollinsParserTest`, `ColfrenParserTest`, `DidacParserTest`,
+  `DiccionariParserTest`, `DdoParserTest`, `SdoParserTest`, `SoParserTest`,
+  `LeRobertParserTest`, `LingueeParserTest`, `InfopediaParserTest`,
+  `WiktionaryParserTest`, and the `{Est,Dle,Collins,Didac,Diccionari,
+  LeRobert,Linguee,Infopedia,Wiktionary}IntegrationTest` suites
   (MockWebServer) — are plain JUnit and run on a desktop JVM.
 - `Word` fields are read by `renderer.js` by exact JSON name; renaming fields
   in `Word.kt` requires updating the golden-schema data classes in
-  `core/.../WordJson.kt`, the `testdata/{dle,est,colspan}/` fixtures, and
+  `core/.../WordJson.kt`, the `testdata/<tag>/` fixtures, and
   `renderer.js`/its tests.
 - Multi-entry pages: when a JSON dictionary page yields more than one word
   (RAE homographs/.sols sub-entries, Collins POS-group homs) each `Word`
