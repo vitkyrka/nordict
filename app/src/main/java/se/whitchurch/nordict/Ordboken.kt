@@ -202,7 +202,9 @@ class Ordboken private constructor(
         val caes = CatalaCastellaDictionary(this.client)
         val caen = CatalaAnglesDictionary(this.client)
         val lingpt = LingueeDictionary(this.client)
-        val infopedia = InfopediaDictionary(this.client)
+        // Infopedia is Cloudflare-challenged like Collins: OkHttp first,
+        // hidden-WebView fallback the moment a fetch looks challenged.
+        val infopedia = InfopediaDictionary(this.client, pageFetcher = infopediaPageFetcher(this.client))
         val wfr = FrWiktionary(this.client)
         val rob = LeRobertDictionary(this.client)
         val colfren = CollinsFrenchEnglishDictionary(this.client, pageFetcher = collinsFetcher)

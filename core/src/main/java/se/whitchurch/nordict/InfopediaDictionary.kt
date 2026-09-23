@@ -7,8 +7,9 @@ import okhttp3.OkHttpClient
 
 class InfopediaDictionary(
     client: OkHttpClient,
-    private val baseUrl: String = "https://www.infopedia.pt"
-) : Dictionary(client) {
+    private val baseUrl: String = "https://www.infopedia.pt",
+    pageFetcher: PageFetcher? = null
+) : Dictionary(client, pageFetcher ?: OkHttpPageFetcher(client)) {
     override val tag: String = "INFOPEDIA"
     override val flagCode: String = "pt"
     override val lang: String = "pt"
@@ -20,7 +21,16 @@ class InfopediaDictionary(
             .addPathSegment(query)
             .build()
 
-        val page = fetch(uri.toString())
+        // The endpoint serves the `{"html": ...}` autocomplete JSON only to
+        // XHR callers (the site's own jQuery `dataType: "json"` request); a
+        // plain page load gets the full word-page HTML instead, which parses
+        // to nothing here.
+        val result = pageFetcher.fetch(uri.toString(), SEARCH_HEADERS)
+        if (!result.isSuccessful) {
+            log.severe("Unexpected response: " + result.code)
+            return ArrayList()
+        }
+        val page = result.body
         if (page.isEmpty()) {
             return ArrayList()
         }
@@ -65,5 +75,15 @@ class InfopediaDictionary(
 
     companion object {
         const val REFPARAM = "__ref"
+
+        /**
+         * Headers the site's own autocomplete request sends (jQuery
+         * `dataType: "json"`): without them `sugestao-pesquisa` serves the
+         * full word-page HTML instead of the `{"html": ...}` JSON.
+         */
+        val SEARCH_HEADERS = mapOf(
+            "Accept" to "application/json",
+            "X-Requested-With" to "XMLHttpRequest"
+        )
     }
 }

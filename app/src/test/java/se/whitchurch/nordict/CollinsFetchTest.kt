@@ -28,6 +28,8 @@ class CollinsFetchTest {
     fun setUp() {
         CollinsClearance.reset()
         CollinsTransport.reset()
+        InfopediaClearance.reset()
+        InfopediaTransport.reset()
         Ordboken.reset()
     }
 
@@ -35,6 +37,8 @@ class CollinsFetchTest {
     fun tearDown() {
         CollinsClearance.reset()
         CollinsTransport.reset()
+        InfopediaClearance.reset()
+        InfopediaTransport.reset()
         Ordboken.reset()
     }
 
@@ -100,7 +104,7 @@ class CollinsFetchTest {
         val pool = Executors.newSingleThreadExecutor()
         try {
             val future = pool.submit<ChallengeWebView.WebFetch> {
-                ChallengeWebView.loadAndExtract("https://www.collinsdictionary.com/x", 5_000L)
+                ChallengeWebView.loadAndExtract("https://www.collinsdictionary.com/x", timeoutMs = 5_000L)
             }
             val fetched = future.get(15, TimeUnit.SECONDS)
             assertThat(fetched.result.code).isEqualTo(-1)
@@ -123,10 +127,62 @@ class CollinsFetchTest {
         assertThat((colspan.pageFetcher as FallbackPageFetcher).secondary)
             .isInstanceOf(WebViewPageFetcher::class.java)
 
+        // Infopedia is challenged too, so it shares the fallback transport.
+        val infopedia = ordboken.dictMap["INFOPEDIA"]!!
+        assertThat(infopedia.pageFetcher).isInstanceOf(FallbackPageFetcher::class.java)
+        assertThat((infopedia.pageFetcher as FallbackPageFetcher).secondary)
+            .isInstanceOf(WebViewPageFetcher::class.java)
+
         // Every other dictionary keeps the plain OkHttp transport.
         for ((tag, dict) in ordboken.dictMap) {
-            if (tag == "COLSPAN" || tag == "COLFREN") continue
+            if (tag == "COLSPAN" || tag == "COLFREN" || tag == "INFOPEDIA") continue
             assertThat(dict.pageFetcher).isInstanceOf(OkHttpPageFetcher::class.java)
         }
+    }
+
+    @Test
+    fun testInfopediaFetcherIsOkHttpWithWebViewFallback() {
+        val fetcher = infopediaPageFetcher(client)
+
+        assertThat(fetcher).isInstanceOf(FallbackPageFetcher::class.java)
+        val fallback = fetcher as FallbackPageFetcher
+        assertThat(fallback.primary).isInstanceOf(OkHttpPageFetcher::class.java)
+        assertThat(fallback.secondary).isInstanceOf(WebViewPageFetcher::class.java)
+    }
+
+    @Test
+    fun testInfopediaClearanceSyncGatesOnHostAndPresence() {
+        assertThat(InfopediaClearance.cookieHeaderFor("https://www.infopedia.pt/dicionarios/lingua-portuguesa/mesa"))
+            .isEmpty()
+
+        InfopediaClearance.noteCookies(
+            "https://www.infopedia.pt/dicionarios/lingua-portuguesa/mesa",
+            "cf_clearance=tok456; _ga=abc"
+        )
+        assertThat(
+            InfopediaClearance.cookieHeaderFor("https://www.infopedia.pt/dicionarios/lingua-portuguesa/sugestao-pesquisa/mesa")
+        ).containsExactly("Cookie", "cf_clearance=tok456")
+        // Foreign hosts never get the cookie.
+        assertThat(InfopediaClearance.cookieHeaderFor("https://dle.rae.es/frente")).isEmpty()
+        // ... nor does Collins get Infopedia's token.
+        assertThat(InfopediaClearance.cookieHeaderFor("https://www.collinsdictionary.com/x")).isEmpty()
+    }
+
+    @Test
+    fun testInfopediaClearanceIgnoresForeignCookies() {
+        InfopediaClearance.noteCookies("https://dle.rae.es/frente", "cf_clearance=nope")
+        assertThat(InfopediaClearance.cookieHeaderFor("https://www.infopedia.pt/x")).isEmpty()
+    }
+
+    @Test
+    fun testInfopediaTransportNoticeTracksFallback() {
+        assertThat(InfopediaTransport.recentFallbackNotice()).isNull()
+
+        InfopediaTransport.noteFallback(true)
+        assertThat(InfopediaTransport.recentFallbackNotice()).contains("Infopedia")
+        assertThat(InfopediaTransport.recentFallbackNotice()).contains("embedded browser")
+
+        InfopediaTransport.noteFallback(false)
+        assertThat(InfopediaTransport.recentFallbackNotice()).contains("could not solve")
     }
 }

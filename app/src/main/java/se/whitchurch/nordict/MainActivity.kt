@@ -153,7 +153,7 @@ class MainActivity : AppCompatActivity() {
         mOrdboken?.onResume()
         mOrdboken?.onDictChanged = null
         // While resumed this activity hosts the human-tap dialog for a
-        // Collins challenge the hidden WebView cannot solve on its own.
+        // Collins/Infopedia challenge the hidden WebView cannot solve on its own.
         ChallengeWebView.tapHost = object : ChallengeWebView.TapHost {
             override fun showChallengeWebView(view: WebView) {
                 runOnUiThread { showChallengeDialog(view) }
@@ -198,7 +198,7 @@ class MainActivity : AppCompatActivity() {
         challengeDialog = AlertDialog.Builder(this)
             .setTitle("Dictionary security check")
             .setMessage(
-                "Collins asked to verify you are human. " +
+                "The dictionary asked to verify you are human. " +
                     "Tick the box and this closes itself."
             )
             .setView(container)

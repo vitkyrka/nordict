@@ -12,6 +12,7 @@ import se.whitchurch.nordict.DiccionariParser
 import se.whitchurch.nordict.DidacParser
 import se.whitchurch.nordict.DleParser
 import se.whitchurch.nordict.EstParser
+import se.whitchurch.nordict.InfopediaDictionary
 import se.whitchurch.nordict.InfopediaParser
 import se.whitchurch.nordict.LeRobertParser
 import se.whitchurch.nordict.LingueeParser
@@ -652,6 +653,11 @@ class Main {
         val builder = Request.Builder().url(url)
         if (url.host.endsWith("wiktionary.org")) {
             builder.addHeader("User-Agent", Wiktionary.USER_AGENT)
+        }
+        if (url.host.endsWith("infopedia.pt") && "sugestao-pesquisa" in url.encodedPath) {
+            // The autocomplete endpoint serves its {"html": ...} JSON only to
+            // XHR callers; a plain load gets the full word-page HTML instead.
+            InfopediaDictionary.SEARCH_HEADERS.forEach { (name, value) -> builder.addHeader(name, value) }
         }
         val request = builder.build()
         client.newCall(request).execute().use { response ->

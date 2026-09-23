@@ -14,7 +14,7 @@ import java.util.logging.Logger
 
 /**
  * Hidden-WebView page transport for hosts that challenge non-browser clients
- * (Cloudflare on collinsdictionary.com). A real Chromium engine executes the
+ * (Cloudflare on collinsdictionary.com and www.infopedia.pt). A real Chromium engine executes the
  * managed challenge, mints `cf_clearance`, and the rendered DOM is handed
  * back up the same string path the OkHttp body takes, so parsers are
  * untouched.
@@ -73,10 +73,16 @@ object ChallengeWebView {
     /**
      * Loads [url] in the hidden WebView, waits out any Cloudflare challenge,
      * and returns the rendered page: `outerHTML` for a word page, the raw
-     * text for a JSON endpoint (e.g. Collins `/autocomplete/`). Never call on
+     * text for a JSON endpoint (e.g. Collins `/autocomplete/`, Infopedia
+     * `sugestao-pesquisa`). [headers] are sent with the initial load (so an
+     * XHR-only JSON endpoint answers JSON and not a full page). Never call on
      * the main thread (returns a failure rather than deadlocking).
      */
-    fun loadAndExtract(url: String, timeoutMs: Long = TIMEOUT_MS): WebFetch {
+    fun loadAndExtract(
+        url: String,
+        headers: Map<String, String> = emptyMap(),
+        timeoutMs: Long = TIMEOUT_MS
+    ): WebFetch {
         if (Looper.myLooper() == Looper.getMainLooper()) {
             log.severe("loadAndExtract called on the main thread for $url")
             return WebFetch(PageResult(-1, ""), null)
@@ -109,7 +115,8 @@ object ChallengeWebView {
                     }
                 }
             }
-            view.loadUrl(url)
+            if (headers.isEmpty()) view.loadUrl(url)
+            else view.loadUrl(url, headers)
         }
         pageLatch.await(PAGE_WAIT_MS, TimeUnit.MILLISECONDS)
         if (pageError) return WebFetch(PageResult(-1, ""), null)
@@ -237,9 +244,10 @@ object ChallengeWebView {
 
     private const val PROBE_JS =
         "(function(){" +
-            "var e=document.querySelector('div.cB.cB-def')!=null;" +
+            "var e=document.querySelector('div.cB.cB-def')!=null" +
+            "||document.querySelector('.dolEntradaVverbete')!=null;" +
             "var t=document.documentElement.innerText.trim();" +
-            "var j=t.charAt(0)=='[';" +
+            "var j=t.charAt(0)=='['||t.charAt(0)=='{';" +
             "var c=document.title.indexOf('Just a moment')>=0" +
             "||!!document.querySelector('iframe[src*=\"challenges.cloudflare\"]');" +
             "return JSON.stringify({entry:e,json:j,challenge:c});" +

@@ -672,14 +672,22 @@ writes the fixture back in latin-1.
 ## Infopédia (INFOPEDIA, Portuguese)
 
 `InfopediaDictionary` (`:core`) is baseUrl-parameterized (default
-`https://www.infopedia.pt`, tests use a MockWebServer). `search()` hits the
+`https://www.infopedia.pt`, tests use a MockWebServer) and takes an optional
+`pageFetcher` like the Collins pair. `search()` hits the
 `sugestao-pesquisa/<query>` autocomplete endpoint — which returns JSON
 `{"html": "<li title=\"…\">…"}` — unwraps the `html` field and delegates to
 `InfopediaParser.parseSearch(body) { title -> … }`, where each `<li title>`
 is the headword that becomes the result's word-page URL
-(`/dicionarios/lingua-portuguesa/<title>`). `get(uri)` fetches that page and
+(`/dicionarios/lingua-portuguesa/<title>`). The endpoint serves that JSON
+only to XHR callers (the site's own jQuery `dataType: "json"` request), so
+search sends `Accept: application/json` + `X-Requested-With:
+XMLHttpRequest` (`InfopediaDictionary.SEARCH_HEADERS`, forwarded through the
+WebView fallback too) — a plain load gets the full word-page HTML and parses
+to nothing. `get(uri)` fetches that page and
 resolves the `__ref` homographs like the other JSON dictionaries. The live
-site serves a Cloudflare JS challenge to datacenter IPs, so capture fixtures
+site serves a Cloudflare JS challenge to datacenter IPs (both the word pages
+and the search endpoint; the app solves it in the hidden challenge WebView
+via `infopediaPageFetcher`, same pattern as Collins), so capture fixtures
 from the `.pt` web archive (arquivo.pt) and strip the `/wayback/<ts><flag>_/`
 URL prefixes, `<base>`, and Insert scripts back to live-site form.
 
