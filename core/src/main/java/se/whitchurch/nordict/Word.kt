@@ -199,10 +199,11 @@ class Word(
             word.pronunciation = base.pronunciation
             word.idioms.addAll(base.idioms)
             word.definitions.addAll(base.definitions)
-            word.audio.addAll(base.audio)
-            if (word.audio.isEmpty()) {
-                word.audio.addAll(entries.flatMap { it.audio }.distinct())
-            }
+            // The play button queues the top-level list, so union every
+            // dictionary's clips (base first, deduped): keeping only the base
+            // clips drops the second dictionary's audio (e.g. INFOPEDIA +
+            // LINGPT both carry pronunciation).
+            word.audio.addAll((base.audio + entries.flatMap { it.audio }).distinct())
             word.mHomonymEntries.addAll(entries)
             return word
         }

@@ -94,5 +94,13 @@ class MultiDictAllDictionariesTest {
             .containsExactly("LINGPT::1", "LINGPT::2", "INFOPEDIA::1").inOrder()
         assertThat(combined.mHomonymEntries.map { it.dictionary })
             .containsExactly("LINGPT", "LINGPT", "INFOPEDIA").inOrder()
+        // Both dictionaries carry pronunciation clips: the play button queues
+        // the top-level list, so it must union both (regression: only the
+        // first dictionary's audio played).
+        assertThat(combined.mHomonymEntries.flatMap { it.audio }).isNotEmpty()
+        assertThat(combined.audio).containsAtLeastElementsIn(
+            combined.mHomonymEntries.flatMap { it.audio }.distinct()
+        )
+        assertThat(combined.audio.size).isGreaterThan(1)
     }
 }

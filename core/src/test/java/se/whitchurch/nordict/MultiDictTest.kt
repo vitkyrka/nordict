@@ -226,10 +226,10 @@ class MultiDictTest {
     }
 
     @Test
-    fun combinedWordKeepsBaseAudioWhenItHasSome() {
-        // When the base word already carries audio, its clips win and the
-        // entries' audio is NOT bolted on (no surprise duplicates in the
-        // play button's playlist).
+    fun combinedWordUnionsBaseAndEntryAudio() {
+        // The play button queues the top-level list, so when two dictionaries
+        // both carry clips (e.g. INFOPEDIA + LINGPT) both must play: base
+        // first, then entries', deduped.
         val base = dle.get(server.url("/frente"))!!
         val baseWithAudio = Word.toHomonymEntry(base).apply {
             audio.add("https://example.com/base.mp3")
@@ -242,7 +242,9 @@ class MultiDictTest {
         val combined = Word.combined(
             baseWord, "DLE", listOf(baseWithAudio, audioEntry), "frente", null
         )
-        assertThat(combined.audio).containsExactly("https://example.com/base.mp3")
+        assertThat(combined.audio).containsExactly(
+            "https://example.com/base.mp3", "https://example.com/pron.mp3"
+        ).inOrder()
     }
 
     @Test
