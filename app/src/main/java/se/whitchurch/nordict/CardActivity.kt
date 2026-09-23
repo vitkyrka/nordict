@@ -694,8 +694,20 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
     // session: its replay must toast instead of refetching in a loop.
     private var audioFallbackDoneForUrl: String? = null
 
+    // Cache-file path -> clip URL, so a failed file replay still resolves to
+    // its source URL and refetches instead of sticking on a corrupt file.
+    private val fallbackFileToUrl = HashMap<String, String>()
+
     private fun playAudio(url: String) {
-        playAudioSource(url, isFallbackFile = false)
+        // A challenged-host clip fetched earlier replays straight from its
+        // cache file: no 403, no slow fallback fetch again.
+        val file = audioFallbackFile(cacheDir, url)
+        if (WordViewModel.isChallengedAudioHost(url) && isUsableFallbackFile(file)) {
+            fallbackFileToUrl[file.absolutePath] = url
+            playAudioSource(file.absolutePath, isFallbackFile = true)
+        } else {
+            playAudioSource(url, isFallbackFile = false)
+        }
     }
 
     // Plays a clip URL, or a cache file a previous fallback wrote. A failed
@@ -734,11 +746,14 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         }
 
         mediaPlayer.setOnErrorListener { mp, what, extra ->
-            if (!isFallbackFile && audioFallbackDoneForUrl != url &&
-                url.startsWith("http") && WordViewModel.isChallengedAudioHost(url)
+            val httpUrl = fallbackFileToUrl[url] ?: url.takeIf { it.startsWith("http") }
+            if (httpUrl != null && audioFallbackDoneForUrl != httpUrl &&
+                WordViewModel.isChallengedAudioHost(httpUrl)
             ) {
-                audioFallbackDoneForUrl = url
-                fetchClipBytesAndPlay(url)
+                audioFallbackDoneForUrl = httpUrl
+                // A stale cache file resolves back to its clip and refetches.
+                fallbackFileToUrl[url]?.let { audioFallbackFile(cacheDir, it).delete() }
+                fetchClipBytesAndPlay(httpUrl)
             } else {
                 android.widget.Toast.makeText(applicationContext, R.string.error_audio, android.widget.Toast.LENGTH_SHORT)
                     .show()
@@ -762,9 +777,20 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 }
                 return@launch
             }
-            val file = java.io.File(cacheDir, "audio-fallback-card.mp3")
+            val file = audioFallbackFile(cacheDir, url)
             try {
-                file.writeBytes(fetched.bytes!!)
+                val tmp = java.io.File(file.absolutePath + ".tmp")
+                tmp.writeBytes(fetched.bytes!!)
+                if (!tmp.renameTo(file)) {
+                    withContext(Dispatchers.Main) {
+                        android.widget.Toast.makeText(
+                            applicationContext, R.string.error_audio,
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                    return@launch
+                }
+                pruneAudioFallbackCache(cacheDir)
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     android.widget.Toast.makeText(
@@ -775,6 +801,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                 return@launch
             }
             withContext(Dispatchers.Main) {
+                fallbackFileToUrl[file.absolutePath] = url
                 playAudioSource(file.absolutePath, isFallbackFile = true)
             }
         }

@@ -235,6 +235,10 @@ class WordViewModel(
     private var audioGeneration = 0
     private var audioFallbackDoneForGen = -1
 
+    // Cache-file URI -> clip URL, so a failed file replay still resolves to
+    // its source URL and refetches instead of sticking on a corrupt file.
+    private val fallbackFileToUrl = HashMap<String, String>()
+
     // A direct clip fetch failed in the player. Challenged-host clips get one
     // silent recovery per play — bytes through the hidden challenge WebView
     // (the Chromium stack the site's own player uses), replayed from a cache
@@ -247,7 +251,11 @@ class WordViewModel(
         }
         val urls = ArrayList<String>()
         for (i in 0 until player.mediaItemCount) {
-            player.getMediaItemAt(i).localConfiguration?.uri?.toString()?.let { urls.add(it) }
+            val itemUri = player.getMediaItemAt(i).localConfiguration?.uri?.toString()
+                ?: continue
+            // A failed cache-file replay resolves back to its clip URL, so a
+            // corrupt file refetches instead of erroring forever.
+            urls.add(fallbackFileToUrl[itemUri] ?: itemUri)
         }
         android.util.Log.i("NordictAudio", "play failed for $urls")
         val httpUrls = urls.filter { it.startsWith("http") && isChallengedAudioHost(it) }
@@ -258,16 +266,20 @@ class WordViewModel(
         audioFallbackDoneForGen = gen
         val referer = mWord?.uri?.toString()
         viewModelScope.launch(Dispatchers.IO) {
-            val files = httpUrls.mapIndexedNotNull { index, url ->
+            // Written under the URL-keyed cache name, so the next play of
+            // the same clip replays the file instead of refetching.
+            val cacheDir = getApplication<android.app.Application>().cacheDir
+            val files = httpUrls.mapNotNull { url ->
                 val fetched = ChallengeWebView.fetchBytes(url, referer)
                 android.util.Log.i("NordictAudio", "webview fetch $url -> ${fetched.status}")
-                if (!fetched.ok) return@mapIndexedNotNull null
-                val file = java.io.File(
-                    getApplication<android.app.Application>().cacheDir,
-                    "audio-fallback-$index.mp3"
-                )
+                if (!fetched.ok) return@mapNotNull null
+                val file = audioFallbackFile(cacheDir, url)
                 try {
-                    file.writeBytes(fetched.bytes!!)
+                    val tmp = java.io.File(file.absolutePath + ".tmp")
+                    tmp.writeBytes(fetched.bytes!!)
+                    if (!tmp.renameTo(file)) return@mapNotNull null
+                    pruneAudioFallbackCache(cacheDir)
+                    fallbackFileToUrl[android.net.Uri.fromFile(file).toString()] = url
                     file
                 } catch (e: Exception) {
                     null
@@ -698,6 +710,19 @@ class WordViewModel(
     fun playAudio(urls: java.util.ArrayList<String>) {
         if (urls.isEmpty()) return
         audioGeneration += 1
+        // A challenged-host clip fetched earlier replays straight from its
+        // cache file: no 403, no slow fallback fetch again.
+        val cacheDir = getApplication<android.app.Application>().cacheDir
+        val playUris = urls.map { url ->
+            val file = audioFallbackFile(cacheDir, url)
+            if (isChallengedAudioHost(url) && isUsableFallbackFile(file)) {
+                val fileUri = android.net.Uri.fromFile(file).toString()
+                fallbackFileToUrl[fileUri] = url
+                fileUri
+            } else {
+                url
+            }
+        }
         // The player's own HTTP stack never solved the Cloudflare challenge,
         // so challenged-host clips 403 without the synced clearance cookie;
         // Infopedia's TTS endpoint additionally needs the word page as
@@ -715,7 +740,7 @@ class WordViewModel(
         lastAudioUserAgent = ua
         httpDataSourceFactory.setUserAgent(ua)
         player.clearMediaItems()
-        urls.forEach { player.addMediaItem(MediaItem.fromUri(it)) }
+        playUris.forEach { player.addMediaItem(MediaItem.fromUri(it)) }
         player.prepare()
         player.play()
     }

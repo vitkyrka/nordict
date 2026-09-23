@@ -147,14 +147,38 @@ fun webViewCookiesFor(url: String): String? = try {
 }
 
 /** Merges jar cookies with a synced `cf_clearance`, without duplicating it. */
-fun mergeCookies(jar: String?, syncedCookie: String?): String? {
-    val synced = syncedCookie?.removePrefix("Cookie=")?.trim()?.takeIf { it.isNotEmpty() }
+fun mergeCookies(jar: String?, syncedCookie: String?): String? {    val synced = syncedCookie?.removePrefix("Cookie=")?.trim()?.takeIf { it.isNotEmpty() }
     return when {
         jar != null && synced != null && "cf_clearance=" !in jar -> "$jar; $synced"
         jar != null -> jar
         synced != null -> synced
         else -> null
     }
+}
+
+/**
+ * Cache file for a WebView-fetched clip, keyed by URL: a replay finds warm
+ * bytes and plays instantly instead of paying the fallback fetch again.
+ * Clips are static, so no expiry — presence plus a non-empty body is enough.
+ */
+fun audioFallbackFile(cacheDir: java.io.File, url: String): java.io.File {
+    val key = (url.hashCode().toLong() and 0xffffffffL).toString(36)
+    return java.io.File(cacheDir, "audio-fallback-$key.mp3")
+}
+
+/** True when [file] is a usable cached clip (present and non-empty). */
+fun isUsableFallbackFile(file: java.io.File): Boolean =
+    file.isFile && file.length() > 0
+
+/**
+ * Keeps the fallback cache bounded: oldest clips beyond [keep] go. Clips are
+ * tiny (a pronunciation is a few KB), so this is only backstop hygiene.
+ */
+fun pruneAudioFallbackCache(cacheDir: java.io.File, keep: Int = 20) {
+    val clips = cacheDir.listFiles { f ->
+        f.isFile && f.name.startsWith("audio-fallback-") && f.name.endsWith(".mp3")
+    }?.sortedByDescending { it.lastModified() } ?: return
+    clips.drop(keep).forEach { it.delete() }
 }
 
 /**

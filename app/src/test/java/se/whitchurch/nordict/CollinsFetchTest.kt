@@ -9,6 +9,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import java.nio.file.Files
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -271,8 +272,7 @@ class CollinsFetchTest {
     }
 
     @Test
-    fun testMergeCookiesPrefersJarAndAppendsMissingClearance() {
-        assertThat(mergeCookies(null, null)).isNull()
+    fun testMergeCookiesPrefersJarAndAppendsMissingClearance() {        assertThat(mergeCookies(null, null)).isNull()
         assertThat(mergeCookies("a=b", null)).isEqualTo("a=b")
         assertThat(mergeCookies(null, "cf_clearance=t")).isEqualTo("cf_clearance=t")
         // The jar already carries a clearance: no duplicate.
@@ -281,5 +281,54 @@ class CollinsFetchTest {
         // Otherwise the synced clearance rides along with the jar.
         assertThat(mergeCookies("__cf_bm=z", "cf_clearance=s"))
             .isEqualTo("__cf_bm=z; cf_clearance=s")
+    }
+
+    @Test
+    fun testFallbackCacheFileKeysByUrl() {
+        val dir = Files.createTempDirectory("fallback").toFile()
+        try {
+            val tts = "https://www.infopedia.pt/dicionarios/lingua-portuguesa/tts/word/mesa?homografia=0"
+            assertThat(audioFallbackFile(dir, tts)).isEqualTo(audioFallbackFile(dir, tts))
+            assertThat(audioFallbackFile(dir, tts).name).startsWith("audio-fallback-")
+            assertThat(audioFallbackFile(dir, tts).name).endsWith(".mp3")
+            assertThat(audioFallbackFile(dir, tts))
+                .isNotEqualTo(audioFallbackFile(dir, "$tts&x=1"))
+
+            // Usability is presence plus a non-empty body.
+            val file = audioFallbackFile(dir, tts)
+            assertThat(isUsableFallbackFile(file)).isFalse()
+            file.createNewFile()
+            assertThat(isUsableFallbackFile(file)).isFalse()
+            file.writeBytes(byteArrayOf(1, 2, 3))
+            assertThat(isUsableFallbackFile(file)).isTrue()
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun testPruneFallbackCacheKeepsNewest() {
+        val dir = Files.createTempDirectory("prune").toFile()
+        try {
+            val now = System.currentTimeMillis()
+            for (i in 0 until 22) {
+                val f = java.io.File(dir, "audio-fallback-$i.mp3")
+                f.writeBytes(byteArrayOf(1))
+                f.setLastModified(now - i * 1_000L)
+            }
+            // Unrelated files are never touched.
+            val keep = java.io.File(dir, "other.txt")
+            keep.writeBytes(byteArrayOf(1))
+
+            pruneAudioFallbackCache(dir, keep = 20)
+
+            assertThat(dir.listFiles { f -> f.name.startsWith("audio-fallback-") }!!.size)
+                .isEqualTo(20)
+            assertThat(java.io.File(dir, "audio-fallback-21.mp3").exists()).isFalse()
+            assertThat(java.io.File(dir, "audio-fallback-0.mp3").exists()).isTrue()
+            assertThat(keep.exists()).isTrue()
+        } finally {
+            dir.deleteRecursively()
+        }
     }
 }

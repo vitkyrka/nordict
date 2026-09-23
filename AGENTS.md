@@ -435,7 +435,9 @@ failed challenged-host clip falls back to bytes fetched through the hidden
 challenge WebView (`ChallengeWebView.fetchBytes`: same Chromium stack and
 cleared session as the site's own player, same-origin via the word page),
 replayed from a cache file (`audio-fallback-*.mp3`, `DefaultDataSource` routes
-the `file://` replay). Failures log under `NordictAudio`.
+the `file://` replay). A recovered clip is cached under a URL-keyed name, so
+replays hit the file directly without refetching. Failures log under
+`NordictAudio`.
 
 Tests: `CollinsParserTest`/`CollfrenParserTest` (both `:core`, plain JUnit
 goldens), `CollinsIntegrationTest`/`ColfrenIntegrationTest` (MockWebServer).

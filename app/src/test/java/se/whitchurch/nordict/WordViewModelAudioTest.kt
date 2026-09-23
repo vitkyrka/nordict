@@ -123,4 +123,32 @@ class WordViewModelAudioTest {
         )
         assertThat(vm.lastAudioUserAgent).isEqualTo(WordViewModel.BROWSER_UA)
     }
+
+    @Test
+    fun replayUsesCachedFallbackFile() {
+        // A clip recovered once replays straight from its cache file: the
+        // playlist carries the file URI, so no 403 and no slow refetch.
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val vm = WordViewModel(app, SavedStateHandle(mapOf("uri" to "https://example.com/frente")))
+        val clip = "https://www.collinsdictionary.com/sounds/hwd_sounds/ES-ES-W0034030.mp3"
+        audioFallbackFile(app.cacheDir, clip).writeBytes(byteArrayOf(1, 2, 3))
+
+        vm.playAudio(java.util.ArrayList(listOf(clip)))
+
+        assertThat(vm.player.currentMediaItem?.localConfiguration?.uri?.scheme).isEqualTo("file")
+    }
+
+    @Test
+    fun replayIgnoresEmptyCacheFiles() {
+        // A zero-byte cache entry is not usable: the http URL plays instead,
+        // so a corrupt file can still refetch through the fallback.
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val vm = WordViewModel(app, SavedStateHandle(mapOf("uri" to "https://example.com/frente")))
+        val clip = "https://www.infopedia.pt/dicionarios/lingua-portuguesa/tts/word/mesa?homografia=0"
+        audioFallbackFile(app.cacheDir, clip).createNewFile()
+
+        vm.playAudio(java.util.ArrayList(listOf(clip)))
+
+        assertThat(vm.player.currentMediaItem?.localConfiguration?.uri.toString()).isEqualTo(clip)
+    }
 }
