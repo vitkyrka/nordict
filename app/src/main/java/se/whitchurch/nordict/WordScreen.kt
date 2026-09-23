@@ -746,11 +746,7 @@ fun WordScreen(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         val s = vm.uiStatus
                         if (s is WordUiStatus.Loading) {
-                            LoadingIndicator(modifier = Modifier.padding(bottom = 16.dp))
-                            Text(
-                                stringResource(R.string.loading),
-                                textAlign = TextAlign.Center
-                            )
+                            LoadingIndicator()
                         } else if (s is WordUiStatus.Error) {
                             Text(
                                 text = stringResource(s.textRes),

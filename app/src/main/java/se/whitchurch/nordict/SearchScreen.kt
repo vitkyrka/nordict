@@ -90,11 +90,12 @@ fun SearchScreen(
             onRetry = { retries++ }
         )
 
-        theLoading && theResults == null -> StatusPanel(
-            context = context,
-            message = context.getString(R.string.loading),
-            showProgress = true
-        )
+        theLoading && theResults == null -> Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            LoadingIndicator()
+        }
 
         theResults != null && theResults.isEmpty() -> StatusPanel(
             context = context,
@@ -137,7 +138,6 @@ fun SearchScreen(
 fun StatusPanel(
     context: Context,
     message: String,
-    showProgress: Boolean = false,
     onRetry: (() -> Unit)? = null
 ) {
     Column(
@@ -147,9 +147,6 @@ fun StatusPanel(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        if (showProgress) {
-            LoadingIndicator(modifier = Modifier.padding(bottom = 16.dp))
-        }
         Text(
             text = message,
             textAlign = TextAlign.Center,

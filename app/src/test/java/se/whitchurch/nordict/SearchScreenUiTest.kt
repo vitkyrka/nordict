@@ -2,6 +2,7 @@ package se.whitchurch.nordict
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.test.core.app.ApplicationProvider
 import android.content.Context
@@ -24,6 +25,8 @@ import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowNetwork
 import org.robolectric.shadows.ShadowNetworkCapabilities
 import org.robolectric.shadows.ShadowNetworkInfo
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
 /**
  * Compose tests for [SearchScreen]'s results list.
@@ -132,6 +135,52 @@ class SearchScreenUiTest {
         assertThat(composeRule.onAllNodesWithText("husar").fetchSemanticsNodes()).hasSize(1)
         assertThat(composeRule.onAllNodesWithText("husarregemente (husar)").fetchSemanticsNodes())
             .hasSize(1)
+    }
+
+    @Test
+    fun loadingShowsIndicatorWithoutText() {
+        // Hang the autocomplete endpoint so the results screen stays in its
+        // loading state: the M3 Expressive wavy indicator must be on screen
+        // with no accompanying "Loading..." text.
+        val release = CountDownLatch(1)
+        val hanging = MockWebServer()
+        hanging.start()
+        hanging.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                release.await(15, TimeUnit.SECONDS)
+                return MockResponse().setResponseCode(404)
+            }
+        }
+        try {
+            Ordboken.reset()
+            val hangingOrdboken = Ordboken.getInstance(
+                app, OkHttpClient(),
+                arrayOf(SoDictionary(OkHttpClient(), hanging.url("/").toString().removeSuffix("/")))
+            )
+            composeRule.setContent {
+                MaterialTheme {
+                    SearchScreen(
+                        context = app,
+                        ordboken = hangingOrdboken,
+                        query = "hus",
+                        onOpenWord = {},
+                        onOpenHistory = { _, _, _ -> }
+                    )
+                }
+            }
+
+            composeRule.waitUntil(timeoutMillis = 10_000) {
+                composeRule.onAllNodesWithTag("LoadingIndicator")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+            assertThat(
+                composeRule.onAllNodesWithText("", substring = true)
+                    .fetchSemanticsNodes()
+            ).isEmpty()
+        } finally {
+            release.countDown()
+            hanging.shutdown()
+        }
     }
 
     @Test

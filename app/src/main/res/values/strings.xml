@@ -4,7 +4,6 @@
     <string name="app_name">Nordict</string>
     <string name="menu_search">Sök</string>
     <string name="search_hint">Sök i ordboken</string>
-    <string name="loading">Laddar…</string>
     <string name="empty">Tom.</string>
     <string name="tryagain">Försök igen</string>
     <string name="error_offline">Ingen anslutning.</string>
