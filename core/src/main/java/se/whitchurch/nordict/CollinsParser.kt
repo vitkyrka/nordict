@@ -46,6 +46,7 @@ class CollinsParser {
             doc.select("link[rel=preload]").forEach { it.remove() }
             doc.select("link[rel=preconnect]").forEach { it.remove() }
             doc.select("div.mpuslot_b-container").forEach { it.remove() }
+            doc.select("div.parallax-container").forEach { it.remove() }
             doc.select("div.carousel").forEach { it.remove() }
             doc.select("div.navigation").forEach { it.remove() }
             doc.select("div.topslot_container").forEach { it.remove() }

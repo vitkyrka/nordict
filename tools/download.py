@@ -28,12 +28,18 @@ view, and homographs get numbered entry URLs like /didac/cap1. Pass `--url`
 (plus the full entry URL, e.g. `--url https://www.diccionari.cat/didac/cap1`)
 to grab a single homograph entry instead.
 
-The RAE, Collins and diccionari.cat sites are fronted by Cloudflare, which
+The RAE and diccionari.cat sites are fronted by Cloudflare, which
 challenges plain curl/urllib requests (TLS/HTTP fingerprint) but serves real
 content to a Chrome TLS stack. OkHttp on Android also gets through, because its
 Conscrypt (Google BoringSSL) stack presents the same Chrome-family ClientHello.
 curl_cffi baits the same fingerprint, so we impersonate Chrome for every
 dictionary.
+
+NOTE: collinsdictionary.com (COLSPAN/COLFREN) now serves a managed
+Cloudflare challenge to every non-browser client, including Chrome
+impersonation, so downloads for those two tags fail with HTTP 403. Refresh
+their fixtures from a real browser (or the app's hidden challenge WebView)
+instead; the app itself solves the challenge on-device.
 """
 
 import argparse

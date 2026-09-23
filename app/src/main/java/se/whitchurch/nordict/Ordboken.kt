@@ -192,7 +192,11 @@ class Ordboken private constructor(
         val sdo = SdoDictionary(this.client)
         val dle = DleDictionary(this.client)
         val est = EstDictionary(this.client)
-        val colspan = CollinsSpanishEnglishDictionary(this.client)
+        // Collins is Cloudflare-challenged for plain HTTP clients: OkHttp
+        // first (carrying the synced clearance when held), hidden-WebView
+        // fallback the moment a fetch looks challenged.
+        val collinsFetcher = collinsPageFetcher(this.client)
+        val colspan = CollinsSpanishEnglishDictionary(this.client, pageFetcher = collinsFetcher)
         val didac = DidacDictionary(this.client)
         val gdlc = GdlcDictionary(this.client)
         val caes = CatalaCastellaDictionary(this.client)
@@ -201,7 +205,7 @@ class Ordboken private constructor(
         val infopedia = InfopediaDictionary(this.client)
         val wfr = FrWiktionary(this.client)
         val rob = LeRobertDictionary(this.client)
-        val colfren = CollinsFrenchEnglishDictionary(this.client)
+        val colfren = CollinsFrenchEnglishDictionary(this.client, pageFetcher = collinsFetcher)
         return arrayOf(so, ddo, sdo, dle, est, colspan, didac, gdlc, caes, caen, lingpt, infopedia, wfr, rob, colfren)
     }
 

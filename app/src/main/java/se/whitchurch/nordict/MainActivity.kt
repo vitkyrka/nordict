@@ -5,7 +5,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.view.ViewGroup
+import android.webkit.WebView
+import android.widget.FrameLayout
 import androidx.activity.compose.setContent
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +32,7 @@ import se.whitchurch.nordict.ui.theme.NordictTheme
  */
 class MainActivity : AppCompatActivity() {
     private var mOrdboken: Ordboken? = null
+    private var challengeDialog: AlertDialog? = null
 
     /** Set once [NordictApp] composes; read by the debug agent driver. */
     var navController: NavHostController? = null
@@ -35,6 +40,9 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Application context for the hidden challenge-solving WebView.
+        ChallengeWebView.init(this)
 
         if (ContextCompat.checkSelfPermission(
                 this,
@@ -144,10 +152,57 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         mOrdboken?.onResume()
         mOrdboken?.onDictChanged = null
+        // While resumed this activity hosts the human-tap dialog for a
+        // Collins challenge the hidden WebView cannot solve on its own.
+        ChallengeWebView.tapHost = object : ChallengeWebView.TapHost {
+            override fun showChallengeWebView(view: WebView) {
+                runOnUiThread { showChallengeDialog(view) }
+            }
+
+            override fun hideChallengeWebView() {
+                runOnUiThread {
+                    challengeDialog?.dismiss()
+                    challengeDialog = null
+                }
+            }
+        }
     }
 
     override fun onPause() {
         super.onPause()
         mOrdboken?.persistBlocking()
+        ChallengeWebView.tapHost = null
+        challengeDialog?.dismiss()
+        challengeDialog = null
+    }
+
+    /**
+     * Shows the shared hidden challenge WebView visibly so the user can tap
+     * through an interactive Cloudflare checkbox. The fetch's poll loop keeps
+     * running and dismisses this (via [ChallengeWebView.TapHost]) once the
+     * challenge clears.
+     */
+    private fun showChallengeDialog(view: WebView) {
+        if (challengeDialog?.isShowing == true) return
+        (view.parent as? ViewGroup)?.removeView(view)
+        val height = (420 * resources.displayMetrics.density).toInt()
+        val container = FrameLayout(this).apply {
+            addView(
+                view,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    height
+                )
+            )
+        }
+        challengeDialog = AlertDialog.Builder(this)
+            .setTitle("Dictionary security check")
+            .setMessage(
+                "Collins asked to verify you are human. " +
+                    "Tick the box and this closes itself."
+            )
+            .setView(container)
+            .setCancelable(true)
+            .show()
     }
 }

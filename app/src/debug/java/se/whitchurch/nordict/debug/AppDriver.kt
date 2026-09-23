@@ -12,6 +12,7 @@ import se.whitchurch.nordict.AgentOps
 import se.whitchurch.nordict.AgentResult
 import se.whitchurch.nordict.AgentState
 import se.whitchurch.nordict.CardActivity
+import se.whitchurch.nordict.CollinsTransport
 import se.whitchurch.nordict.ExactMatch
 import se.whitchurch.nordict.MainActivity
 import se.whitchurch.nordict.MultiDict
@@ -75,10 +76,15 @@ class AppDriver(private val app: android.app.Application) {
     private fun opSearch(command: AgentCommand): AgentResult {
         val query = command.require("query", command.query).trim()
         val results = ordboken().search(query, 0)
+        // When a Collins lookup just went through the challenge fallback, say
+        // so: an empty result then means "challenged", not "no such word".
+        val notice = CollinsTransport.recentFallbackNotice()
         return AgentResult(
             ok = true,
             op = AgentOps.SEARCH,
-            message = if (results.isEmpty()) "no search results for '$query'" else null,
+            message = if (results.isEmpty()) {
+                listOfNotNull("no search results for '$query'", notice).joinToString(". ")
+            } else notice,
             state = snapshot(),
             results = results.map { it.toSearchResultData() }
         )

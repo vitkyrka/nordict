@@ -2,10 +2,12 @@ package se.whitchurch.nordict
 
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
-import okhttp3.Request
 import java.util.logging.Logger
 
-abstract class Dictionary(val client: OkHttpClient) : WordLookup {
+abstract class Dictionary(
+    val client: OkHttpClient,
+    val pageFetcher: PageFetcher = OkHttpPageFetcher(client)
+) : WordLookup {
     override abstract val tag: String
 
     /**
@@ -23,16 +25,15 @@ abstract class Dictionary(val client: OkHttpClient) : WordLookup {
     protected val log: Logger by lazy { Logger.getLogger(tag) }
 
     fun fetch(pageUrl: String): String {
-        val request = Request.Builder().url(pageUrl).build()
-        val response = client.newCall(request).execute()
+        val result = pageFetcher.fetch(pageUrl, emptyMap())
 
-        if (!response.isSuccessful) {
-            log.severe("Unexpected response: " + response.code)
+        if (!result.isSuccessful) {
+            log.severe("Unexpected response: " + result.code)
             return ""
         }
 
         log.fine("url $pageUrl")
 
-        return response.body?.string() ?: ""
+        return result.body
     }
 }

@@ -3,12 +3,12 @@ package se.whitchurch.nordict
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
-import okhttp3.Request
 
 abstract class CollinsDictionary(
     client: OkHttpClient,
-    protected open val baseUrl: String = "https://www.collinsdictionary.com"
-) : Dictionary(client) {
+    protected open val baseUrl: String = "https://www.collinsdictionary.com",
+    pageFetcher: PageFetcher? = null
+) : Dictionary(client, pageFetcher ?: OkHttpPageFetcher(client)) {
     abstract val dictCode: String
 
     override fun get(uri: HttpUrl): Word? {
@@ -38,17 +38,14 @@ abstract class CollinsDictionary(
     }
 
     private fun fetchBody(requestUrl: String): String {
-        val request = Request.Builder().url(requestUrl)
-            .addHeader("Accept", "application/json")
-            .build()
-        val response = client.newCall(request).execute()
+        val result = pageFetcher.fetch(requestUrl, mapOf("Accept" to "application/json"))
 
-        if (!response.isSuccessful) {
-            log.severe("Unexpected response: " + response.code)
+        if (!result.isSuccessful) {
+            log.severe("Unexpected response: " + result.code)
             return ""
         }
 
-        return response.body?.string() ?: ""
+        return result.body
     }
 
     override fun search(query: String): List<SearchResult> {
