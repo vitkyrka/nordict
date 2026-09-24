@@ -40,7 +40,7 @@ class ImagePicker : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         ordboken = Ordboken.getInstance(this)
 
-        val initialWord = intent?.getStringExtra(Intent.EXTRA_TEXT) ?: "spritsa"
+        val initialWord = intent?.getStringExtra(Intent.EXTRA_TEXT) ?: "apple"
         val dictImages = intent?.getStringArrayListExtra("dictionaryImages") ?: arrayListOf()
 
         setContent {

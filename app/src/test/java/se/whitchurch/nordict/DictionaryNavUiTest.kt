@@ -75,7 +75,7 @@ class DictionaryNavUiTest {
 
     /** The swap-to-last-language button labelled for [lang]. */
     private fun swapButton(lang: String) =
-        composeRule.onNodeWithContentDescription("Byt till $lang")
+        composeRule.onNodeWithContentDescription("Switch to $lang")
 
     /** The clickable chip node whose text is [tag]. */
     private fun chip(tag: String) =
@@ -175,7 +175,7 @@ class DictionaryNavUiTest {
     @Test
     fun swapButtonShowsLastLangAndSwapsBackAndForth() {
         // Seeded with [es, ca, se]: fresh current language is es, so lastLang
-        // is ca and the split button's swap segment reads "Byt till ca".
+        // is ca and the split button's swap segment reads "Switch to ca".
         setTopBar()
         swapButton("ca").assertExists().performClick()
         composeRule.waitForIdle()
@@ -196,7 +196,7 @@ class DictionaryNavUiTest {
 
         // The trailing segment of the split button opens the language menu;
         // picking a language goes through Ordboken.setLanguage.
-        composeRule.onNodeWithContentDescription("Byt språk").assertExists().performClick()
+        composeRule.onNodeWithContentDescription("Change language").assertExists().performClick()
         composeRule.waitForIdle()
 
         composeRule.onNodeWithText("se").performClick()
@@ -234,7 +234,7 @@ class DictionaryNavUiTest {
         setNav()
 
         // Pick se from the language menu: chips must switch to SO.
-        composeRule.onNodeWithContentDescription("Byt språk").performClick()
+        composeRule.onNodeWithContentDescription("Change language").performClick()
         composeRule.waitForIdle()
         composeRule.onNodeWithText("se").performClick()
         composeRule.waitForIdle()
@@ -252,8 +252,8 @@ class DictionaryNavUiTest {
         NordictPrefs.clearBlocking(app)
         ordboken = Ordboken.getInstance(app, client, arrayOf(dle(), est()))
         setTopBar()
-        composeRule.onNodeWithContentDescription("Byt till ca").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Byt till es").assertDoesNotExist()
-        composeRule.onNodeWithContentDescription("Byt språk").assertExists()
+        composeRule.onNodeWithContentDescription("Switch to ca").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Switch to es").assertDoesNotExist()
+        composeRule.onNodeWithContentDescription("Change language").assertExists()
     }
 }

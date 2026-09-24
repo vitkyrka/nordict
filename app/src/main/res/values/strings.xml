@@ -2,29 +2,29 @@
 <resources>
 
     <string name="app_name">Nordict</string>
-    <string name="menu_search">Sök</string>
-    <string name="search_hint">Sök i ordboken</string>
-    <string name="empty">Tom.</string>
-    <string name="tryagain">Försök igen</string>
-    <string name="error_offline">Ingen anslutning.</string>
-    <string name="error_results">Hämtningen misslyckades.</string>
-    <string name="error_word">Hämtningen misslyckades.</string>
-    <string name="error_audio">Ljuduppspelningen misslyckades.</string>
-    <string name="no_results">Inga resultat hittades.</string>
-    <string name="search_fill_current_word">Fyll i aktuellt ord i sökfältet</string>
-    <string name="search_fill_row">Fyll i ordet i sökfältet</string>
-    <string name="search_clear">Rensa sökningen</string>
-    <string name="search_edit">Redigera sökningen</string>
-    <string name="history">Historik</string>
-    <string name="open_in_browser">Öppna i webbläsare</string>
-    <string name="menu_reset_zoom">Återställ zoom</string>
-    <string name="menu_add_card">Lägg till kort</string>
-    <string name="menu_play_audio">Spela upp ljud</string>
-    <string name="menu_autoplay">Automatisk ljuduppspelning</string>
-    <string name="menu_more">Fler alternativ</string>
-    <string name="swap_to">Byt till %1$s</string>
-    <string name="change_language">Byt språk</string>
-    <string name="title_activity_card">CardActivity</string>
+    <string name="menu_search">Search</string>
+    <string name="search_hint">Search the dictionary</string>
+    <string name="empty">Empty.</string>
+    <string name="tryagain">Try again</string>
+    <string name="error_offline">No connection.</string>
+    <string name="error_results">Failed to load results.</string>
+    <string name="error_word">Failed to load word.</string>
+    <string name="error_audio">Audio playback failed.</string>
+    <string name="no_results">No results found.</string>
+    <string name="search_fill_current_word">Fill current word into search field</string>
+    <string name="search_fill_row">Fill word into search field</string>
+    <string name="search_clear">Clear search</string>
+    <string name="search_edit">Edit search</string>
+    <string name="history">History</string>
+    <string name="open_in_browser">Open in browser</string>
+    <string name="menu_reset_zoom">Reset zoom</string>
+    <string name="menu_add_card">Add card</string>
+    <string name="menu_play_audio">Play audio</string>
+    <string name="menu_autoplay">Automatic audio playback</string>
+    <string name="menu_more">More options</string>
+    <string name="swap_to">Switch to %1$s</string>
+    <string name="change_language">Change language</string>
+    <string name="title_activity_card">Cards</string>
     <string name="action_settings">Settings</string>
 
 </resources>
