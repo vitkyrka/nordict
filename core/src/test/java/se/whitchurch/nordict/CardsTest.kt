@@ -305,12 +305,15 @@ class CardsTest {
     }
 
     @Test
-    fun buildCardWord_mergedSameDictionary_staysOneArticle() {
+    fun buildCardWord_mergedSameDictionary_staysOneArticleInPageOrder() {
         val word = parseDleOtro()
-        val defs = listOf(word.definitions[0], word.definitions[1])
-        val card = Cards.buildCardWord(word, defs, emptyList())
+        // Selected in reverse toggle order: the card still follows the page.
+        val card = Cards.buildCardWord(
+            word, listOf(word.definitions[1], word.definitions[0]), emptyList()
+        )
 
-        assertThat(card.definitions).containsExactlyElementsIn(defs).inOrder()
+        assertThat(card.definitions)
+            .containsExactly(word.definitions[0], word.definitions[1]).inOrder()
         assertThat(card.mHomonymEntries).isEmpty()
     }
 
@@ -329,8 +332,10 @@ class CardsTest {
         // gloss instances; the card builder must still resolve them.
         val proposals = Cards.proposals(masc).filterIsInstance<CardProposal.Definition>()
         assertThat(proposals).hasSize(6)
+        // Selected in reverse toggle order: split senses sort back into
+        // gloss (sense) order.
         val card = Cards.buildCardWord(
-            masc, listOf(proposals[0].definition, proposals[1].definition), emptyList()
+            masc, listOf(proposals[1].definition, proposals[0].definition), emptyList()
         )
 
         assertThat(card.mTitle).isEqualTo("frente")
@@ -338,7 +343,7 @@ class CardsTest {
         assertThat(card.definitions.map { it.glosses.single()?.definition }).containsExactly(
             proposals[0].definition.glosses.single()?.definition,
             proposals[1].definition.glosses.single()?.definition
-        )
+        ).inOrder()
         assertThat(card.mHomonymEntries).isEmpty()
     }
 
@@ -364,17 +369,21 @@ class CardsTest {
         val entries = MultiDict.entriesFor("DLE", dle) + MultiDict.entriesFor("EST", est)
         val combined = Word.combined(dle, "combined", entries, "otro", null)
 
-        // Selected EST-first (reverse toggle order): sections must still
-        // follow the page's dictionary order.
+        // Selected EST-first with two DLE defs reversed (reverse toggle
+        // order throughout): sections must still follow the page's dictionary
+        // order, and defs within a dictionary must follow page order.
         val card = Cards.buildCardWord(
-            combined, listOf(est.definitions[0], dle.definitions[0]), emptyList()
+            combined,
+            listOf(est.definitions[0], dle.definitions[1], dle.definitions[0]),
+            emptyList()
         )
 
         // One section per dictionary, in dictionary order, each carrying only
         // its own definitions under its dictionary label — the renderer draws
         // them as separated .homonym-entry sections instead of jammed text.
         assertThat(card.mHomonymEntries).hasSize(2)
-        assertThat(card.mHomonymEntries[0].definitions).containsExactly(dle.definitions[0])
+        assertThat(card.mHomonymEntries[0].definitions)
+            .containsExactly(dle.definitions[0], dle.definitions[1]).inOrder()
         assertThat(card.mHomonymEntries[1].definitions).containsExactly(est.definitions[0])
         assertThat(card.mHomonymEntries.map { it.dictionary }).containsExactly(
             entries.first { it.definitions.contains(dle.definitions[0]) }.dictionary,
@@ -433,6 +442,23 @@ class CardsTest {
         val examples = Cards.examples(word, listOf(def), emptyList())
         assertThat(examples).hasSize(def.glosses.sumOf { it.examples.size })
         assertThat(examples).containsExactlyElementsIn(def.glosses.flatMap { it.examples })
+    }
+
+    @Test
+    fun examples_mergedDefinitions_followPageOrderNotToggleOrder() {
+        val defEl = Element("div").text("def")
+        val first = Word.Definition("first", defEl)
+        first.examples.add("example 1")
+        val second = Word.Definition("second", defEl)
+        second.examples.add("example 2")
+        val word = Word("DDO", "hund", "hund", "hund", httpUrl("https://ordnet.dk/ddo/"))
+        word.definitions.add(first)
+        word.definitions.add(second)
+
+        // Selected in reverse toggle order: the front matches the Back's
+        // page order.
+        assertThat(Cards.examples(word, listOf(second, first), emptyList()))
+            .containsExactly("example 1", "example 2").inOrder()
     }
 
     @Test

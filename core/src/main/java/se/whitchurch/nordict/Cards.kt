@@ -165,6 +165,48 @@ object Cards {
                 candidate.glosses.any { gloss -> def.glosses.any { it === gloss } }
         }
 
+    /** Definitions in page order: every entry's list for a combined word
+     * (entries themselves are already in dictionary order), else the word's
+     * own list. */
+    private fun masterDefinitions(word: Word): List<Word.Definition> =
+        if (word.mHomonymEntries.any { MultiDict.isCombinedRef(it.ref) }) {
+            word.mHomonymEntries.flatMap { it.definitions }
+        } else {
+            word.definitions
+        }
+
+    /** Idioms in page order, like [masterDefinitions]. */
+    private fun masterIdioms(word: Word): List<Word.Idiom> =
+        if (word.mHomonymEntries.any { MultiDict.isCombinedRef(it.ref) }) {
+            word.mHomonymEntries.flatMap { it.idioms }
+        } else {
+            word.idioms
+        }
+
+    /**
+     * Page-order sort key for a selected definition: its index in the master
+     * list, or, for a Collins split copy, its parent's index plus the gloss's
+     * position within the parent — so split senses from one POS group sort in
+     * sense order. Anything unrecognized sorts last (stable sort then keeps
+     * selection order between those).
+     */
+    private fun defPageKey(master: List<Word.Definition>, def: Word.Definition): Pair<Int, Int> {
+        master.forEachIndexed { i, candidate ->
+            if (candidate === def) return Pair(i, -1)
+        }
+        master.forEachIndexed { i, candidate ->
+            val gloss = candidate.glosses.indexOfFirst { gloss -> def.glosses.any { it === gloss } }
+            if (gloss >= 0) return Pair(i, gloss)
+        }
+        return Pair(Int.MAX_VALUE, Int.MAX_VALUE)
+    }
+
+    /** Page-order sort key for a selected idiom (idioms are never copied). */
+    private fun idiomPageKey(master: List<Word.Idiom>, idiom: Word.Idiom): Int {
+        val i = master.indexOfFirst { it === idiom }
+        return if (i >= 0) i else Int.MAX_VALUE
+    }
+
     /**
      * A synthetic word carrying only the selected definitions and idioms for
      * one card. `renderCardWord` draws it: a single article when the selection
@@ -174,9 +216,10 @@ object Cards {
      * when a merge spans dictionaries, so combined entries stay separated
      * under their dictionary labels instead of jammed together.
      *
-     * Sections follow the page's dictionary order (`mHomonymEntries`), not the
-     * order the merge switches were toggled in; definitions/idioms within one
-     * dictionary keep selection order.
+     * The selection renders in page order throughout — sections follow the
+     * page's dictionary order (`mHomonymEntries`) and definitions/idioms
+     * follow page order within their dictionary — never the order the merge
+     * switches were toggled in.
      *
      * Definitions/idioms are matched back to their source entry by object
      * identity (idioms are never copied; unsplit definitions keep their model
@@ -186,7 +229,15 @@ object Cards {
      * silently empty.
      */
     fun buildCardWord(word: Word, defs: List<Word.Definition>, idioms: List<Word.Idiom>): Word {
-        val title = defs.mapNotNull { it.title }.firstOrNull() ?: word.mTitle
+        val masterDefs = masterDefinitions(word)
+        val masterIdioms = masterIdioms(word)
+        // Page order, not toggle order (the sort is stable, so unrecognized
+        // entries keep selection order between themselves).
+        val orderedDefs = defs.sortedWith(
+            compareBy({ defPageKey(masterDefs, it).first }, { defPageKey(masterDefs, it).second })
+        )
+        val orderedIdioms = idioms.sortedBy { idiomPageKey(masterIdioms, it) }
+        val title = orderedDefs.mapNotNull { it.title }.firstOrNull() ?: word.mTitle
         val card = Word(word.dict, title, word.mSlug, word.summary, word.uri)
         val combined = word.mHomonymEntries.any { MultiDict.isCombinedRef(it.ref) }
         if (!combined) {
@@ -196,17 +247,17 @@ object Cards {
             card.participle = word.participle
             card.etymology = word.etymology
             card.pronunciation = word.pronunciation
-            card.definitions.addAll(defs)
-            card.idioms.addAll(idioms)
+            card.definitions.addAll(orderedDefs)
+            card.idioms.addAll(orderedIdioms)
             return card
         }
-        // Partition the selection by source entry, in first-seen order.
+        // Partition the page-ordered selection by source entry.
         val groups = LinkedHashMap<Word.HomonymEntry?, Pair<ArrayList<Word.Definition>, ArrayList<Word.Idiom>>>()
-        for (def in defs) {
+        for (def in orderedDefs) {
             val entry = word.mHomonymEntries.firstOrNull { it.defines(def) }
             groups.getOrPut(entry) { Pair(ArrayList(), ArrayList()) }.first.add(def)
         }
-        for (idiom in idioms) {
+        for (idiom in orderedIdioms) {
             val entry = word.mHomonymEntries.firstOrNull { it.idioms.any { candidate -> candidate === idiom } }
             groups.getOrPut(entry) { Pair(ArrayList(), ArrayList()) }.second.add(idiom)
         }
@@ -258,12 +309,16 @@ object Cards {
      * The example sentences shown on the card front: every chosen
      * definition's examples (from its glosses when it has them — Collins and
      * the RAE dictionaries keep examples there — else the definition-level
-     * list), plus any clipboard extras. Falls back to the
-     * word's title so the front is never empty.
+     * list), in page order like the Back, plus any clipboard extras. Falls
+     * back to the word's title so the front is never empty.
      */
     fun examples(word: Word, defs: List<Word.Definition>, extras: List<String>): List<String> {
+        val master = masterDefinitions(word)
+        val ordered = defs.sortedWith(
+            compareBy({ defPageKey(master, it).first }, { defPageKey(master, it).second })
+        )
         val out = ArrayList<String>()
-        for (def in defs) {
+        for (def in ordered) {
             if (def.glosses.isNotEmpty()) {
                 for (gloss in def.glosses) out.addAll(gloss.examples)
             } else {
@@ -272,7 +327,7 @@ object Cards {
         }
         out.addAll(extras)
         if (out.isEmpty()) {
-            out.add(defs.mapNotNull { it.title }.firstOrNull() ?: word.mTitle)
+            out.add(ordered.mapNotNull { it.title }.firstOrNull() ?: word.mTitle)
         }
         return out
     }
