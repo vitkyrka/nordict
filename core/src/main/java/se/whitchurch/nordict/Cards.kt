@@ -167,13 +167,16 @@ object Cards {
 
     /**
      * A synthetic word carrying only the selected definitions and idioms for
-     * one card, in selection order. `renderCardWord` draws it: a single
-     * article when the selection comes from one dictionary (the common case —
-     * a definition card, a merged same-dictionary card, or an idiom-only
-     * card, which renders as a header plus its idiom section), or one
-     * `.homonym-entry` section per dictionary when a merge spans dictionaries,
-     * so combined entries stay separated under their dictionary labels instead
-     * of jammed together.
+     * one card. `renderCardWord` draws it: a single article when the selection
+     * comes from one dictionary (the common case — a definition card, a merged
+     * same-dictionary card, or an idiom-only card, which renders as a header
+     * plus its idiom section), or one `.homonym-entry` section per dictionary
+     * when a merge spans dictionaries, so combined entries stay separated
+     * under their dictionary labels instead of jammed together.
+     *
+     * Sections follow the page's dictionary order (`mHomonymEntries`), not the
+     * order the merge switches were toggled in; definitions/idioms within one
+     * dictionary keep selection order.
      *
      * Definitions/idioms are matched back to their source entry by object
      * identity (idioms are never copied; unsplit definitions keep their model
@@ -220,7 +223,12 @@ object Cards {
             return card
         }
         card.dictionary = word.dictionary
-        for ((entry, selection) in groups) {
+        // Sections follow the page's dictionary order, not toggle order.
+        val pageOrder = word.mHomonymEntries.withIndex().associate { it.value to it.index }
+        val ordered = groups.entries.sortedBy { (entry, _) ->
+            entry?.let { pageOrder[it] } ?: Int.MAX_VALUE
+        }
+        for ((entry, selection) in ordered) {
             card.mHomonymEntries.add(
                 Word.HomonymEntry(
                     mTitle = selection.first.mapNotNull { it.title }.firstOrNull()

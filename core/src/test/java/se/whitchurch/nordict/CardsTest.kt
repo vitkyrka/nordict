@@ -364,11 +364,13 @@ class CardsTest {
         val entries = MultiDict.entriesFor("DLE", dle) + MultiDict.entriesFor("EST", est)
         val combined = Word.combined(dle, "combined", entries, "otro", null)
 
+        // Selected EST-first (reverse toggle order): sections must still
+        // follow the page's dictionary order.
         val card = Cards.buildCardWord(
-            combined, listOf(dle.definitions[0], est.definitions[0]), emptyList()
+            combined, listOf(est.definitions[0], dle.definitions[0]), emptyList()
         )
 
-        // One section per dictionary, in selection order, each carrying only
+        // One section per dictionary, in dictionary order, each carrying only
         // its own definitions under its dictionary label — the renderer draws
         // them as separated .homonym-entry sections instead of jammed text.
         assertThat(card.mHomonymEntries).hasSize(2)
