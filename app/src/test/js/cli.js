@@ -33,7 +33,6 @@ const inlineStyle = (id, filename) => {
 };
 
 inlineStyle('main-css', 'renderer.css');
-inlineScript('jq-js', 'jquery.min.js');
 inlineScript('renderer-js', 'renderer.js');
 inlineScript('word-js', 'word.js');
 
@@ -46,22 +45,20 @@ const json = JSON.stringify(words).replace(/<\/script>/g, '<\\/script>');
 const loadScript = words.length === 1 ? `
     loadWord(words[0]);
 ` : `
-    $(document).ready(() => {
-        const homs = words.map(w => ({
-            mTitle: w.mTitle,
-            ref: (w.xrefs && w.xrefs[0]) || '',
-            dictionary: w.dictionary,
-            conjugation: w.conjugation || '',
-            participle: w.participle || '',
-            etymology: w.etymology || '',
-            gender: w.gender || '',
-            definitions: w.definitions || [],
-            idioms: w.idioms || [],
-            audio: w.audio || []
-        }));
-        renderWord(Object.assign({}, words[0], { mHomonymEntries: homs }));
-        createLinks(document.getElementById('content'));
-    });
+    const homs = words.map(w => ({
+        mTitle: w.mTitle,
+        ref: (w.xrefs && w.xrefs[0]) || '',
+        dictionary: w.dictionary,
+        conjugation: w.conjugation || '',
+        participle: w.participle || '',
+        etymology: w.etymology || '',
+        gender: w.gender || '',
+        definitions: w.definitions || [],
+        idioms: w.idioms || [],
+        audio: w.audio || []
+    }));
+    renderWord(Object.assign({}, words[0], { mHomonymEntries: homs }));
+    createLinks(document.getElementById('content'));
 `;
 
 html = html.replace('</body>', () => `

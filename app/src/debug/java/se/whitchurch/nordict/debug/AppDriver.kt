@@ -260,7 +260,7 @@ class AppDriver(private val app: android.app.Application) {
      * view's "add card" action: the same `CardActivity` intent (deck name
      * `"Nordict - <dict>"` for a single dictionary, `"Nordict - <LANG>"` for
      * a combined multi-dictionary word). The page CSS is left as the last
-     * value in [Ordboken.currentCss] — the WebView `getCSS()` call happens
+     * value in [Ordboken.currentCss] — the `renderer.css` asset read happens
      * on the FAB path only — so the agent path is headless-friendly while
      * the cards produced are structurally identical.
      */

@@ -249,7 +249,7 @@ function renderWord(word) {
         ? word.mHomonymEntries
         : null;
 
-    $('#content').html(entries ? renderHomonymPage(entries) : template(word));
+    document.getElementById('content').innerHTML = entries ? renderHomonymPage(entries) : template(word);
 }
 
 // For Node.js testing

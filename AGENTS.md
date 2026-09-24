@@ -12,7 +12,7 @@ autoplay, gender highlighting, and AnkiDroid integration.
 There are no Kotlin libraries beyond the Android SDK, `org.jsoup` for HTML
 parsing, Gson for JSON serialization, and OkHttp (its `HttpUrl` is used as the
 JVM-neutral URL type in the shared module). JS assets run inside an Android
-WebView; the jQuery-based rendering code is separated out and unit-tested with
+WebView; the vanilla-JS rendering code is separated out and unit-tested with
 Node/Jest.
 
 The parsing core is a pure-JVM module (`:core`) shared by the Android app and a
@@ -36,7 +36,7 @@ cli/src/main/...                        Desktop CLI (application) using :core
 app/src/main/java/...      Android-only Kotlin (Ordboken registry, Compose UI,
                            MainActivity/AppNavHost/WordScreen/SearchScreen,
                            CardActivity, Flags.kt — the flagCode → R.drawable mapping)
-app/src/main/assets/        WebView assets (HTML/JS/CSS/jquery)
+app/src/main/assets/        WebView assets (HTML/JS/CSS)
 app/src/debug/...           Debug-only agent server (AgentServer) for on-device driving
 app/src/test/java/...      Robolectric unit + MockWebServer tests (UI, ViewModel, AppDriver)
 app/src/test/js/            Jest tests + CLI for the JS renderer
@@ -114,7 +114,7 @@ tools/                      Standalone python scripts (crawl/download/parse/anki
   `href` (the full source link target, e.g. a RAE DLE `?id=` deep-link), and a
   `plev` marker (the DLE `abbr.sin_alert` title, e.g. "malsonante").
 - **`assets/renderer.js`** — builds the DOM from the JSON word object
-  (`renderWord(word)` -> `$('#content').html(...)`).
+  (`renderWord(word)` -> `#content` `innerHTML`).
 - **`assets/word.js`** — turns words inside definitions/examples into
   `/search/...` links (`createLinks`). Synonyms rendered as `<a>` anchors by
   `renderer.js` are skipped (the regex already skips anchor content). Needs

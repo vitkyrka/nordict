@@ -34,19 +34,3 @@ var createLinks = function(el) {
 		return before + '<a class="normalx" href="/search/' + a.toLowerCase() + '">' + a + "</a>";
 	});
 };
-
-var getCSS = function() {
-    var css = "";
-
-    $(document.styleSheets).each(function (index) {
-        try {
-            $(this.cssRules).each(function (e) {
-                    css += this.cssText + "\n";
-            });
-        } catch (e) {
-            // alert("fail: " + this.href);
-        }
-    })
-
-    return css;
-};

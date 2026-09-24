@@ -4,19 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link id="main-css" rel='stylesheet' type='text/css' href='renderer.css'>
-    <script id="jq-js" src='jquery.min.js'></script>
     <script id="renderer-js" src='renderer.js'></script>
     <script id="word-js" src='word.js'></script>
     <script>
         function loadWord(wordData) {
-            $(document).ready(() => {
+            const render = () => {
                 if (typeof renderWord === 'function') {
                     renderWord(wordData);
                 }
                 if (typeof createLinks === 'function') {
                     createLinks(document.getElementById('content'));
                 }
-            });
+            };
+            if (document.readyState !== 'loading') {
+                render();
+            } else {
+                document.addEventListener('DOMContentLoaded', render);
+            }
         }
     </script>
 </head>

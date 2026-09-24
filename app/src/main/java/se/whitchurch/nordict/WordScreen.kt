@@ -6,7 +6,6 @@ import android.os.Build
 import android.content.Intent
 import android.content.res.Configuration
 import android.net.Uri
-import android.util.JsonReader
 import android.util.Log
 import android.view.View
 import android.webkit.JavascriptInterface
@@ -62,7 +61,6 @@ import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.StringReader
 import java.net.URLDecoder
 import kotlin.math.roundToInt
 
@@ -774,18 +772,17 @@ class WordViewModel(
 
     fun share() {
         if (mWord == null) return
-        val webView = this.webView ?: return
-        webView.evaluateJavascript("getCSS()", android.webkit.ValueCallback { json ->
-            val reader = JsonReader(StringReader(json))
-            reader.isLenient = true
-            ordboken.currentCss = reader.nextString()
+        // The word view renders from the bundled renderer.css asset, so read
+        // it directly for the Anki card backs (Cards.definitionBack) instead
+        // of scraping the live stylesheets via JS.
+        ordboken.currentCss = getApplication<android.app.Application>().assets
+            .open("renderer.css").bufferedReader().use { it.readText() }
 
-            val intent = Intent(getApplication(), CardActivity::class.java).apply {
-                putExtra("deckName", deckName)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            getApplication<android.app.Application>().startActivity(intent)
-        })
+        val intent = Intent(getApplication(), CardActivity::class.java).apply {
+            putExtra("deckName", deckName)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        getApplication<android.app.Application>().startActivity(intent)
     }
 }
 
