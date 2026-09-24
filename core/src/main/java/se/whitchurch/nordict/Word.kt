@@ -55,8 +55,8 @@ class Word(
         val examples: ArrayList<String> = ArrayList()
 
         // The source fragment for this sense (Collins `div.sense`, cloned
-        // after examples/idioms are pruned). Lets card Backs render one
-        // sense instead of the whole POS-group `hom`. Excluded from JSON.
+        // after examples/idioms are pruned). Split card copies share this
+        // instance, which is their stable hide-key identity. Excluded from JSON.
         @Transient var element: Element? = null
 
         // Collins idioms and phrases nested inside this sense (gloss).

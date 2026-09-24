@@ -221,6 +221,7 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                             }
                         )
                         is CardProposal.Idiom -> IdiomCard(
+                            word = word,
                             proposal = proposal,
                             onCreate = { hiddenCards = hiddenCards + Cards.hideKey(proposal.idiom) }
                         )
@@ -431,13 +432,23 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                         val effectiveDefs =
                             if (selectedDefinitions.isEmpty()) listOf(definition)
                             else selectedDefinitions.values.toList()
-                        previewTitle = title
-                        preview = Cards.preview(
-                            Cards.definitionBack(word, effectiveDefs, ordboken.currentCss),
-                            Cards.examples(word, effectiveDefs, extraExamples),
-                            imagesMap[proposal.id].orEmpty(),
-                            audio.elementAtOrElse(audioIdx.intValue) { _ -> "" }
-                        )
+                        val cardWord = Cards.buildCardWord(word, effectiveDefs, emptyList())
+                        renderCardBack(cardWord) { back ->
+                            if (back == null) {
+                                android.widget.Toast.makeText(
+                                    this@CardActivity, "Fail",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                                return@renderCardBack
+                            }
+                            previewTitle = title
+                            preview = Cards.preview(
+                                back,
+                                Cards.examples(word, effectiveDefs, extraExamples),
+                                imagesMap[proposal.id].orEmpty(),
+                                audio.elementAtOrElse(audioIdx.intValue) { _ -> "" }
+                            )
+                        }
                     }) {
                         Icon(
                             Icons.Filled.Visibility,
@@ -454,13 +465,20 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                             else selectedDefinitions.values.toList()
                         val imagesForCard = imagesMap[proposal.id].orEmpty()
                         val cardExamples = Cards.examples(word, effectiveDefs, extraExamples)
-                        val noteId = createCard(
-                            Cards.definitionBack(word, effectiveDefs, ordboken.currentCss),
-                            cardExamples,
-                            imagesForCard,
-                            audio.elementAtOrElse(audioIdx.intValue) { _ -> "" }
-                        )
-                        if (noteId != null) onCreate(effectiveDefs)
+                        val cardAudio = audio.elementAtOrElse(audioIdx.intValue) { _ -> "" }
+                        renderCardBack(
+                            Cards.buildCardWord(word, effectiveDefs, emptyList())
+                        ) { back ->
+                            if (back == null) {
+                                android.widget.Toast.makeText(
+                                    this@CardActivity, "Fail",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                                return@renderCardBack
+                            }
+                            val noteId = createCard(back, cardExamples, imagesForCard, cardAudio)
+                            if (noteId != null) onCreate(effectiveDefs)
+                        }
                     }) {
                         Icon(
                             painterResource(R.drawable.ic_done),
@@ -503,8 +521,17 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
         }
     }
 
+    /**
+     * Renders the Back for a synthetic card word through `renderer.js` and
+     * delivers the self-contained static HTML (or null on capture failure).
+     */
+    private fun renderCardBack(cardWord: Word, onDone: (String?) -> Unit) {
+        CardBackRenderer.render(this, cardWord, onDone)
+    }
+
     @Composable
     fun IdiomCard(
+        word: Word,
         proposal: CardProposal.Idiom,
         onCreate: () -> Unit
     ) {
@@ -535,13 +562,24 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                     horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)
                 ) {
                     OutlinedButton(onClick = {
-                        previewTitle = proposal.title
-                        preview = Cards.preview(
-                            Cards.idiomBack(idiom),
-                            Cards.idiomExamples(idiom),
-                            emptyList(),
-                            ""
-                        )
+                        renderCardBack(
+                            Cards.buildCardWord(word, emptyList(), listOf(idiom))
+                        ) { back ->
+                            if (back == null) {
+                                android.widget.Toast.makeText(
+                                    this@CardActivity, "Fail",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                                return@renderCardBack
+                            }
+                            previewTitle = proposal.title
+                            preview = Cards.preview(
+                                back,
+                                Cards.idiomExamples(idiom),
+                                emptyList(),
+                                ""
+                            )
+                        }
                     }) {
                         Icon(
                             Icons.Filled.Visibility,
@@ -552,13 +590,24 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
                         Text("Preview")
                     }
                     Button(onClick = {
-                        val noteId = createCard(
-                            Cards.idiomBack(idiom),
-                            Cards.idiomExamples(idiom),
-                            ArrayList(),
-                            ""
-                        )
-                        if (noteId != null) onCreate()
+                        renderCardBack(
+                            Cards.buildCardWord(word, emptyList(), listOf(idiom))
+                        ) { back ->
+                            if (back == null) {
+                                android.widget.Toast.makeText(
+                                    this@CardActivity, "Fail",
+                                    android.widget.Toast.LENGTH_SHORT
+                                ).show()
+                                return@renderCardBack
+                            }
+                            val noteId = createCard(
+                                back,
+                                Cards.idiomExamples(idiom),
+                                ArrayList(),
+                                ""
+                            )
+                            if (noteId != null) onCreate()
+                        }
                     }) {
                         Icon(
                             painterResource(R.drawable.ic_done),
@@ -636,57 +685,62 @@ class CardActivity : androidx.appcompat.app.AppCompatActivity() {
 
     /**
      * Creates the card for visible proposal [index] (default the first
-     * remaining entry) through the same pipeline the Create button drives, and
-     * returns the new Anki note id (null on failure). On success the entry is
-     * hidden from the card view, exactly like the Create button. Used by the
-     * agent REPL and tests.
+     * remaining entry) through the same pipeline the Create button drives,
+     * delivering the new Anki note id (null on failure) to [cb]. On success
+     * the entry is hidden from the card view, exactly like the Create button.
+     * Asynchronous: the Back renders through the hidden WebView first. Used by
+     * the agent REPL and tests.
      */
-    fun agentCreateCard(index: Int?): Long? {
-        val word = mWord ?: return null
-        val proposal = visibleProposals().getOrNull(index ?: 0) ?: return null
+    fun agentCreateCard(index: Int?, cb: (Long?) -> Unit) {
+        val word = mWord ?: return cb(null)
+        val proposal = visibleProposals().getOrNull(index ?: 0) ?: return cb(null)
         val audio = mAudio.elementAtOrElse(0) { _ -> "" }
-        val noteId = when (proposal) {
-            is CardProposal.Definition -> createCard(
-                Cards.definitionBack(word, listOf(proposal.definition), ordboken.currentCss),
+        val (cardWord, examples, cardAudio) = when (proposal) {
+            is CardProposal.Definition -> Triple(
+                Cards.buildCardWord(word, listOf(proposal.definition), emptyList()),
                 Cards.examples(word, listOf(proposal.definition), emptyList()),
-                emptyList(),
                 audio
             )
-            is CardProposal.Idiom -> createCard(
-                Cards.idiomBack(proposal.idiom),
+            is CardProposal.Idiom -> Triple(
+                Cards.buildCardWord(word, emptyList(), listOf(proposal.idiom)),
                 Cards.idiomExamples(proposal.idiom),
-                emptyList(),
                 ""
             )
         }
-        if (noteId != null) {
-            hiddenCards = hiddenCards + Cards.proposalHideKey(proposal)
+        renderCardBack(cardWord) { back ->
+            if (back == null) return@renderCardBack cb(null)
+            val noteId = createCard(back, examples, emptyList(), cardAudio)
+            if (noteId != null) {
+                hiddenCards = hiddenCards + Cards.proposalHideKey(proposal)
+            }
+            cb(noteId)
         }
-        return noteId
     }
 
     /**
      * Builds the front/back preview for proposal [index] (default the first
      * definition) through the same pipeline the Preview button drives, without
-     * touching Anki. Used by the agent REPL and tests.
+     * touching Anki, delivering it to [cb] (null on failure). Used by the
+     * agent REPL and tests.
      */
-    fun agentPreviewCard(index: Int?): Cards.CardPreview? {
-        val word = mWord ?: return null
-        val proposal = Cards.proposals(word).getOrNull(index ?: 0) ?: return null
+    fun agentPreviewCard(index: Int?, cb: (Cards.CardPreview?) -> Unit) {
+        val word = mWord ?: return cb(null)
+        val proposal = Cards.proposals(word).getOrNull(index ?: 0) ?: return cb(null)
         val audio = mAudio.elementAtOrElse(0) { _ -> "" }
-        return when (proposal) {
-            is CardProposal.Definition -> Cards.preview(
-                Cards.definitionBack(word, listOf(proposal.definition), ordboken.currentCss),
+        val (cardWord, examples, cardAudio) = when (proposal) {
+            is CardProposal.Definition -> Triple(
+                Cards.buildCardWord(word, listOf(proposal.definition), emptyList()),
                 Cards.examples(word, listOf(proposal.definition), emptyList()),
-                emptyList(),
                 audio
             )
-            is CardProposal.Idiom -> Cards.preview(
-                Cards.idiomBack(proposal.idiom),
+            is CardProposal.Idiom -> Triple(
+                Cards.buildCardWord(word, emptyList(), listOf(proposal.idiom)),
                 Cards.idiomExamples(proposal.idiom),
-                emptyList(),
                 ""
             )
+        }
+        renderCardBack(cardWord) { back ->
+            cb(back?.let { Cards.preview(it, examples, emptyList(), cardAudio) })
         }
     }
 

@@ -1,7 +1,7 @@
 /**
  * @jest-environment jsdom
  */
-const { renderWord, GENDERS } = require('../../main/assets/renderer.js');
+const { renderWord, renderCardWord, GENDERS } = require('../../main/assets/renderer.js');
 const $ = require('jquery');
 
 // Setup JSDOM
@@ -1218,4 +1218,102 @@ test('renders etymology below the definitions', () => {
     expect($('.etymology').text()).toContain('Du latin tabula.');
     const article = $('article');
     expect(article.find('.definitions').index()).toBeLessThan(article.find('.etymology').index());
+});
+
+/* ---- Card back (renderCardWord: the Anki Back renderer) ---- */
+
+const cardDef = (definition, grammar = 'nombre femenino') => ({
+    senseNumber: '1',
+    glosses: [{ definition, grammar, gender: '', examples: [] }]
+});
+
+test('card renders a single selection as one article with a title and no nav', () => {
+    renderCardWord({
+        mTitle: 'otro, tra',
+        dictionary: 'DLE',
+        definitions: [cardDef('Dicho de una persona.')],
+        idioms: []
+    });
+
+    expect($('article').length).toBe(1);
+    expect($('h1').text()).toBe('otro, tra');
+    expect($('.dictionary-label').text()).toBe('DLE');
+    expect($('.homonym-entry').length).toBe(0);
+    expect($('.homonym-nav').length).toBe(0);
+    // Numbering comes from the original sense, never an auto-numbered list.
+    expect($('.sense-number').first().text()).toBe('1');
+    expect($('ol').length).toBe(0);
+});
+
+test('card renders an idiom-only selection with the same header path', () => {
+    renderCardWord({
+        mTitle: 'frente',
+        dictionary: 'EST',
+        definitions: [],
+        idioms: [
+            {
+                idiom: 'al frente',
+                glosses: [
+                    { definition: 'Hacia delante.', grammar: 'locución adverbial', gender: '', examples: [], senseNumber: '1' }
+                ]
+            }
+        ]
+    });
+
+    expect($('h1').text()).toBe('frente');
+    expect($('section.idiom').length).toBe(1);
+    expect($('section.idiom .idiom-heading').text()).toBe('al frente');
+    expect($('section.idiom .grammar').text()).toBe('locución adverbial');
+});
+
+test('card keeps grammar colors on the selected definitions', () => {
+    renderCardWord({
+        mTitle: 'frente',
+        definitions: [
+            {
+                domain: 'meteorología',
+                glosses: [
+                    { definition: 'Zona de contacto.', grammar: 'nombre masculino', gender: GENDERS.MASCULINE, examples: [] }
+                ]
+            }
+        ],
+        idioms: []
+    });
+
+    expect($('.definitions .grammar.masculine').text()).toBe('nombre masculino');
+    expect($('.definitions .domain').text()).toBe('meteorología');
+});
+
+test('card renders a cross-dictionary merge as separated labeled sections', () => {
+    renderCardWord({
+        mTitle: 'otro, tra',
+        dictionary: 'combined',
+        definitions: [],
+        idioms: [],
+        mHomonymEntries: [
+            {
+                mTitle: 'otro, tra',
+                ref: '',
+                dictionary: 'DLE',
+                definitions: [cardDef('Dicho de una persona.')],
+                idioms: []
+            },
+            {
+                mTitle: 'otro, tra',
+                ref: '',
+                dictionary: 'EST',
+                definitions: [cardDef('Que es distinto.', 'adjetivo')],
+                idioms: []
+            }
+        ]
+    });
+
+    // One section per dictionary with its label, separated by the shared
+    // .homonym-entry rule — and no nav rows (dead anchors in Anki).
+    expect($('.homonym-entry').length).toBe(2);
+    expect($('.homonym-nav').length).toBe(0);
+    const labels = $('.homonym-entry .dictionary-label').map((_, el) => $(el).text()).get();
+    expect(labels).toEqual(['DLE', 'EST']);
+    expect($('.homonym-entry').eq(0).find('.definition').text()).toContain('Dicho de una persona');
+    expect($('.homonym-entry').eq(1).find('.definition').text()).toContain('Que es distinto');
 });

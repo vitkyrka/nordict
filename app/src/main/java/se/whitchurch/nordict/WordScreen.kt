@@ -772,12 +772,8 @@ class WordViewModel(
 
     fun share() {
         if (mWord == null) return
-        // The word view renders from the bundled renderer.css asset, so read
-        // it directly for the Anki card backs (Cards.definitionBack) instead
-        // of scraping the live stylesheets via JS.
-        ordboken.currentCss = getApplication<android.app.Application>().assets
-            .open("renderer.css").bufferedReader().use { it.readText() }
-
+        // Card Backs render through the hidden WebView (CardBackRenderer reads
+        // the bundled renderer.css asset itself), so nothing needs staging here.
         val intent = Intent(getApplication(), CardActivity::class.java).apply {
             putExtra("deckName", deckName)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

@@ -258,7 +258,7 @@ class SoParser {
             return definition
         }
 
-        /** A plain HTML fragment per definition so Anki card backs are not empty. */
+        /** A plain HTML fragment per definition (the Definition model keeps its source element). */
         private fun definitionElement(glosses: List<Word.Gloss>): Element {
             val body = Jsoup.parseBodyFragment("").body()
             body.appendElement("div").addClass("gloss")

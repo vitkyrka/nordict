@@ -22,6 +22,21 @@
                 document.addEventListener('DOMContentLoaded', render);
             }
         }
+        // Card-back capture (see CardBackRenderer): renders the synthetic
+        // card word with renderCardWord and deliberately skips word.js
+        // auto-linking — /search/ links are dead inside Anki.
+        function loadCard(wordData) {
+            const render = () => {
+                if (typeof renderCardWord === 'function') {
+                    renderCardWord(wordData);
+                }
+            };
+            if (document.readyState !== 'loading') {
+                render();
+            } else {
+                document.addEventListener('DOMContentLoaded', render);
+            }
+        }
     </script>
 </head>
 <body>

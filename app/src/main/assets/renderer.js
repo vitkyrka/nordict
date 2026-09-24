@@ -252,7 +252,31 @@ function renderWord(word) {
     document.getElementById('content').innerHTML = entries ? renderHomonymPage(entries) : template(word);
 }
 
+// ---- Card back ----
+//
+// Anki cards render a synthetic word carrying only the selected definitions
+// and idioms (see Cards.buildCardWord): a single dictionary's selection
+// renders as one article via template(), a merge spanning dictionaries
+// renders one section per dictionary. There are no homonym nav rows —
+// in-page #hom-N anchors are meaningless in Anki — and word.js auto-linking
+// is never run on card content.
+const renderCardEntry = (entry) => `
+    <section class="homonym-entry">
+        ${template(entry)}
+    </section>
+`;
+
+function renderCardWord(word) {
+    const entries = (word.mHomonymEntries && word.mHomonymEntries.length > 1)
+        ? word.mHomonymEntries
+        : null;
+
+    document.getElementById('content').innerHTML = entries
+        ? entries.map(renderCardEntry).join('')
+        : template(word);
+}
+
 // For Node.js testing
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { renderWord, GENDERS };
+    module.exports = { renderWord, renderCardWord, GENDERS };
 }

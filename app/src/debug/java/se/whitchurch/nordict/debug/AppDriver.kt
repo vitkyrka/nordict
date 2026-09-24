@@ -259,10 +259,9 @@ class AppDriver(private val app: android.app.Application) {
      * Opens the card screen for the current word, exactly like the word
      * view's "add card" action: the same `CardActivity` intent (deck name
      * `"Nordict - <dict>"` for a single dictionary, `"Nordict - <LANG>"` for
-     * a combined multi-dictionary word). The page CSS is left as the last
-     * value in [Ordboken.currentCss] — the `renderer.css` asset read happens
-     * on the FAB path only — so the agent path is headless-friendly while
-     * the cards produced are structurally identical.
+     * a combined multi-dictionary word). Card Backs render through the hidden
+     * WebView on every path (agent included), so the cards produced are
+     * structurally identical.
      */
     private fun opOpenCards(command: AgentCommand): AgentResult {
         val word = ordboken().currentWord
@@ -294,7 +293,11 @@ class AppDriver(private val app: android.app.Application) {
         val card = activity as CardActivity
         // The word/audio load task populates mWord asynchronously on open.
         await({ card.isCardReady() }, 10_000)
-        val id = onMain { card.agentCreateCard(command.index) }
+        // The Back renders through the hidden WebView first.
+        var done = false
+        var id: Long? = null
+        onMain { card.agentCreateCard(command.index) { id = it; done = true } }
+        await({ done }, 15_000)
         return if (id != null) {
             val remaining = onMain { card.visibleProposals().size }
             AgentResult(
@@ -327,16 +330,21 @@ class AppDriver(private val app: android.app.Application) {
         val card = activity as CardActivity
         // The word/audio load task populates mWord asynchronously on open.
         await({ card.isCardReady() }, 10_000)
-        val preview = onMain { card.agentPreviewCard(command.index) }
-        return if (preview != null) {
+        // The Back renders through the hidden WebView first.
+        var done = false
+        var preview: se.whitchurch.nordict.Cards.CardPreview? = null
+        onMain { card.agentPreviewCard(command.index) { preview = it; done = true } }
+        await({ done }, 15_000)
+        val result = preview
+        return if (result != null) {
             AgentResult(
                 ok = true,
                 op = AgentOps.PREVIEW_CARD,
                 message = "preview for proposal ${command.index ?: 0}",
                 state = snapshot(),
                 preview = se.whitchurch.nordict.CardPreviewData(
-                    frontHtml = preview.frontHtml,
-                    backField = preview.backField
+                    frontHtml = result.frontHtml,
+                    backField = result.backField
                 )
             )
         } else {

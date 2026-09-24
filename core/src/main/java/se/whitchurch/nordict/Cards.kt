@@ -31,13 +31,12 @@ sealed interface CardProposal {
 
 /**
  * Pure card-pipeline logic: enumerating the cards a [Word] proposes, building
- * each card's Back HTML, collecting the front examples, and assembling the
- * note fields. JSON-rendered dictionaries (DLE, EST, Collins, diccionari.cat,
- * Didac, SO, LeRobert, Linguee, Infopedia, Wiktionary, DDO/SDO, and combined
- * multi-dictionary words) get their Back rendered from the definition
- * fragments directly — there is no page skeleton to inject into (combined
- * words carry an empty `element`), and Collins' definitions are not reached
- * by any skeleton selector.
+ * the synthetic card word each Back renders from, collecting the front
+ * examples, and assembling the note fields. The Back itself is rendered by
+ * `renderer.js` (`renderCardWord`) inside a hidden WebView and captured as
+ * static HTML (see `CardBackRenderer`), so every dictionary — including
+ * combined multi-dictionary words, which carry no single page of their own —
+ * renders through the same template as the word view.
  */
 object Cards {
     private val gson = Gson()
@@ -156,17 +155,89 @@ object Cards {
     }
 
     /**
-     * The Back field HTML for a definition card: the chosen definitions'
-     * fragments stacked directly, wrapped in the extracted page CSS.
+     * True when [def] comes from this entry: the same definition object
+     * (unsplit definitions keep their model objects across [proposals] calls)
+     * or a Collins split copy sharing one of the entry's gloss instances.
      */
-    fun definitionBack(word: Word, defs: List<Word.Definition>, css: String?): String {
-        val style = if (css.isNullOrBlank()) "" else "<style>$css</style>"
-        return style + defs.joinToString(separator = "") { it.element.outerHtml() }
-    }
+    private fun Word.HomonymEntry.defines(def: Word.Definition): Boolean =
+        definitions.any { candidate ->
+            candidate === def ||
+                candidate.glosses.any { gloss -> def.glosses.any { it === gloss } }
+        }
 
-    /** The Back field HTML for an idiom card. */
-    fun idiomBack(idiom: Word.Idiom): String {
-        return "<strong>${idiom.idiom}</strong><p>${idiom.definition}"
+    /**
+     * A synthetic word carrying only the selected definitions and idioms for
+     * one card, in selection order. `renderCardWord` draws it: a single
+     * article when the selection comes from one dictionary (the common case —
+     * a definition card, a merged same-dictionary card, or an idiom-only
+     * card, which renders as a header plus its idiom section), or one
+     * `.homonym-entry` section per dictionary when a merge spans dictionaries,
+     * so combined entries stay separated under their dictionary labels instead
+     * of jammed together.
+     *
+     * Definitions/idioms are matched back to their source entry by object
+     * identity (idioms are never copied; unsplit definitions keep their model
+     * objects) or, for Collins split copies, by their shared gloss instance —
+     * the same stable identity [hideKey] keys on. Anything unmatched falls
+     * into a trailing group under the word's own header, so the Back is never
+     * silently empty.
+     */
+    fun buildCardWord(word: Word, defs: List<Word.Definition>, idioms: List<Word.Idiom>): Word {
+        val title = defs.mapNotNull { it.title }.firstOrNull() ?: word.mTitle
+        val card = Word(word.dict, title, word.mSlug, word.summary, word.uri)
+        val combined = word.mHomonymEntries.any { MultiDict.isCombinedRef(it.ref) }
+        if (!combined) {
+            card.dictionary = word.dictionary
+            card.gender = word.gender
+            card.conjugation = word.conjugation
+            card.participle = word.participle
+            card.etymology = word.etymology
+            card.pronunciation = word.pronunciation
+            card.definitions.addAll(defs)
+            card.idioms.addAll(idioms)
+            return card
+        }
+        // Partition the selection by source entry, in first-seen order.
+        val groups = LinkedHashMap<Word.HomonymEntry?, Pair<ArrayList<Word.Definition>, ArrayList<Word.Idiom>>>()
+        for (def in defs) {
+            val entry = word.mHomonymEntries.firstOrNull { it.defines(def) }
+            groups.getOrPut(entry) { Pair(ArrayList(), ArrayList()) }.first.add(def)
+        }
+        for (idiom in idioms) {
+            val entry = word.mHomonymEntries.firstOrNull { it.idioms.any { candidate -> candidate === idiom } }
+            groups.getOrPut(entry) { Pair(ArrayList(), ArrayList()) }.second.add(idiom)
+        }
+        if (groups.size == 1) {
+            val (entry, selection) = groups.entries.single()
+            card.dictionary = entry?.dictionary ?: word.dictionary
+            card.gender = entry?.gender ?: word.gender
+            card.conjugation = entry?.conjugation ?: word.conjugation
+            card.participle = entry?.participle ?: word.participle
+            card.etymology = entry?.etymology ?: word.etymology
+            card.pronunciation = entry?.pronunciation ?: word.pronunciation
+            card.definitions.addAll(selection.first)
+            card.idioms.addAll(selection.second)
+            return card
+        }
+        card.dictionary = word.dictionary
+        for ((entry, selection) in groups) {
+            card.mHomonymEntries.add(
+                Word.HomonymEntry(
+                    mTitle = selection.first.mapNotNull { it.title }.firstOrNull()
+                        ?: entry?.mTitle ?: title,
+                    ref = "",
+                    dictionary = entry?.dictionary ?: word.dictionary,
+                    conjugation = entry?.conjugation ?: "",
+                    participle = entry?.participle ?: "",
+                    etymology = entry?.etymology ?: "",
+                    pronunciation = entry?.pronunciation ?: "",
+                    definitions = ArrayList(selection.first),
+                    idioms = ArrayList(selection.second),
+                    gender = entry?.gender ?: ""
+                )
+            )
+        }
+        return card
     }
 
     /** The example sentences for an idiom card front: the idiom's examples,
@@ -340,10 +411,11 @@ object Cards {
 
     /**
      * Builds the preview for a card with note fields
-     * `fields(back, examples, images, audio)`: `backField` is the exact Anki
-     * `Back` field (the definition fragments wrapped left-aligned, CSS
-     * included), and `html` is a standalone page showing the front above the
-     * back.
+     * `fields(back, examples, images, audio)`: `back` is the captured static
+     * card HTML (`CardBackRenderer`: inlined `renderer.css` plus the
+     * `renderCardWord` output), `backField` is the exact Anki `Back` field
+     * wrapping it left-aligned, and `html` is a standalone page showing the
+     * front above the back.
      */
     fun preview(back: String, examples: List<String>, images: List<String>, audio: String): CardPreview {
         val backField = fields(back, examples, images, audio)[3]

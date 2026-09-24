@@ -299,8 +299,8 @@ class CollinsParser {
                 definition.append(child.outerHtml())
             }
             gloss.definition = cleanHtml(definition.toString())
-            // Keep the pruned sense fragment so card Backs can render this
-            // sense alone instead of the whole POS-group hom.
+            // Keep the pruned sense fragment on the model (split card copies
+            // share this gloss instance, which is their stable identity).
             gloss.element = sense.clone()
             return gloss
         }

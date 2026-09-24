@@ -49,7 +49,6 @@ class Ordboken private constructor(
         private set
     var lastRef: String? = null
         private set
-    var currentCss: String = ""
     lateinit     var currentDictionary: Dictionary
     var currentFlag: Int = R.drawable.flag_se
     var onDictChanged: (() -> Unit)? = null

@@ -124,8 +124,8 @@ class CardsTest {
         }
         // Each card previews and renders just its own sense.
         assertThat(defs.map { Cards.definitionText(it.definition) }.toSet()).hasSize(6)
-        val backs = defs.map { Cards.definitionBack(masc, listOf(it.definition), "") }
-        assertThat(backs.toSet()).hasSize(6)
+        val cards = defs.map { Cards.buildCardWord(masc, listOf(it.definition), emptyList()) }
+        assertThat(cards.map { it.definitions.single().glosses.single() }.toSet()).hasSize(6)
         // The first sense keeps its phrases; other senses keep their own.
         assertThat(defs[0].definition.glosses[0].phrases.map { it.headword }).contains("al frente")
         val firstGlossExamples = defs[0].definition.glosses[0].examples
@@ -173,13 +173,14 @@ class CardsTest {
         assertThat(first.id).isEqualTo("d0")
         assertThat(first.title).isEqualTo("otro, tra")
 
-        // Both dictionaries' fragments are reachable: an EST definition's card
-        // renders its own element, not the base (DLE) word's.
+        // Both dictionaries' entries are reachable: an EST definition's card
+        // resolves to the EST entry, not the base (DLE) word's.
         val estDef = est.definitions.first()
         val estProposal = proposals.filterIsInstance<CardProposal.Definition>()
             .first { it.definition === estDef }
-        assertThat(Cards.definitionBack(combined, listOf(estDef), ""))
-            .contains(estDef.element.outerHtml())
+        val estCard = Cards.buildCardWord(combined, listOf(estDef), emptyList())
+        assertThat(estCard.definitions).containsExactly(estDef)
+        assertThat(estCard.mHomonymEntries).isEmpty()
 
         val estProposalIndex = proposals.indexOf(estProposal)
         assertThat(estProposalIndex).isGreaterThan(0)
@@ -271,86 +272,132 @@ class CardsTest {
         assertThat(selected.containsKey(Cards.proposalHideKey(third[1]))).isTrue()
     }
 
-    // ---- definition Back ----
+    // ---- card word (renderCardWord input) ----
 
     @Test
-    fun definitionBack_jsonDictionary_rendersFragmentsNotThePage() {
+    fun buildCardWord_singleDefinition_isASingleArticleWithHeader() {
         val word = parseDleOtro()
-        val back = Cards.definitionBack(word, listOf(word.definitions[0]), ".x{}")
+        val card = Cards.buildCardWord(word, listOf(word.definitions[0]), emptyList())
 
-        assertThat(back).startsWith("<style>.x{}</style>")
-        assertThat(back).contains(word.definitions[0].element.outerHtml())
-        // DLE splits each word of a definition into its own <span data-id>,
-        // so assert on the rendered text, not a contiguous raw substring.
-        assertThat(Jsoup.parseBodyFragment(back).text()).contains("Dicho de una persona")
-        // A DLE definition is a <li>; the fragment mode renders just that.
-        assertThat(word.definitions[0].element.outerHtml()).startsWith("<li")
+        // The card carries the headword title and header for the renderer's
+        // <header><h1> block, and renders as one article (no homonym entries).
+        assertThat(card.mTitle).isEqualTo("otro, tra")
+        assertThat(card.dictionary).isEqualTo(word.dictionary)
+        assertThat(card.definitions).containsExactly(word.definitions[0])
+        assertThat(card.idioms).isEmpty()
+        assertThat(card.mHomonymEntries).isEmpty()
     }
 
     @Test
-    fun definitionBack_collins_rendersTheHomFragmentNotTheWholePage() {
-        val word = parseCollinsFrente()
-        val def = word.definitions[0]
-        val back = Cards.definitionBack(word, listOf(def), "css{}")
+    fun buildCardWord_idiomOnly_carriesHeaderAndIdiom() {
+        val word = parseDleOtro()
+        val idiom = word.idioms.first()
+        val card = Cards.buildCardWord(word, emptyList(), listOf(idiom))
 
-        // Exactly the .hom fragment, wrapped in the extracted CSS.
-        assertThat(back).isEqualTo("<style>css{}</style>" + def.element.outerHtml())
-        assertThat(def.element.outerHtml()).contains("feminine noun")
+        // Idiom-only cards render through the same template path as
+        // definitions (header + idiom section), so they get the title and the
+        // inlined CSS like every other card.
+        assertThat(card.mTitle).isEqualTo(word.mTitle)
+        assertThat(card.dictionary).isEqualTo(word.dictionary)
+        assertThat(card.definitions).isEmpty()
+        assertThat(card.idioms).containsExactly(idiom)
+        assertThat(card.mHomonymEntries).isEmpty()
+    }
 
-        // The page-level chrome stays out of the card back.
+    @Test
+    fun buildCardWord_mergedSameDictionary_staysOneArticle() {
+        val word = parseDleOtro()
+        val defs = listOf(word.definitions[0], word.definitions[1])
+        val card = Cards.buildCardWord(word, defs, emptyList())
+
+        assertThat(card.definitions).containsExactlyElementsIn(defs).inOrder()
+        assertThat(card.mHomonymEntries).isEmpty()
+    }
+
+    @Test
+    fun buildCardWord_collinsSplitCopy_matchesItsSourceEntry() {
         val page = Goldens.fixtureText("../testdata/colspan/frente.html")
-        assertThat(page).contains("Log in here")
-        assertThat(back).doesNotContain("Log in here")
-    }
-
-    @Test
-    fun definitionBack_multiDefinition_mergesFragments() {
-        val word = parseDleOtro()
-        val def1 = word.definitions[0]
-        val def2 = word.definitions[1]
-        val back = Cards.definitionBack(word, listOf(def1, def2), "css{}")
-
-        assertThat(back).isEqualTo(
-            "<style>css{}</style>" + def1.element.outerHtml() + def2.element.outerHtml()
+        val masc = CollinsParser.parse(
+            page,
+            httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/frente"),
+            "COLSPAN", "spanish-english"
+        ).single {
+            it.dictionary == "Collins Spanish-English" &&
+                it.definitions.singleOrNull()?.pos == "masculine noun"
+        }
+        // proposals() mints fresh Definition copies sharing the original
+        // gloss instances; the card builder must still resolve them.
+        val proposals = Cards.proposals(masc).filterIsInstance<CardProposal.Definition>()
+        assertThat(proposals).hasSize(6)
+        val card = Cards.buildCardWord(
+            masc, listOf(proposals[0].definition, proposals[1].definition), emptyList()
         )
+
+        assertThat(card.mTitle).isEqualTo("frente")
+        assertThat(card.definitions).hasSize(2)
+        assertThat(card.definitions.map { it.glosses.single()?.definition }).containsExactly(
+            proposals[0].definition.glosses.single()?.definition,
+            proposals[1].definition.glosses.single()?.definition
+        )
+        assertThat(card.mHomonymEntries).isEmpty()
     }
 
     @Test
-    fun definitionBack_combinedWord_doesNotProduceAnEmptyBody() {
+    fun buildCardWord_combinedSameDictionary_staysOneArticle() {
         val dle = parseDleOtro()
         val est = parseEstOtro()
         val entries = MultiDict.entriesFor("DLE", dle) + MultiDict.entriesFor("EST", est)
         val combined = Word.combined(dle, "combined", entries, "otro", null)
 
-        // The combined word has no page skeleton, so fragment mode must render
-        // the definitions' elements directly, never an empty body.
-        val back = Cards.definitionBack(combined, combined.definitions, "css{}")
-        assertThat(back).isEqualTo(
-            "<style>css{}</style>" + combined.definitions.joinToString("") { it.element.outerHtml() }
+        val card = Cards.buildCardWord(
+            combined, listOf(dle.definitions[0], dle.definitions[1]), emptyList()
         )
-        assertThat(back).doesNotContain("<body></body>")
-        assertThat(Jsoup.parseBodyFragment(back).text()).contains("Dicho de una persona")
+
+        assertThat(card.definitions).containsExactly(dle.definitions[0], dle.definitions[1])
+        assertThat(card.mHomonymEntries).isEmpty()
     }
 
     @Test
-    fun definitionBack_combinedWord_canMixDictionaryFragments() {
+    fun buildCardWord_combinedMergeAcrossDictionaries_groupsPerDictionary() {
         val dle = parseDleOtro()
         val est = parseEstOtro()
         val entries = MultiDict.entriesFor("DLE", dle) + MultiDict.entriesFor("EST", est)
         val combined = Word.combined(dle, "combined", entries, "otro", null)
 
-        val mixed = Cards.definitionBack(combined, listOf(dle.definitions[0], est.definitions[0]), "css{}")
-        assertThat(mixed).contains(dle.definitions[0].element.outerHtml())
-        assertThat(mixed).contains(est.definitions[0].element.outerHtml())
-    }
+        val card = Cards.buildCardWord(
+            combined, listOf(dle.definitions[0], est.definitions[0]), emptyList()
+        )
 
-    // ---- idiom Back / examples ----
+        // One section per dictionary, in selection order, each carrying only
+        // its own definitions under its dictionary label — the renderer draws
+        // them as separated .homonym-entry sections instead of jammed text.
+        assertThat(card.mHomonymEntries).hasSize(2)
+        assertThat(card.mHomonymEntries[0].definitions).containsExactly(dle.definitions[0])
+        assertThat(card.mHomonymEntries[1].definitions).containsExactly(est.definitions[0])
+        assertThat(card.mHomonymEntries.map { it.dictionary }).containsExactly(
+            entries.first { it.definitions.contains(dle.definitions[0]) }.dictionary,
+            entries.first { it.definitions.contains(est.definitions[0]) }.dictionary
+        )
+        assertThat(card.definitions).isEmpty()
+    }
 
     @Test
-    fun idiomBack_buildsStrongPStructure() {
-        val idiom = Word.Idiom("frente a", "Enfrente de")
-        assertThat(Cards.idiomBack(idiom)).isEqualTo("<strong>frente a</strong><p>Enfrente de")
+    fun buildCardWord_combinedIdiom_matchesItsSourceEntry() {
+        val dle = parseDleOtro()
+        val est = parseEstOtro()
+        val entries = MultiDict.entriesFor("DLE", dle) + MultiDict.entriesFor("EST", est)
+        val combined = Word.combined(dle, "combined", entries, "otro", null)
+
+        val idiom = est.idioms.first()
+        val card = Cards.buildCardWord(combined, emptyList(), listOf(idiom))
+
+        // A single-dictionary selection stays one article headed by that
+        // entry, even on a combined word.
+        assertThat(card.idioms).containsExactly(idiom)
+        assertThat(card.mHomonymEntries).isEmpty()
     }
+
+    // ---- idiom examples ----
 
     @Test
     fun idiomExamples_usesIdiomWhenEmpty() {

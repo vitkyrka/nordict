@@ -25,8 +25,10 @@ import se.whitchurch.nordict.AgentOps
 import se.whitchurch.nordict.AgentResult
 import se.whitchurch.nordict.AnkiApi
 import se.whitchurch.nordict.CardActivity
+import se.whitchurch.nordict.CardBackRenderer
 import se.whitchurch.nordict.CardProposal
 import se.whitchurch.nordict.Cards
+import se.whitchurch.nordict.Word
 import se.whitchurch.nordict.CollinsParser
 import se.whitchurch.nordict.DleDictionary
 import se.whitchurch.nordict.EstDictionary
@@ -61,6 +63,8 @@ class AppDriverTest {
     private var app: android.app.Application? = null
     private lateinit var scenario: ActivityScenario<MainActivity>
     private val composeRule = createEmptyComposeRule()
+    // Synthetic card words the Back capture received (see setUp stub).
+    private val renderedCardWords = mutableListOf<Word>()
 
     @Before
     fun setUp() {
@@ -100,10 +104,22 @@ class AppDriverTest {
             )
         )
         driver = AppDriver(app!!)
+
+        // Card Backs render through a hidden WebView running renderer.js, and
+        // Robolectric never executes page JavaScript — so stub the capture
+        // with the real static wrapper around a minimal title fragment. The
+        // recorded card words still verify the selection-to-Back wiring.
+        renderedCardWords.clear()
+        CardBackRenderer.debugRenderer = { _, cardWord, cb ->
+            renderedCardWords.add(cardWord)
+            cb(CardBackRenderer.wrapBack("css{}", "<h1>${cardWord.mTitle}</h1>"))
+        }
     }
 
     @After
     fun tearDown() {
+        CardBackRenderer.debugRenderer = null
+        CardActivity.debugAnkiApi = null
         Ordboken.reset()
         server.shutdown()
         if (::scenario.isInitialized) scenario.close()
@@ -551,7 +567,9 @@ class AppDriverTest {
 
         // Back field is the 4th element (index 3) in the encoded note fields.
         assertThat(fake.addedFields).hasSize(1)
-        assertThat(fake.addedFields[0][3]).isNotEmpty()
+        assertThat(fake.addedFields[0][3]).contains("<h1>")
+        assertThat(renderedCardWords).hasSize(1)
+        assertThat(renderedCardWords.single().definitions).hasSize(1)
     }
 
     @Test
@@ -646,19 +664,29 @@ class AppDriverTest {
         assertThat(preview.preview).isNotNull()
         assertThat(preview.preview!!.frontHtml).isNotEmpty()
         assertThat(preview.preview!!.backField).contains("<div style=\"text-align: left\">")
+        assertThat(preview.preview!!.backField).contains("<h1>")
 
         // Previewing never inserts a note.
         assertThat(fake.addedNotes).isEmpty()
 
+        // The first proposal is a definition card: its card word carries that
+        // single definition under the headword title.
+        assertThat(renderedCardWords).hasSize(1)
+        assertThat(renderedCardWords.single().definitions).hasSize(1)
+        assertThat(renderedCardWords.single().mTitle).isNotEmpty()
+
         // An explicit index previews that proposal: the first idiom card
-        // renders the <strong> idiom header, not a definition fragment.
+        // carries the idiom (and no definitions) under the same header path.
         val word = Ordboken.getInstance(app!!).currentWord!!
         val proposals = se.whitchurch.nordict.Cards.proposals(word)
         val firstIdiom = proposals.indexOfFirst { it is se.whitchurch.nordict.CardProposal.Idiom }
         assertThat(firstIdiom).isGreaterThan(0)
         val idiom = drive(AgentCommand(op = AgentOps.PREVIEW_CARD, index = firstIdiom))
         assertThat(idiom.ok).isTrue()
-        assertThat(idiom.preview!!.backField).contains("<strong>")
+        assertThat(idiom.preview!!.backField).contains("<h1>")
+        assertThat(renderedCardWords).hasSize(2)
+        assertThat(renderedCardWords.last().definitions).isEmpty()
+        assertThat(renderedCardWords.last().idioms).hasSize(1)
     }
 
     @Test
