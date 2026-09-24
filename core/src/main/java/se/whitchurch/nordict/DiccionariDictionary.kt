@@ -90,7 +90,7 @@ abstract class DiccionariDictionary(
         val page = fetch(newUri.toString())
 
         val words = DiccionariParser.parse(page, newUri, tag, nodeClass, bilingual)
-        if (words.isEmpty()) return null
+        if (words.isEmpty()) return fallbackGet(newUri, uri.queryParameter(REFPARAM))
 
         val ref = uri.queryParameter(REFPARAM)
         if (ref != null) {
@@ -113,6 +113,41 @@ abstract class DiccionariDictionary(
             }?.let { return it }
         }
 
+        return words[0]
+    }
+
+    // A bare autocomplete completion (e.g. "repenjar" from "repenja") resolves
+    // to /<entryPath>/<slug>, but the real headword may not exist under that
+    // slug (CA-ES/CA-EN list "repenjar-se", so /catala-castella/repenjar is a
+    // 404 and parses to nothing). Fall back to the cerca search view for the
+    // slug and return its first entry instead of failing the whole lookup.
+    private fun fallbackGet(newUri: HttpUrl, ref: String?): Word? {
+        if ("cerca" in newUri.pathSegments) return null
+        val slug = newUri.pathSegments.lastOrNull()?.takeIf { it.isNotBlank() } ?: return null
+        if (slug == entryPath) return null
+
+        val pageUri = baseUrl.toHttpUrlOrNull()!!
+            .newBuilder()!!
+            .addPathSegments("cerca/$cercaPath")
+            .addQueryParameter("search_api_fulltext_cust", slug)
+            .addQueryParameter("show", "title")
+            .build()
+        val page = fetch(pageUri.toString())
+        if (page.isEmpty()) return null
+        val words = DiccionariParser.parse(page, pageUri, tag, nodeClass, bilingual)
+        if (words.isEmpty()) return null
+
+        if (ref != null) {
+            val candidates = words.filter { ref in it.xrefs }
+            if (candidates.isEmpty()) {
+                return words[0]
+            }
+            return candidates[0]
+        }
+        val wantedNorm = normalizeSlug(slug)
+        words.firstOrNull {
+            it.mSlug == slug || it.mTitle == slug || normalizeSlug(it.mTitle) == wantedNorm
+        }?.let { return it }
         return words[0]
     }
 

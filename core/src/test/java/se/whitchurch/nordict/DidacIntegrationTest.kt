@@ -87,6 +87,33 @@ class DidacIntegrationTest {
     }
 
     @Test
+    fun testGetFallsBackToCercaWhenEntryMissing() {
+        // A bare autocomplete completion (e.g. "repenjar" from "repenja")
+        // resolves to /didac/<slug>, but the real headword may live under a
+        // different slug ("repenjar-se"), so the entry URL is a 404. get()
+        // falls back to the cerca view instead of returning null.
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.enqueue(MockResponse().setBody(Goldens.fixtureText("../testdata/didac/cap.html")))
+
+        val word = dictionary.get(server.url("/didac/repenjar"))
+
+        assertThat(word).isNotNull()
+        assertThat(word?.mTitle).isEqualTo("cap")
+        server.takeRequest() // the 404 entry fetch
+        val fallback = server.takeRequest()
+        assertThat(fallback.path).contains("/cerca/didac")
+        assertThat(fallback.path).contains("search_api_fulltext_cust=repenjar")
+    }
+
+    @Test
+    fun testGetReturnsNullWhenFallbackEmpty() {
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.enqueue(MockResponse().setBody("<html><body></body></html>"))
+
+        assertThat(dictionary.get(server.url("/didac/zzznonexistent"))).isNull()
+    }
+
+    @Test
     fun testGetLocutionFromCombinedPage() {
         // A locution URL is served from the search-view page that embeds all
         // the "cap" entries; the URL slug picks the right headword.

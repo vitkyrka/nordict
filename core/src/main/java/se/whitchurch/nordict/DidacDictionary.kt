@@ -74,7 +74,7 @@ class DidacDictionary(client: OkHttpClient, private val baseUrl: String = "https
         val page = fetch(newUri.toString())
 
         val words = DidacParser.parse(page, newUri, tag)
-        if (words.isEmpty()) return null
+        if (words.isEmpty()) return fallbackGet(newUri, uri.queryParameter(REFPARAM))
 
         val ref = uri.queryParameter(REFPARAM)
         if (ref != null) {
@@ -98,6 +98,42 @@ class DidacDictionary(client: OkHttpClient, private val baseUrl: String = "https
             }?.let { return it }
         }
 
+        return words[0]
+    }
+
+    // A bare autocomplete completion (e.g. "repenjar" from "repenja") resolves
+    // to /didac/<slug>, but the real headword may not exist under that slug
+    // (DIDAC lists "repenjar-se", so /didac/repenjar is a 404 and parses to
+    // nothing). Fall back to the cerca search view for the slug and return
+    // its first entry instead of failing the whole lookup.
+    private fun fallbackGet(newUri: HttpUrl, ref: String?): Word? {
+        if ("cerca" in newUri.pathSegments) return null
+        val slug = newUri.pathSegments.lastOrNull()?.takeIf { it.isNotBlank() } ?: return null
+        if (slug == "didac") return null
+
+        val pageUri = baseUrl.toHttpUrlOrNull()!!
+            .newBuilder()!!
+            .addPathSegments("cerca/didac")
+            .addQueryParameter("search_api_fulltext_cust", slug)
+            .addQueryParameter("show", "title")
+            .build()
+        val page = fetch(pageUri.toString())
+        if (page.isEmpty()) return null
+        val words = DidacParser.parse(page, pageUri, tag)
+        if (words.isEmpty()) return null
+
+        if (ref != null) {
+            val candidates = words.filter { ref in it.xrefs }
+            if (candidates.isEmpty()) {
+                return words[0]
+            }
+            return candidates[0]
+        }
+        val wantedSlug = slug.replace(" ", "-").lowercase()
+        words.firstOrNull {
+            it.mSlug == slug || it.mSlug == wantedSlug ||
+                it.mTitle == slug || slugify(it.mTitle) == wantedSlug
+        }?.let { return it }
         return words[0]
     }
 

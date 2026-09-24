@@ -169,6 +169,35 @@ class DiccionariIntegrationTest {
         assertThat(word?.definitions?.get(0)?.grammar).isEqualTo("nom propi")
     }
 
+    // ---- CA-ES cerca fallback (bare-completion 404s, e.g. repenjar) ----
+
+    @Test
+    fun testCaEsGetFallsBackToCercaWhenEntryMissing() {
+        // Like DIDAC: a bare completion ("repenjar") 404s because the real
+        // headword is "repenjar-se"; get() falls back to the cerca view.
+        val dict = caes()
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.enqueue(MockResponse().setBody(Goldens.fixtureText("../testdata/ca-es/cap.html")))
+
+        val word = dict.get(server.url("/catala-castella/repenjar"))
+
+        assertThat(word).isNotNull()
+        assertThat(word?.mTitle).isEqualTo("cap")
+        server.takeRequest() // the 404 entry fetch
+        val fallback = server.takeRequest()
+        assertThat(fallback.path).contains("/cerca/diccionari-catala-castella")
+        assertThat(fallback.path).contains("search_api_fulltext_cust=repenjar")
+    }
+
+    @Test
+    fun testCaEsGetReturnsNullWhenFallbackEmpty() {
+        val dict = caes()
+        server.enqueue(MockResponse().setResponseCode(404))
+        server.enqueue(MockResponse().setBody("<html><body></body></html>"))
+
+        assertThat(dict.get(server.url("/catala-castella/zzznonexistent"))).isNull()
+    }
+
     // ---- CA-EN (bilingual) ----
 
     @Test
