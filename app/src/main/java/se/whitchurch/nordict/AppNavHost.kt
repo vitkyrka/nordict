@@ -358,7 +358,14 @@ fun NordictApp(
                         ordboken = ordboken,
                         query = query,
                         onOpenWord = { result -> openWord(result.uri.toAndroidUri(), result.mTitle) },
-                        onOpenHistory = { title, url, sources -> openHistory(title, url, sources) }
+                        onOpenHistory = { title, url, sources -> openHistory(title, url, sources) },
+                        onFillHistory = { fillQuery ->
+                            if (searchBarState.currentValue == SearchBarValue.Collapsed) {
+                                preserveQueryOnExpand = true
+                            }
+                            textFieldState.setTextAndPlaceCursorAtEnd(fillQuery)
+                            scope.launch { searchBarState.animateToExpanded() }
+                        }
                     )
                 }
                 composable(
@@ -502,7 +509,8 @@ fun NordictApp(
                             context = context,
                             ordboken = ordboken,
                             onOpenWord = { title, url, sources -> openHistory(title, url, sources) },
-                            excludeUrl = currentWord?.uri?.toString()
+                            excludeUrl = currentWord?.uri?.toString(),
+                            onFillWord = { textFieldState.setTextAndPlaceCursorAtEnd(it) }
                         )
                         if (currentWord == null && !historyShown) {
                             Text(

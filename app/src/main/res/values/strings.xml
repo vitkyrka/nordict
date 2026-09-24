@@ -12,6 +12,7 @@
     <string name="error_audio">Ljuduppspelningen misslyckades.</string>
     <string name="no_results">Inga resultat hittades.</string>
     <string name="search_fill_current_word">Fyll i aktuellt ord i sökfältet</string>
+    <string name="search_fill_row">Fyll i ordet i sökfältet</string>
     <string name="search_clear">Rensa sökningen</string>
     <string name="search_edit">Redigera sökningen</string>
     <string name="history">Historik</string>

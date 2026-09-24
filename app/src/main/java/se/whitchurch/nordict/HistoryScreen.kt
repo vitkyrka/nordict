@@ -6,11 +6,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.NorthWest
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -36,7 +39,8 @@ const val HISTORY_MAX = 10
 fun HistoryList(
     context: Context,
     ordboken: Ordboken,
-    onOpenWord: (title: String, url: String, sources: String) -> Unit
+    onOpenWord: (title: String, url: String, sources: String) -> Unit,
+    onFillWord: ((String) -> Unit)? = null
 ) {
     val rows by produceState(initialValue = emptyList<WordRow>()) {
         value = loadHistoryRows(context)
@@ -55,7 +59,8 @@ fun HistoryList(
                 WordRowItem(
                     row = row,
                     ordboken = ordboken,
-                    onOpen = { onOpenWord(row.title, row.url, row.sources) }
+                    onOpen = { onOpenWord(row.title, row.url, row.sources) },
+                    onFill = onFillWord?.let { fill -> { fill(row.title) } }
                 )
             }
         }
@@ -76,7 +81,8 @@ data class WordRow(
 fun WordRowItem(
     row: WordRow,
     ordboken: Ordboken,
-    onOpen: () -> Unit
+    onOpen: () -> Unit,
+    onFill: (() -> Unit)? = null
 ) {
     Row(
         modifier = Modifier
@@ -110,6 +116,18 @@ fun WordRowItem(
                 )
             }
         }
+        // The north-west arrow fills the row's title into the search field
+        // for easy editing (like the current-word suggestion above the
+        // history); tapping the row itself still opens the word.
+        if (onFill != null) {
+            IconButton(onClick = onFill) {
+                Icon(
+                    Icons.Filled.NorthWest,
+                    contentDescription = stringResource(R.string.search_fill_row),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
     }
 }
 
@@ -125,7 +143,8 @@ fun HistorySuggestionList(
     context: Context,
     ordboken: Ordboken,
     onOpenWord: (title: String, url: String, sources: String) -> Unit,
-    excludeUrl: String? = null
+    excludeUrl: String? = null,
+    onFillWord: ((String) -> Unit)? = null
 ): Boolean {
     val rows by produceState(initialValue = emptyList<WordRow>()) {
         value = loadHistoryRows(context)
@@ -139,7 +158,8 @@ fun HistorySuggestionList(
             WordRowItem(
                 row = row,
                 ordboken = ordboken,
-                onOpen = { onOpenWord(row.title, row.url, row.sources) }
+                onOpen = { onOpenWord(row.title, row.url, row.sources) },
+                onFill = onFillWord?.let { fill -> { fill(row.title) } }
             )
         }
     }

@@ -31,13 +31,15 @@ fun SearchScreen(
     ordboken: Ordboken,
     query: String,
     onOpenWord: (SearchResult) -> Unit,
-    onOpenHistory: (title: String, url: String, sources: String) -> Unit
+    onOpenHistory: (title: String, url: String, sources: String) -> Unit,
+    onFillHistory: ((String) -> Unit)? = null
 ) {
     if (query.trim().isEmpty()) {
         HistoryList(
             context = context,
             ordboken = ordboken,
-            onOpenWord = onOpenHistory
+            onOpenWord = onOpenHistory,
+            onFillWord = onFillHistory
         )
         return
     }
