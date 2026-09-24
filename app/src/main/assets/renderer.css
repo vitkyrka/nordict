@@ -257,8 +257,8 @@ div.morphology span.conjugation strong {
  *
  * The captured card HTML lives under <div id="content" class="card-back">,
  * so every rule above applies verbatim. Cards need no word-bar clearance
- * padding, and the headword — the most important part of the back — is large
- * and centered. The per-dictionary sections reuse .homonym-entry, whose
+ * padding, and the headword — the most important part of the back — is large.
+ * The per-dictionary sections reuse .homonym-entry, whose
  * adjacent-sibling rule draws the separator between merged dictionaries. */
 
 #content.card-back {
@@ -267,7 +267,6 @@ div.morphology span.conjugation strong {
 
 #content.card-back header h1 {
     font-size: 1.6em;
-    text-align: center;
 }
 
 /* All numbering comes from the originals via `senseNumber`; the
