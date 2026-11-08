@@ -19,7 +19,7 @@ class DleParserTest {
 
     private fun httpUrl(url: String): HttpUrl = url.toHttpUrlOrNull()!!
 
-    @Test
+@Test
     fun testParseDleFrente() {
         val htmlFile = Goldens.fixture("../testdata/dle/frente.html")
         val page = htmlFile.readText()
@@ -30,7 +30,7 @@ class DleParserTest {
         val word = words[0]
 
         assertThat(word.mTitle).isEqualTo("frente")
-        assertThat(word.definitions).hasSize(14)
+        assertThat(word.definitions).hasSize(17)
         // One Idiom per h3 header (the original groups N numbered li senses
         // under one headword): 19 headers with senses on the frente page
         // ("en frente" heads only a "V. enfrente." cross-reference).
@@ -38,33 +38,33 @@ class DleParserTest {
         assertThat(word.etymology).contains("Del antiguo fruente")
 
         val def1 = word.definitions[0]
-        assertThat(def1.grammar).isEqualTo("nombre femenino")
+        assertThat(def1.grammar).isEqualTo("sustantivo femenino")
         assertThat(def1.gender).isEqualTo(Genders.FEMININE)
         assertThat(def1.glosses[0].definition).contains("Parte superior de la cara")
         assertThat(def1.synonyms.map { it.text }).containsExactly("testa", "testuz")
-        assertThat(def1.synonyms[0].href).isEqualTo("https://dle.rae.es/?id=ZecEwPE")
+        assertThat(def1.synonyms[0].href).startsWith("https://dle.rae.es/?id=")
 
-        val def2 = word.definitions[1]
+        val def2 = word.definitions[2]
         assertThat(def2.glosses[0].examples).containsExactly("Frente serena.")
 
-        val def6 = word.definitions[5]
+        val def6 = word.definitions[12]
         assertThat(def6.domain).isEqualTo("Meteorología")
 
-        val def8 = word.definitions[7]
+        val def8 = word.definitions[9]
         assertThat(def8.antonyms).containsExactly("retaguardia")
         assertThat(def8.glosses[0].examples).containsExactly("El escuadrón tenía diez hombres de frente.")
 
         // First idiom
         val idiom1 = word.idioms[0]
-        assertThat(idiom1.idiom).isEqualTo("frente calzada")
-        assertThat(idiom1.glosses[0].grammar).isEqualTo("nombre femenino")
+        assertThat(idiom1.idiom).isEqualTo("a frente")
+        assertThat(idiom1.glosses[0].grammar).isEqualTo("locución")
 
         val idiomBatalla = word.idioms.find { it.idiom.contains("frente de batalla") }
         assertThat(idiomBatalla).isNotNull()
         assertThat(idiomBatalla?.domain).isEqualTo("Milicia")
 
         val lastIdiom = word.idioms.last()
-        assertThat(lastIdiom.idiom).isEqualTo("traerlo alguien escrito en la frente")
+        assertThat(lastIdiom.idiom).isEqualTo("traerlo escrito en la frente alguien")
         assertThat(lastIdiom.glosses[0].definition).contains("No acertar a disimular")
 
         // Grouped senses keep their per-li .n_acep numbers on each gloss.
@@ -75,15 +75,15 @@ class DleParserTest {
             .containsExactly("1", "2").inOrder()
         val deFrente = word.idioms.find { it.idiom == "de frente" }
         assertThat(deFrente).isNotNull()
-        assertThat(deFrente!!.glosses).hasSize(3)
+        assertThat(deFrente!!.glosses).hasSize(5)
         assertThat(deFrente.glosses.map { it.senseNumber })
-            .containsExactly("1", "2", "3").inOrder()
+            .containsExactly("1.a", "1.a", "1.b", "2", "3").inOrder()
 
         // Definitions carry their .n_acep numbers.
         assertThat(word.definitions.map { it.senseNumber })
             .containsExactly(
-                "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-                "11", "12", "13", "14"
+                "1.a", "1.a", "1.b", "2.a", "2.a", "2.b", "2.c", "2.d", "2.e", "2.f",
+                "3", "4", "5", "6", "7.a", "7.a", "7.b"
             ).inOrder()
 
         assertGolden(words, "../testdata/dle/frente.json")

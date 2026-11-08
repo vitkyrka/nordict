@@ -59,8 +59,8 @@ class DleParser {
                 )
                 headword.rawHeadword = Word.raeSearchKey(plain)
 
-                // Etymology: div.n2.c-text-intro (e.g. "Del lat. cacāre.")
-                val etymEl = lemma.selectFirst("div.n2.c-text-intro")
+                // Etymology: div.n2.c-text-intro (legacy) or div.c-text-intro > div.in2 (current)
+                val etymEl = lemma.selectFirst("div.n2.c-text-intro") ?: lemma.selectFirst("div.c-text-intro > div.in2")
                 if (etymEl != null) {
                     headword.etymology = etymEl.text()
                 }
@@ -164,9 +164,13 @@ class DleParser {
                 definition.glosses.add(gloss)
             }
 
-            // Examples are <span class="h"> inside the main div.
+            // Examples are <span class="h"> inside the main div (legacy) or
+            // in the sibling div.c-definitions__item-example (current).
             mainDiv.select("span.h").forEach { example ->
                 definition.glosses.firstOrNull()?.examples?.add(example.text())
+            }
+            defItem.selectFirst(".c-definitions__item-example")?.let { exampleDiv ->
+                definition.glosses.firstOrNull()?.examples?.add(exampleDiv.text())
             }
 
             // Synonyms and antonyms from the footer.
@@ -263,9 +267,9 @@ class DleParser {
             var domain = ""
             var geo = ""
 
-            // Classify the abbr markers (grammar / register / domain / geo).
-            for (abbr in mainDiv.select("abbr")) {
-                when (val marker = classifyMarker(abbr)) {
+            // Classify markers: abbr (legacy) and span.usgc (current).
+            fun processMarker(el: Element) {
+                when (val marker = classifyMarker(el)) {
                     is Marker.Grammar -> grammarParts.add(marker.text)
                     is Marker.Register -> registerParts.add(marker.text)
                     is Marker.GrammarAndRegister -> {
@@ -278,6 +282,9 @@ class DleParser {
                 }
             }
 
+            mainDiv.select("abbr").forEach { processMarker(it) }
+            mainDiv.select("span.usgc, abbr.usgc").forEach { processMarker(it) }
+
             // Build the definition text by cloning the div, removing the number,
             // example spans, and the classified markers, then taking the remaining text.
             val textDiv = mainDiv.clone()
@@ -286,6 +293,11 @@ class DleParser {
             textDiv.select("abbr").forEach { abbr ->
                 if (classifyMarker(abbr) != null) {
                     abbr.remove()
+                }
+            }
+            textDiv.select("span.usgc, abbr.usgc").forEach { marker ->
+                if (classifyMarker(marker) != null) {
+                    marker.remove()
                 }
             }
             // Remove footer inside clone if present
@@ -328,10 +340,14 @@ class DleParser {
 
             if (isDomain(t)) return Marker.Domain(t)
 
-            // Class "c" marks domain/geo markers in the DLE markup; anything
-            // that is not a known domain is a geographic marker (e.g. "España",
-            // "El Salvador y México", "Cuba y Venezuela").
-            if (abbr.hasClass("c") || isGeo(t)) return Marker.Geo(t)
+            // Class "c" (legacy) or "cat" (current) marks domain/geo markers in
+            // the DLE markup; anything that is not a known domain is a geographic
+            // marker (e.g. "España", "El Salvador y México", "Cuba y Venezuela").
+            if (abbr.hasClass("c") || abbr.hasClass("cat") || isGeo(t)) return Marker.Geo(t)
+
+            // "leyenda" marks legend headers (Sinónimos, Antónimos) and "abr" marks
+            // abbreviation notes (e.g. "etcétera") — neither are grammar markers.
+            if (abbr.hasClass("leyenda") || abbr.hasClass("abr")) return null
 
             return null
         }
@@ -391,6 +407,9 @@ class DleParser {
         private val GRAMMAR_TITLES = setOf(
             Genders.GRAMMAR_MASCULINE, Genders.GRAMMAR_MASCULINE_PLURAL,
             Genders.GRAMMAR_FEMININE, Genders.GRAMMAR_FEMININE_PLURAL,
+            "sustantivo masculino", "sustantivo masculino plural",
+            "sustantivo femenino", "sustantivo femenino plural",
+            "sustantivo masculino o femenino", "sustantivo femenino o masculino",
             "nombre masculino o femenino", "nombre femenino o masculino",
             "adjetivo", "adjetivo invariable",
             "adverbio", "artículo",
