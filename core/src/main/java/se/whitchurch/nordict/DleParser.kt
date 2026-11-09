@@ -101,21 +101,66 @@ class DleParser {
                     }
                 }
 
-                lemma.select("h3, ol.c-definitions > li").forEach { child ->
+                // Select all h3 and li elements in the lemma subtree, but filter out
+                // li elements that are inside a nested ol.c-definitions (to avoid
+                // duplicates in the new DLE HTML structure where a wrapper li contains
+                // an inner ol.c-definitions with the actual definitions).
+                val candidates = lemma.select("h3, ol.c-definitions > li")
+                val filtered = mutableListOf<Element>()
+                candidates.forEach { el ->
+                    if (el.tagName() == "h3") {
+                        filtered.add(el)
+                    } else if (el.tagName() == "li") {
+                        // Check if this li's parent ol.c-definitions is nested inside another ol.c-definitions
+                        val parentOl = el.parent()
+                        if (parentOl is Element && parentOl.tagName() == "ol" && parentOl.hasClass("c-definitions")) {
+                            val grandParent = parentOl.parent()
+                            val isNested = grandParent is Element &&
+                                    grandParent.tagName() == "li" &&
+                                    grandParent.parent() is Element &&
+                                    grandParent.parent()!!.tagName() == "ol" &&
+                                    grandParent.parent()!!.hasClass("c-definitions")
+                            if (!isNested) {
+                                filtered.add(el)
+                            }
+                        } else {
+                            filtered.add(el)
+                        }
+                    }
+                }
+
+                filtered.forEach { child ->
                     if (child.tagName() == "h3") {
                         flushIdiomGroup()
                         currentIdiom = if (child.hasClass("l2")) null else child.text()
                         return@forEach
                     }
 
-                    val meaning = child
-                    val defItem = meaning.selectFirst(".c-definitions__item") ?: meaning
-
-                    if (currentIdiom == null) {
-                        headword.definitions.add(parseDefinition(defItem, meaning, finalBaseUrl))
-                        meaning.remove()
+                    // If this li contains a nested ol.c-definitions, process the nested li elements instead
+                    val nestedOl = child.selectFirst("ol.c-definitions")
+                    if (nestedOl != null) {
+                        nestedOl.children().forEach { nestedChild ->
+                            if (nestedChild.tagName() == "li") {
+                                val meaning = nestedChild
+                                val defItem = meaning.selectFirst(".c-definitions__item") ?: meaning
+                                if (currentIdiom == null) {
+                                    headword.definitions.add(parseDefinition(defItem, meaning, finalBaseUrl))
+                                    meaning.remove()
+                                } else {
+                                    pendingIdiomItems.add(defItem)
+                                }
+                            }
+                        }
                     } else {
-                        pendingIdiomItems.add(defItem)
+                        val meaning = child
+                        val defItem = meaning.selectFirst(".c-definitions__item") ?: meaning
+
+                        if (currentIdiom == null) {
+                            headword.definitions.add(parseDefinition(defItem, meaning, finalBaseUrl))
+                            meaning.remove()
+                        } else {
+                            pendingIdiomItems.add(defItem)
+                        }
                     }
                 }
                 flushIdiomGroup()

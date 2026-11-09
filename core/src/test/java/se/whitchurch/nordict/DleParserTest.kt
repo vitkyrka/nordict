@@ -30,7 +30,7 @@ class DleParserTest {
         val word = words[0]
 
         assertThat(word.mTitle).isEqualTo("frente")
-        assertThat(word.definitions).hasSize(17)
+        assertThat(word.definitions).hasSize(14)
         // One Idiom per h3 header (the original groups N numbered li senses
         // under one headword): 19 headers with senses on the frente page
         // ("en frente" heads only a "V. enfrente." cross-reference).
@@ -44,13 +44,13 @@ class DleParserTest {
         assertThat(def1.synonyms.map { it.text }).containsExactly("testa", "testuz")
         assertThat(def1.synonyms[0].href).startsWith("https://dle.rae.es/?id=")
 
-        val def2 = word.definitions[2]
+        val def2 = word.definitions[1]
         assertThat(def2.glosses[0].examples).containsExactly("Frente serena.")
 
-        val def6 = word.definitions[12]
+        val def6 = word.definitions[10]
         assertThat(def6.domain).isEqualTo("Meteorología")
 
-        val def8 = word.definitions[9]
+        val def8 = word.definitions[7]
         assertThat(def8.antonyms).containsExactly("retaguardia")
         assertThat(def8.glosses[0].examples).containsExactly("El escuadrón tenía diez hombres de frente.")
 
@@ -75,15 +75,15 @@ class DleParserTest {
             .containsExactly("1", "2").inOrder()
         val deFrente = word.idioms.find { it.idiom == "de frente" }
         assertThat(deFrente).isNotNull()
-        assertThat(deFrente!!.glosses).hasSize(5)
+        assertThat(deFrente!!.glosses).hasSize(4)
         assertThat(deFrente.glosses.map { it.senseNumber })
-            .containsExactly("1.a", "1.a", "1.b", "2", "3").inOrder()
+            .containsExactly("1.a", "1.b", "2", "3").inOrder()
 
         // Definitions carry their .n_acep numbers.
         assertThat(word.definitions.map { it.senseNumber })
             .containsExactly(
-                "1.a", "1.a", "1.b", "2.a", "2.a", "2.b", "2.c", "2.d", "2.e", "2.f",
-                "3", "4", "5", "6", "7.a", "7.a", "7.b"
+                "1.a", "1.b", "2.a", "2.b", "2.c", "2.d", "2.e", "2.f",
+                "3", "4", "5", "6", "7.a", "7.b"
             ).inOrder()
 
         assertGolden(words, "../testdata/dle/frente.json")
