@@ -52,7 +52,8 @@ interface AgentBackend {
  */
 class HeadlessAgentDriver(
     private val dictionaries: List<Dict>,
-    private val fetch: (HttpUrl) -> String = { url -> liveFetch(url) }
+    private val fetch: (HttpUrl) -> String = { url -> liveFetch(url) },
+    private val fetchBody: (HttpUrl, String) -> String = { url, _ -> fetch(url) }
 ) : AgentBackend {
 
     private val selection = mutableListOf(dictionaries.first())
@@ -157,7 +158,7 @@ class HeadlessAgentDriver(
         if (sources.size == 1) {
             return openAt(sources[0].uri, query, op)
         }
-        val combined = MultiDict.fetch(activeDicts.map { it.asLookup(fetch) }, sources, headword = query.orEmpty())
+        val combined = MultiDict.fetch(activeDicts.map { it.asLookup(fetch, fetchBody) }, sources, headword = query.orEmpty())
             ?: return AgentResult.error(op, "no words parsed from combined sources (${sources.joinToString(",") { it.tag }})")
         selectedIdx = combined.mHomonymEntries.indexOfFirst { it.ref == combined.xrefs.firstOrNull() }.coerceAtLeast(0)
         combinedPage = combined
@@ -340,9 +341,12 @@ class HeadlessAgentDriver(
         val trimmed = query.trim()
         if (trimmed.isEmpty()) return emptyList()
         if (selection.size > 1) {
-            return MultiDict.search(activeDicts.map { it.asLookup(fetch) }, trimmed)
+            return MultiDict.search(activeDicts.map { it.asLookup(fetch, fetchBody) }, trimmed)
         }
-        return active.searchResults(fetch(active.searchUrl(trimmed)))
+        return active.searchResults(
+            if (active.searchBody != null) fetchBody(active.searchUrl(trimmed), active.searchBody!!.invoke(trimmed))
+            else fetch(active.searchUrl(trimmed))
+        )
     }
 
     private fun snapshot(): AgentState =

@@ -48,9 +48,11 @@ class ColfrenIntegrationTest {
             .isEqualTo("$baseUrl/dictionary/french-english/table-basse")
 
         val request = server.takeRequest()
-        assertThat(request.path).contains("/autocomplete/")
-        assertThat(request.path).contains("dictCode=french-english")
-        assertThat(request.path).contains("q=table")
+        assertThat(request.method).isEqualTo("POST")
+        assertThat(request.path).isEqualTo("/api/autocomplete")
+        val sent = request.body.readUtf8()
+        assertThat(sent).contains("\"dictcode\":\"french-english\"")
+        assertThat(sent).contains("\"term\":\"table\"")
     }
 
     @Test

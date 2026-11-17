@@ -37,14 +37,43 @@ abstract class CollinsDictionary(
         return words[0]
     }
 
-    private fun fetchBody(requestUrl: String): String {
-        val result = pageFetcher.fetch(requestUrl, mapOf("Accept" to "application/json"))
-
+    private fun fetchBody(url: String): String {
+        val result = pageFetcher.fetch(url, mapOf("Accept" to "application/json"))
         if (!result.isSuccessful) {
             log.severe("Unexpected response: " + result.code)
             return ""
         }
+        return result.body
+    }
 
+    /**
+     * Collins' autocomplete moved to `POST /api/autocomplete` with a JSON
+     * `{dictcode, term}` body; the old `GET /autocomplete/?q=&dictCode=`
+     * endpoint is now a 404 page route on their Next.js site.
+     */
+    private fun autocompleteBody(base: HttpUrl, term: String): String {
+        val url = base.resolve("/api/autocomplete")!!.toString()
+        val body = """{"dictcode":"$dictCode","term":"$term"}"""
+        val headers = mapOf("Accept" to "application/json", "Content-Type" to "application/json")
+
+        var result = pageFetcher.fetchPost(url, headers, body)
+        if (isChallenge(result.code, result.body)) {
+            // A POST cannot be navigated to in the hidden WebView (the only
+            // thing that solves Cloudflare's challenge), so warm the clearance
+            // with a word-page GET, then retry the POST with the synced cookie.
+            val slug = term.replace(" ", "-").lowercase()
+            val wordUrl = base.newBuilder()!!
+                .addPathSegment("dictionary")
+                .addPathSegment(dictCode)
+                .addPathSegment(slug)
+                .build()
+            fetchBody(wordUrl.toString())
+            result = pageFetcher.fetchPost(url, headers, body)
+        }
+        if (!result.isSuccessful) {
+            log.severe("Unexpected autocomplete response: " + result.code)
+            return ""
+        }
         return result.body
     }
 
@@ -52,12 +81,8 @@ abstract class CollinsDictionary(
         val trimmed = query.trim()
         if (trimmed.isEmpty()) return emptyList()
         val base = baseUrl.toHttpUrlOrNull()!!
-        val url = base.resolve("/autocomplete/")!!.newBuilder()!!
-            .addQueryParameter("q", trimmed)
-            .addQueryParameter("dictCode", dictCode)
-            .build()
 
-        val body = fetchBody(url.toString())
+        val body = autocompleteBody(base, trimmed)
         if (body.isEmpty()) return emptyList()
 
         return CollinsParser.parseSearch(body) { title ->

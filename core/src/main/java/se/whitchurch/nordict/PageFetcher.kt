@@ -1,7 +1,9 @@
 package se.whitchurch.nordict
 
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.logging.Logger
 
 /**
@@ -20,6 +22,13 @@ data class PageResult(val code: Int, val body: String) {
  */
 fun interface PageFetcher {
     fun fetch(url: String, headers: Map<String, String>): PageResult
+
+    /**
+     * POST variant for endpoints that require a request body (e.g. Collins'
+     * `/api/autocomplete`). Fetchers that only do GET can keep the default.
+     */
+    fun fetchPost(url: String, headers: Map<String, String>, body: String): PageResult =
+        fetch(url, headers)
 }
 
 /**
@@ -37,17 +46,40 @@ fun isChallenge(code: Int, body: String): Boolean {
 class OkHttpPageFetcher(
     val client: OkHttpClient,
     /** Extra headers per URL (e.g. a synced `cf_clearance` cookie). */
-    val extraHeaders: ((url: String) -> Map<String, String>)? = null
+    val extraHeaders: ((url: String) -> Map<String, String>)? = null,
+    /**
+     * Override the User-Agent. Challenged hosts bind a WebView-minted
+     * `cf_clearance` to the browser UA that solved the challenge, so OkHttp
+     * must send that same UA for the synced cookie to be accepted.
+     */
+    val userAgent: String? = null
 ) : PageFetcher {
     override fun fetch(url: String, headers: Map<String, String>): PageResult {
         return try {
             val builder = Request.Builder().url(url)
             headers.forEach { (name, value) -> builder.addHeader(name, value) }
             extraHeaders?.invoke(url)?.forEach { (name, value) -> builder.addHeader(name, value) }
+            userAgent?.let { builder.header("User-Agent", it) }
             val response = client.newCall(builder.build()).execute()
             PageResult(response.code, response.body?.string() ?: "")
         } catch (e: Exception) {
             Logger.getLogger("PageFetcher").severe("fetch failed for $url: ${e.message}")
+            PageResult(-1, "")
+        }
+    }
+
+    override fun fetchPost(url: String, headers: Map<String, String>, body: String): PageResult {
+        return try {
+            val builder = Request.Builder().url(url)
+            headers.forEach { (name, value) -> builder.addHeader(name, value) }
+            extraHeaders?.invoke(url)?.forEach { (name, value) -> builder.addHeader(name, value) }
+            userAgent?.let { builder.header("User-Agent", it) }
+            val mediaType = (headers["Content-Type"] ?: "application/json").toMediaType()
+            builder.post(body.toRequestBody(mediaType))
+            val response = client.newCall(builder.build()).execute()
+            PageResult(response.code, response.body?.string() ?: "")
+        } catch (e: Exception) {
+            Logger.getLogger("PageFetcher").severe("POST failed for $url: ${e.message}")
             PageResult(-1, "")
         }
     }
@@ -62,12 +94,26 @@ class OkHttpPageFetcher(
 class FallbackPageFetcher(
     val primary: PageFetcher,
     val secondary: PageFetcher,
-    val onFallback: ((url: String, result: PageResult) -> Unit)? = null
+    val onFallback: ((url: String, result: PageResult) -> Unit)? = null,
+    /**
+     * Whether a challenged POST falls back to [secondary]. POST endpoints are
+     * typically JSON APIs the WebView can't navigate to; callers that solve
+     * challenges another way (e.g. Collins' word-page bootstrap) turn this off.
+     */
+    val fallbackPost: Boolean = true
 ) : PageFetcher {
     override fun fetch(url: String, headers: Map<String, String>): PageResult {
         val first = primary.fetch(url, headers)
         if (!isChallenge(first.code, first.body)) return first
         val second = secondary.fetch(url, headers)
+        onFallback?.invoke(url, second)
+        return second
+    }
+
+    override fun fetchPost(url: String, headers: Map<String, String>, body: String): PageResult {
+        val first = primary.fetchPost(url, headers, body)
+        if (!isChallenge(first.code, first.body) || !fallbackPost) return first
+        val second = secondary.fetchPost(url, headers, body)
         onFallback?.invoke(url, second)
         return second
     }

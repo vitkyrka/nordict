@@ -61,9 +61,9 @@ class PageFetcherTest {
     @Test
     fun testOkHttpFetcherAppliesExtraHeaders() {
         server.enqueue(MockResponse().setBody("ok"))
-        val fetcher = OkHttpPageFetcher(OkHttpClient()) {
+        val fetcher = OkHttpPageFetcher(OkHttpClient(), extraHeaders = {
             mapOf("Cookie" to "cf_clearance=abc")
-        }
+        })
 
         val result = fetcher.fetch(
             server.url("/dictionary/spanish-english/x").toString(),
@@ -120,6 +120,46 @@ class PageFetcherTest {
 
         assertThat(result.body).isEqualTo("<main>real page</main>")
         assertThat(fallbackSeen?.body).isEqualTo("<main>real page</main>")
+    }
+
+    @Test
+    fun testOkHttpFetcherPostsBodyAndUserAgent() {
+        server.enqueue(MockResponse().setBody("[{\"headword\":\"frente\"}]"))
+        val fetcher = OkHttpPageFetcher(OkHttpClient(), userAgent = "Browser/1.0")
+
+        val result = fetcher.fetchPost(
+            server.url("/api/autocomplete").toString(),
+            mapOf("Content-Type" to "application/json"),
+            """{"dictcode":"spanish-english","term":"frente"}"""
+        )
+
+        assertThat(result.code).isEqualTo(200)
+        assertThat(result.body).contains("frente")
+        val request = server.takeRequest()
+        assertThat(request.method).isEqualTo("POST")
+        assertThat(request.getHeader("Content-Type")).startsWith("application/json")
+        assertThat(request.getHeader("User-Agent")).isEqualTo("Browser/1.0")
+        assertThat(request.body.readUtf8()).isEqualTo("""{"dictcode":"spanish-english","term":"frente"}""")
+    }
+
+    @Test
+    fun testFallbackPostCanSkipSecondary() {
+        var secondaryCalls = 0
+        val secondary = PageFetcher { _, _ ->
+            secondaryCalls += 1
+            PageResult(200, "secondary")
+        }
+        val fallback = FallbackPageFetcher(
+            OkHttpPageFetcher(OkHttpClient()), secondary, fallbackPost = false
+        )
+
+        server.enqueue(MockResponse().setResponseCode(403).setBody("challenge"))
+        val result = fallback.fetchPost(server.url("/api/autocomplete").toString(), emptyMap(), "{}")
+
+        // A challenged POST must not engage the WebView secondary; the caller
+        // bootstraps a clearance and retries instead.
+        assertThat(result.code).isEqualTo(403)
+        assertThat(secondaryCalls).isEqualTo(0)
     }
 
     @Test

@@ -363,6 +363,63 @@ class CollinsParserTest {
     }
 
     @Test
+    fun testParseAudioFromButtonMarkup() {
+        // The live site now renders pronunciation speakers as <button> rather
+        // than <a>; the parser must accept both for the Spain-clip selection.
+        val page = """
+            <main><div class="cB cB-def dictionary biling benedict">
+              <div class="cB-h"><h2 class="h2_entry"><span class="orth">frente</span></h2></div>
+              <div class="mini_h2">
+                <span class="ptr hwd_sound type-hwd_sound">
+                  <button type="button" class="hwd_sound sound audio_play_button"
+                          data-src-mp3="https://cdn/hwd_sounds/ES-419-W0034030.mp3"></button>
+                </span>
+                <span class="ptr hwd_sound type-hwd_sound">
+                  <button type="button" class="hwd_sound sound audio_play_button"
+                          data-src-mp3="https://cdn/hwd_sounds/ES-ES-W0034030.mp3"></button>
+                </span>
+              </div>
+              <div class="content definitions"><div class="hom">
+                <div class="gramGrp">feminine noun</div>
+                <div class="sense"><span class="sensenum">1.</span>forehead</div>
+              </div></div>
+            </div></main>
+        """.trimIndent()
+        val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/frente")
+        val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
+
+        assertThat(words).hasSize(1)
+        // Only the Spain clip is kept; the Latin American one is dropped.
+        assertThat(words[0].audio).containsExactly("https://cdn/hwd_sounds/ES-ES-W0034030.mp3")
+    }
+
+    @Test
+    fun testParseResolvesNextStreamedTemplates() {
+        // The live site streams sense content in hidden S: sources with
+        // <template> placeholders and $RS() swaps the browser runs. A plain
+        // HTTP fetch keeps the placeholders, so the parser must replay them
+        // or the gloss text is truncated.
+        val page = """
+            <main><div class="cB cB-def dictionary biling benedict">
+              <h2 class="h2_entry"><span class="orth">soslayar</span></h2>
+              <div class="content definitions"><div class="hom">
+                <div class="sense"><span class="sensenum">1.</span>
+                  <span class="cit type-translation quote"><template id="P:8"></template></span>
+                </div>
+              </div></div>
+            </div></main>
+            <div hidden id="S:8"><span>to put sideways</span></div>
+            <script>${'$'}RS("S:8","P:8")</script>
+        """.trimIndent()
+        val uri = httpUrl("https://www.collinsdictionary.com/dictionary/spanish-english/soslayar")
+        val words = CollinsParser.parse(page, uri, "COLSPAN", "spanish-english")
+
+        assertThat(words).hasSize(1)
+        assertThat(words[0].definitions[0].glosses[0].definition).contains("to put sideways")
+        assertThat(words[0].definitions[0].glosses[0].definition).doesNotContain("<template")
+    }
+
+    @Test
     fun testParseRodadura() {
         // Live-page regression: the gramGrp span arrives unclosed and
         // swallows the senses (invalid span>div nesting the browser keeps).

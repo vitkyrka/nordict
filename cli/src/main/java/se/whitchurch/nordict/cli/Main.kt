@@ -3,8 +3,10 @@ package se.whitchurch.nordict.cli
 import com.google.gson.JsonParser
 import okhttp3.HttpUrl
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
+import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.jsoup.Jsoup
 import se.whitchurch.nordict.CollinsParser
 import se.whitchurch.nordict.DdoParser
@@ -59,8 +61,10 @@ class Main {
             .toHttpUrlOrNull()!!
 
     private fun collinsAutocomplete(dictCode: String, query: String): HttpUrl =
-        "https://www.collinsdictionary.com/autocomplete/?q=$query&dictCode=$dictCode"
-            .toHttpUrlOrNull()!!
+        "https://www.collinsdictionary.com/api/autocomplete".toHttpUrlOrNull()!!
+
+    private fun collinsAutocompleteBody(dictCode: String, query: String): String =
+        """{"dictcode":"$dictCode","term":"$query"}"""
 
     private fun lingueeUrl(word: String): HttpUrl =
         "https://www.linguee.pt/portugues-ingles/search"
@@ -229,7 +233,8 @@ class Main {
             wordUrl = { word -> collinsUrl("spanish-english", word) },
             searchUrl = { query -> collinsAutocomplete("spanish-english", query) },
             parse = { page, uri -> CollinsParser.parse(page, uri, "COLSPAN", "spanish-english") },
-            searchResults = { body -> CollinsParser.parseSearch(body) { title -> collinsUrl("spanish-english", title) } }
+            searchResults = { body -> CollinsParser.parseSearch(body) { title -> collinsUrl("spanish-english", title) } },
+            searchBody = { query -> collinsAutocompleteBody("spanish-english", query) }
         ),
         Dict(
             aliases = listOf("colfren"),
@@ -238,7 +243,8 @@ class Main {
             wordUrl = { word -> collinsUrl("french-english", word) },
             searchUrl = { query -> collinsAutocomplete("french-english", query) },
             parse = { page, uri -> CollinsParser.parse(page, uri, "COLFREN", "french-english") },
-            searchResults = { body -> CollinsParser.parseSearch(body) { title -> collinsUrl("french-english", title) } }
+            searchResults = { body -> CollinsParser.parseSearch(body) { title -> collinsUrl("french-english", title) } },
+            searchBody = { query -> collinsAutocompleteBody("french-english", query) }
         ),
         Dict(
             aliases = listOf("so"),
@@ -445,7 +451,7 @@ class Main {
                         "run '${missingUrl.aliases.first()} $w --search' to list entries, then --url <result> to parse a page"
                 )
             }
-            val lookups = selection.map { it.asLookup(::fetch) }
+            val lookups = selection.map { it.asLookup(::fetch, ::fetchBody) }
             val sources = selection.map { d -> CombSource(d.tag, d.wordUrl!!.invoke(w)) }
             val combined = MultiDict.fetch(lookups, sources, headword = w)
                 ?: return error("no words parsed for '$w' from ${selection.joinToString(",") { it.tag }}")
@@ -480,7 +486,13 @@ class Main {
                     "--url <result> (optionally with --file <page.html>) to parse a page"
             )
         }
-        val body = if (filePath != null) pageFromFile(filePath, target).first else fetch(target)
+        val body = if (filePath != null) {
+            pageFromFile(filePath, target).first
+        } else if (search && dict.searchBody != null) {
+            fetchBody(target, dict.searchBody(word))
+        } else {
+            fetch(target)
+        }
         return if (search) {
             val results = dict.searchResults(body)
             if (results.isEmpty()) {
@@ -525,7 +537,12 @@ class Main {
         // Combined search: every selection dictionary's autocomplete runs in
         // parallel and merges by headword, tagging each result with its sources.
         val results = MultiDict.mergeSearch(
-            selection.map { d -> d.tag to d.searchResults(fetch(d.searchUrl(query))) },
+            selection.map { d ->
+                d.tag to d.searchResults(
+                    if (d.searchBody != null) fetchBody(d.searchUrl(query), d.searchBody(query))
+                    else fetch(d.searchUrl(query))
+                )
+            },
             query
         )
         if (results.isEmpty()) {
@@ -660,6 +677,19 @@ class Main {
             InfopediaDictionary.SEARCH_HEADERS.forEach { (name, value) -> builder.addHeader(name, value) }
         }
         val request = builder.build()
+        client.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw RuntimeException("HTTP ${response.code} for $url")
+            return response.body?.string() ?: ""
+        }
+    }
+
+    private fun fetchBody(url: HttpUrl, body: String): String {
+        val client = OkHttpClient()
+        val request = Request.Builder().url(url)
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .post(body.toRequestBody("application/json".toMediaType()))
+            .build()
         client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw RuntimeException("HTTP ${response.code} for $url")
             return response.body?.string() ?: ""

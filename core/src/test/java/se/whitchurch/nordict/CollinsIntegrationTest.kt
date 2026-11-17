@@ -48,9 +48,27 @@ class CollinsIntegrationTest {
             .isEqualTo("$baseUrl/dictionary/spanish-english/efectivo-en-caja")
 
         val request = server.takeRequest()
-        assertThat(request.path).contains("/autocomplete/")
-        assertThat(request.path).contains("dictCode=spanish-english")
-        assertThat(request.path).contains("q=cagar")
+        assertThat(request.method).isEqualTo("POST")
+        assertThat(request.path).isEqualTo("/api/autocomplete")
+        val sent = request.body.readUtf8()
+        assertThat(sent).contains("\"dictcode\":\"spanish-english\"")
+        assertThat(sent).contains("\"term\":\"cagar\"")
+    }
+
+    @Test
+    fun testSearchNewApiShape() {
+        // The live /api/autocomplete endpoint returns {headword, url, ...}.
+        val json = """
+            [{"headword":"mesa","url":"mesa","collocation":false,"vulgar":false,"scientific":false},
+             {"headword":"mesa de noche","url":"mesa-de-noche","collocation":false,"vulgar":false,"scientific":false}]
+        """.trimIndent()
+        server.enqueue(MockResponse().setBody(json))
+
+        val results = dictionary.search("mesa")
+
+        assertThat(results.map { it.mTitle }).containsExactly("mesa", "mesa de noche").inOrder()
+        assertThat(results[1].uri.toString())
+            .isEqualTo("$baseUrl/dictionary/spanish-english/mesa-de-noche")
     }
 
     @Test
@@ -64,7 +82,8 @@ class CollinsIntegrationTest {
         assertThat(results[0].mTitle).isEqualTo("cagar")
 
         val request = server.takeRequest()
-        assertThat(request.requestUrl?.queryParameter("q")).isEqualTo("cagar")
+        assertThat(request.method).isEqualTo("POST")
+        assertThat(request.body.readUtf8()).contains("\"term\":\"cagar\"")
     }
 
     @Test

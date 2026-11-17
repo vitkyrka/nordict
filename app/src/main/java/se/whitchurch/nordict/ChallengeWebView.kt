@@ -221,6 +221,97 @@ object ChallengeWebView {
         return WebBytes(-1, null)
     }
 
+    /**
+     * Fetches a JSON/text endpoint (e.g. Collins `/autocomplete/`, Infopedia
+     * `sugestao-pesquisa`) through the hidden WebView's Chromium stack and
+     * returns the raw response body. Unlike [loadAndExtract], which navigates
+     * the top level and therefore can't read a JSON response (Chrome treats a
+     * `application/json` navigation as a download and never fires a usable
+     * `onPageFinished`), this parks the WebView same-origin and uses `fetch()`
+     * — exactly how each site's own autocomplete widget calls the endpoint.
+     * The WebView's solved challenge session and cookies ride along, so a
+     * Cloudflare challenge on a datacenter IP is satisfied here too.
+     *
+     * Retries the fetch while the response still looks like a challenge: the
+     * parked page's managed (`non-interactive`) challenge auto-solves in the
+     * background and mints `cf_clearance`, after which the same-origin fetch
+     * succeeds. Never call on the main thread.
+     */
+    fun fetchText(
+        url: String,
+        headers: Map<String, String> = emptyMap(),
+        body: String? = null,
+        timeoutMs: Long = TIMEOUT_MS
+    ): WebFetch {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            log.severe("fetchText called on the main thread for $url")
+            return WebFetch(PageResult(-1, ""), null)
+        }
+        if (appContext == null) {
+            log.severe("fetchText before init for $url")
+            return WebFetch(PageResult(-1, ""), null)
+        }
+        val deadline = System.currentTimeMillis() + timeoutMs
+        val gen = generation.incrementAndGet()
+
+        if (!parkSameOrigin(url, null, gen, deadline)) {
+            log.severe("cannot park webview same-origin for $url")
+            return WebFetch(PageResult(-1, ""), readCookies(url))
+        }
+
+        val headersJson = Gson().toJson(headers)
+        val slot = "__nordictText$gen"
+        while (System.currentTimeMillis() < deadline) {
+            if (gen != generation.get()) return WebFetch(PageResult(-1, ""), readCookies(url))
+            kickTextFetch(slot, url, headersJson, body)
+            val result = pollTextSlot(slot, deadline)
+            if (result != null && result.text != null) {
+                if (!isChallenge(result.status, result.text)) {
+                    CookieManager.getInstance().flush()
+                    return WebFetch(PageResult(result.status, result.text), readCookies(url))
+                }
+                // Challenge interstitial: the parked page's managed challenge
+                // mints the cookie in the background, so retry the fetch.
+            }
+            Thread.sleep(POLL_MS)
+        }
+        log.severe("text fetch timed out for $url")
+        return WebFetch(PageResult(-1, ""), readCookies(url))
+    }
+
+    private fun kickTextFetch(slot: String, url: String, headersJson: String, body: String?) {
+        val urlJson = Gson().toJson(url)
+        val opts = if (body == null) {
+            "{credentials:'include',headers:$headersJson}"
+        } else {
+            "{method:'POST',credentials:'include',headers:$headersJson,body:${Gson().toJson(body)}}"
+        }
+        val js = "window.$slot=null;" +
+            "fetch($urlJson,$opts)" +
+            ".then(function(r){return r.text().then(function(t){" +
+            "window.$slot=JSON.stringify({status:r.status,text:t});});})" +
+            ".catch(function(e){window.$slot=JSON.stringify({status:-1,text:''});});"
+        mainHandler.post { webView?.evaluateJavascript(js, null) }
+    }
+
+    private fun pollTextSlot(slot: String, deadline: Long): TextResult? {
+        val readJs = "(function(){return window.$slot||null})()"
+        while (System.currentTimeMillis() < deadline) {
+            val raw = evalString(readJs) ?: return null
+            if (raw != "null") {
+                return try {
+                    Gson().fromJson(raw, TextResult::class.java)
+                } catch (e: Exception) {
+                    null
+                }
+            }
+            Thread.sleep(POLL_MS)
+        }
+        return null
+    }
+
+    private data class TextResult(val status: Int = -1, val text: String? = null)
+
     private fun kickFetch(slot: String, url: String, referer: String?) {
         val urlJson = Gson().toJson(url)
         val refJson = Gson().toJson(referer ?: "")
@@ -343,6 +434,12 @@ object ChallengeWebView {
             // must not leak it) and the view is normally never attached.
             val context = appContext ?: throw IllegalStateException("ChallengeWebView.init not called")
             view = WebView(context)
+            // Pin the challenge-solving WebView to the same UA OkHttp sends on
+            // challenged hosts. Cloudflare binds cf_clearance to the UA that
+            // solved the challenge, so a mismatch (e.g. a device WebView's
+            // Chrome/113 vs OkHttp's Chrome/126) makes the synced cookie useless
+            // and every OkHttp fetch re-challenges.
+            view.settings.userAgentString = AUDIO_BROWSER_UA
             view.settings.javaScriptEnabled = true
             view.settings.domStorageEnabled = true
             CookieManager.getInstance().setAcceptCookie(true)

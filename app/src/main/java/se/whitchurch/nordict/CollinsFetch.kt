@@ -98,7 +98,22 @@ class WebViewPageFetcher : PageFetcher {
             log.severe("WebView fetch called on the main thread for $url")
             return PageResult(-1, "")
         }
-        val fetched = ChallengeWebView.loadAndExtract(url, headers)
+        val fetched = if (headers["Accept"]?.contains("application/json") == true) {
+            ChallengeWebView.fetchText(url, headers)
+        } else {
+            ChallengeWebView.loadAndExtract(url, headers)
+        }
+        CollinsClearance.noteCookies(url, fetched.cookies)
+        InfopediaClearance.noteCookies(url, fetched.cookies)
+        return fetched.result
+    }
+
+    override fun fetchPost(url: String, headers: Map<String, String>, body: String): PageResult {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            log.severe("WebView POST called on the main thread for $url")
+            return PageResult(-1, "")
+        }
+        val fetched = ChallengeWebView.fetchText(url, headers, body)
         CollinsClearance.noteCookies(url, fetched.cookies)
         InfopediaClearance.noteCookies(url, fetched.cookies)
         return fetched.result
@@ -112,11 +127,14 @@ class WebViewPageFetcher : PageFetcher {
  * default OkHttp fetcher.
  */
 fun collinsPageFetcher(client: OkHttpClient): PageFetcher = FallbackPageFetcher(
-    OkHttpPageFetcher(client, CollinsClearance::cookieHeaderFor),
+    OkHttpPageFetcher(client, CollinsClearance::cookieHeaderFor, AUDIO_BROWSER_UA),
     WebViewPageFetcher(),
     onFallback = { _, result ->
         CollinsTransport.noteFallback(result.isSuccessful && !isChallenge(result.code, result.body))
-    }
+    },
+    // The autocomplete POST is handled by CollinsDictionary's word-page
+    // bootstrap; a WebView top-level navigation can't replay a POST.
+    fallbackPost = false
 )
 
 /**
@@ -126,7 +144,7 @@ fun collinsPageFetcher(client: OkHttpClient): PageFetcher = FallbackPageFetcher(
  * clients (403 + "Just a moment...") the same way collinsdictionary.com does.
  */
 fun infopediaPageFetcher(client: OkHttpClient): PageFetcher = FallbackPageFetcher(
-    OkHttpPageFetcher(client, InfopediaClearance::cookieHeaderFor),
+    OkHttpPageFetcher(client, InfopediaClearance::cookieHeaderFor, AUDIO_BROWSER_UA),
     WebViewPageFetcher(),
     onFallback = { _, result ->
         InfopediaTransport.noteFallback(result.isSuccessful && !isChallenge(result.code, result.body))

@@ -59,6 +59,17 @@ class CollinsFetchTest {
     }
 
     @Test
+    fun testCollinsTransportPostsWithoutWebViewFallback() {
+        val fetcher = collinsPageFetcher(client) as FallbackPageFetcher
+        // Cloudflare binds cf_clearance to the UA that solved the challenge,
+        // so OkHttp must present the same browser UA as the challenge WebView.
+        assertThat((fetcher.primary as OkHttpPageFetcher).userAgent).isEqualTo(AUDIO_BROWSER_UA)
+        // The autocomplete POST can't be replayed as a WebView navigation;
+        // CollinsDictionary bootstraps the clearance with a word-page GET.
+        assertThat(fetcher.fallbackPost).isFalse()
+    }
+
+    @Test
     fun testClearanceSyncGatesOnHostAndPresence() {
         // Nothing held: no headers anywhere.
         assertThat(CollinsClearance.cookieHeaderFor("https://www.collinsdictionary.com/dictionary/spanish-english/x"))

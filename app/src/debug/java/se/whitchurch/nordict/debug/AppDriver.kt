@@ -90,7 +90,7 @@ class AppDriver(private val app: android.app.Application) {
             op = AgentOps.SEARCH,
             message = if (results.isEmpty()) {
                 listOfNotNull("no search results for '$query'", notice).joinToString(". ")
-            } else notice,
+            } else null,
             state = snapshot(),
             results = results.map { it.toSearchResultData() }
         )

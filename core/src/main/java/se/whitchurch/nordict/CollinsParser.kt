@@ -16,10 +16,11 @@ class CollinsParser {
         private const val MAIN_LABEL_FR = "Collins French-English"
 
         /**
-         * Collins `/autocomplete/` search responses: a JSON array of
-         * `{"title": "..."}` objects. The slug for the target word page is
-         * built by [uriOf] (lower-cased, spaces as hyphens) — Collins-specific,
-         * so no other dictionary shares this decoder.
+         * Collins `/api/autocomplete` search responses: a JSON array of
+         * `{"headword": "...", "url": "..."}` objects (older fixtures use
+         * `{"title": "..."}`). The slug for the target word page is built by
+         * [uriOf] (lower-cased, spaces as hyphens) — Collins-specific, so no
+         * other dictionary shares this decoder.
          */
         fun parseSearch(body: String, uriOf: (title: String) -> HttpUrl): List<SearchResult> {
             val results = ArrayList<SearchResult>()
@@ -28,7 +29,8 @@ class CollinsParser {
                 if (!array.isJsonArray) return results
                 array.asJsonArray.forEach { element ->
                     if (!element.isJsonObject) return@forEach
-                    val title = element.asJsonObject["title"]?.takeIf { it.isJsonPrimitive }?.asString
+                    val obj = element.asJsonObject
+                    val title = (obj["headword"] ?: obj["title"])?.takeIf { it.isJsonPrimitive }?.asString
                         ?: return@forEach
                     if (title.isNotEmpty()) results.add(SearchResult(title, uriOf(title)))
                 }
@@ -41,6 +43,8 @@ class CollinsParser {
             val words: ArrayList<Word> = ArrayList()
             val baseRoot = "$baseUrl/dictionary/${dictCode}"
             val doc = Jsoup.parse(page, baseRoot)
+
+            resolveStreamedTemplates(doc)
 
             doc.select("script").forEach { it.remove() }
             doc.select("link[rel=preload]").forEach { it.remove() }
@@ -136,14 +140,14 @@ class CollinsParser {
                 // which only has ES-419), fall back to whatever is available.
                 if (dictCode == "french-english") {
                     val audioLocales = listOf("FR-", "/fr_")
-                    head.block.select("div.mini_h2 a.hwd_sound[data-src-mp3]").forEach { audio ->
+                    head.block.select("div.mini_h2 .hwd_sound[data-src-mp3]").forEach { audio ->
                         val url = audio.attr("data-src-mp3")
                         if (audioLocales.any { url.contains(it) }) {
                             headword.audio.add(url)
                         }
                     }
                 } else {
-                    val all = head.block.select("div.mini_h2 a.hwd_sound[data-src-mp3]")
+                    val all = head.block.select("div.mini_h2 .hwd_sound[data-src-mp3]")
                         .map { it.attr("data-src-mp3") }
                     // Spain clips come as "ES-ES-W..." or the lower-cased
                     // "es_es_pocima.mp3" underscore variant.
@@ -171,6 +175,28 @@ class CollinsParser {
             }
 
             return words
+        }
+
+        /**
+         * Collins' Next.js site streams blog-style HTML: the server sends
+         * `<template id="P:…">` placeholders plus hidden `<div id="S:…">`
+         * sources, and inline `$RS("S:x","P:x")` scripts swap the source's
+         * children into the template at runtime. A WebView executes that JS,
+         * but a plain HTTP fetch (and jsoup) does not — without this step the
+         * parsed senses are empty and the entry looks truncated. Replay the
+         * same swap on the parsed DOM before any selectors run.
+         */
+        private fun resolveStreamedTemplates(doc: org.jsoup.nodes.Document) {
+            val rs = Regex("[$]RS\\(\\s*\"([^\"]+)\"\\s*,\\s*\"([^\"]+)\"\\s*\\)")
+            doc.select("script").forEach { script ->
+                rs.findAll(script.data()).forEach { match ->
+                    val src = doc.getElementById(match.groupValues[1]) ?: return@forEach
+                    val dst = doc.getElementById(match.groupValues[2]) ?: return@forEach
+                    dst.before(src.html())
+                    dst.remove()
+                    src.remove()
+                }
+            }
         }
 
         private const val REFPARAM = "__ref"
@@ -215,7 +241,11 @@ class CollinsParser {
             // descendants before reading it, or the whole entry text becomes
             // the "pos" (rendered as one red span) and no senses are found.
             val gramText = hom.selectFirst(".gramGrp")?.clone()?.apply {
-                select("div").forEach { it.remove() }
+                // select() includes the context element itself, and jsoup
+                // refuses to remove a parentless root — skip it.
+                select("div").toList().forEach { child ->
+                    if (child !== this && child.parent() != null) child.remove()
+                }
             }?.text()
             val pos = gramText
                 ?.replace("Full verb table", "")?.replace(Regex("\\s+"), " ")?.trim() ?: ""
